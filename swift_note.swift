@@ -77,6 +77,7 @@
         使用成员的值时使用成员运算符 . 
         print("The status code is \(http200Status.statusCode)")     // 输出：The status code is 200
         print("The status message is \(http200Status.description)") // 输出：The status message is OK
+        用下划线代表一个元组成员取任意值
     4.5字面值
             整数字面值：
                 十进制数，无前缀
@@ -137,7 +138,12 @@
                 let catCharacters: [Character] = ["C","a","t","!"]  //定义了一个字符数组catCharacters
                 let catString = String(catCharacters)               //用catCharacters作String()的参数给字符串catString初始化
         4.8.3字符串和字符的合并操作
-            
+            用加号运算符+连接两个字符串，会生成一个新的合并后的字符串
+            用自加运算符+=操作一个字符串变量，会将右操作数合并到字符串变量
+            将一个字符加到字符串变量尾部，用方法：字符串名.append(字符变量/常量名)
+        4.8.4字符串内插
+            字符串内插用于将变量/常量的值代替字符串中的同名的变量/常量的名的字段，格式为：\(变量名) 
+
             
 
 
@@ -199,6 +205,61 @@
             注意逻辑且和逻辑非是短路运算符，意思是如果逻辑且的第一个表达式为假，则第二个表达式被短路，因为此时整个表达式必为假
                                         同理如果逻辑或的第一个表达式为真，则第二个表达式也被短路，因为此时整个表达式必为真
             组合逻辑在不加括号的前提下，从左到右顺序执行
+
+三、控制语句
+1.条件判断语句
+    1.1 if语句
+        if 表达式
+            {语句段}
+        ————————————————
+        if 表达式
+            {语句段1}
+        else
+            {语句段2}
+        ————————————————
+        if 表达式1
+            {语句段1}
+        else if 表达式2
+            {语句段2}
+        else
+            {语句段3}
+        *所有的语句段的大括号不能省略
+    1.2 switch语句
+        在Swift中，switch只执行与表达式匹配的值的第一个case后的语句段，无需像C一样要加break来避免执行了多余的case
+        每个case后的语句段不能省略不写
+        格式：
+            switch 表达式
+            {
+                case 值1:{语句段1}
+                case 值2,值3:{语句段2}  //若表达式的值=2或3，执行语句段2
+                default:{语句段3}       //可选，没有符合的值才执行
+            }
+        case后的值还可以是用范围运算符构成的值的区间，如：case 1..<5
+
+        用switch比较元组的值：
+            let somePoint = (1, 1)
+            switch somePoint 
+            {
+                case (0, 0):
+                    print("\(somePoint) is at the origin")
+                case (_, 0):
+                    print("\(somePoint) is on the x-axis")
+                case (0, _):
+                    print("\(somePoint) is on the y-axis")
+                case (-2...2, -2...2):
+                    print("\(somePoint) is inside the box")
+                default:
+                    print("\(somePoint) is outside of the box")
+            }
+        输出：// Prints "(1, 1) is inside the box"
+        若somePoint = (0,0)，则输出case (0,0)的语句段，因为尽管其匹配所有case，Swift只执行与表达式匹配的值的第一个case的语句段
+        
+
+
+
+
+
+        
 
 
 
