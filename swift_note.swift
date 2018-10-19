@@ -205,6 +205,15 @@
             注意逻辑且和逻辑非是短路运算符，意思是如果逻辑且的第一个表达式为假，则第二个表达式被短路，因为此时整个表达式必为假
                                         同理如果逻辑或的第一个表达式为真，则第二个表达式也被短路，因为此时整个表达式必为真
             组合逻辑在不加括号的前提下，从左到右顺序执行
+    11.位运算符
+        11.1按位取反 ~
+        11.2按位与 &
+        11.3按位或 |
+        11.4按位异或 ^
+        11.5左移操作符<<：格式： 操作数 << 左移的位数
+        11.6右移操作符>>：格式： 操作数 >> 右移的位数
+        
+
 
 三、控制语句
 1.条件判断语句
@@ -251,17 +260,48 @@
                 default:
                     print("\(somePoint) is outside of the box")
             }
-        输出：// Prints "(1, 1) is inside the box"
+        输出：(1, 1) is inside the box
         若somePoint = (0,0)，则输出case (0,0)的语句段，因为尽管其匹配所有case，Swift只执行与表达式匹配的值的第一个case的语句段
-        
 
+        switch用于局部变量的值绑定：
+            当switch的表达式是一个值，且case中包含相应的局部变量时，某个case的局部变量会与表达式中的值部分匹配，从而赋值给局部变量，并执行case后的语句段
+            let anotherPoint = (2, 0)
+            switch anotherPoint 
+            {
+                case (let x, 0):
+                    print("on the x-axis with an x value of \(x)")  //元组(2,0)与这个case部分匹配，从而x=2，并执行后面的print
+                case (0, let y):
+                    print("on the y-axis with a y value of \(y)")
+                case let (x, y):
+                    print("somewhere else at (\(x), \(y))")
+            }
+        输出：on the x-axis with an x value of 2
+2.循环语句
+    2.1 for-in循环
+        for-in循环语句用于在一个序列（如数组，区间和字符串）中重复执行，每次执行时，for后的局部变量被赋值为序列中的某个元素的值，然后执行语句段
+        格式1：for 局部变量名 in 序列 {语句段}  
+        格式2：for _ in 序列 {语句段}            //如果语句段中不需要用到局部变量，可以省略，用下划线_代替
+    2.2 while循环
+        格式：while 条件 {语句段}
+        while循环先判断条件是否为真，然后执行语句段，直到条件为假
+    2.3 repeat-while循环
+        格式：repeat {语句段} while 条件
+        先执行语句段，然后判断条件是否为真，再执行语句段直到条件为假
 
-
-
-
-        
-
-
+四、函数
+1.函数的定义
+    func 函数名(参数名: 类型, 参数名: 类型 ...) -> 返回类型
+    {函数体}
+    如：
+        func greet(person: String) -> String 
+        {
+            let greeting = "Hello, " + person + "!"
+            return greeting
+        }
+    不带参数的函数： func 函数名() -> 返回类型
+                    {函数体}
+    
+    
 
 
 
