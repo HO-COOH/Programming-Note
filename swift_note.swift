@@ -300,6 +300,73 @@
         }
     不带参数的函数： func 函数名() -> 返回类型
                     {函数体}
+	
+	多个返回值的函数：func 函数名(参数:类型...) -> (元组)
+					{函数体}
+	如：func minMax(array: [Int]) -> (min: Int, max: Int) 
+	{
+		var currentMin = array[0]
+		var currentMax = array[0]
+		for value in array[1..<array.count] {
+			if value < currentMin {
+				currentMin = value
+			} else if value > currentMax {
+				currentMax = value
+			}
+		}
+		return (currentMin, currentMax)		//返回一个元组，元组包含两个整形成员，名叫min,max
+	}
+
+	返回可空类型的函数：func 函数名(参数:类型...) -> 返回类型?
+						{函数体}
+	如上例中的minMax函数，若参数的数组是空数组，那么返回的元组就是空值，故上例改写为：
+		func minMax(array: [Int]) -> (min: Int, max: Int)?		//返回一个可空类型的元组(min: Int, max: Int)?
+		{
+			if array.isEmpty { return nil }
+			var currentMin = array[0]
+			var currentMax = array[0]
+			for value in array[1..<array.count] {
+				if value < currentMin {
+					currentMin = value
+				} else if value > currentMax {
+					currentMax = value
+				}
+			}
+			return (currentMin, currentMax)
+		}
+2.函数的调用
+	Swift中的函数调用，必须在实参前加定义函数时的形参名
+	如：func someFunction(firstParameterName: Int, secondParameterName: Int)		//定义了一个函数，函数的第一个形参名firstParameterName，第二个形参名secondParameterName
+		{函数体}
+		someFunction(firstParameterName: 1, secondParameterName: 2)				//调用someFunction，并将1赋值给第一个形参，2赋值给第二个形参
+
+	函数定义时可以给形参一个别名，调用时用这个形参的别名，格式：func 函数名(形参别名 形参: 类型)
+	如：func greet(person: String, from hometown: String) -> String			//第二个形参hometown的别名是from
+	{
+		return "Hello \(person)!  Glad you could visit from \(hometown)."
+	}
+	print(greet(person: "Bill", from: "Cupertino"))							//调用greet，"Bill"赋值给第一个形参person,"Cupertino"赋值给第二个形参hometown
+
+	函数定义时可以给形参一个空的别名，调用时不写任何形参名，直接按顺序给形参传递值
+	如：func someFunction(_ firstParameterName: Int, secondParameterName: Int)		
+		{函数体}
+		someFunction(1, secondParameterName: 2)									//函数的第一个形参有空的别名，所以调用时第一个值传递给第一个形参
+3.
+
+
+	
+
+五、闭包
+1.闭包的类型
+	闭包有以下三种形式：
+		（1）全局函数是一种闭包，有名字，不捕获任何值
+		（2）局部函数是一种闭包，有名字，能捕获定义他的外部函数的值
+		（3）闭包表达式是一种轻量化的闭包，没有名字，能捕获包围他的上下文中的值
+2.闭包表达式
+	2.1形式：
+		{(参数) -> 返回值类型 in {语句段}
+		}
+
     
     
 
