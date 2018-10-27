@@ -352,7 +352,20 @@
 	如：func someFunction(_ firstParameterName: Int, secondParameterName: Int)		
 		{函数体}
 		someFunction(1, secondParameterName: 2)									//函数的第一个形参有空的别名，所以调用时第一个值传递给第一个形参
-3.
+3.形参的初始值
+	可以在函数的定义时给形参赋初始值，这样调用函数时如果没有实参给形参传递值，就使用定义函数中的形参的初始值
+	格式：func 函数名(参数: 类型 = 初始值)
+			{函数体}
+	如：func someFunction(parameterWithoutDefault: Int, parameterWithDefault: Int = 12)	//第二个参数的初始值为12
+			{}
+		someFunction(parameterWithoutDefault: 3, parameterWithDefault: 6)				//调用值完整，所以将6覆盖掉第二个参数的初始值
+		someFunction(parameterWithoutDefault: 4)										//调用时缺少第二个参数的值，所以使用其默认值12
+4.可变参数
+	可以在定义函数时定义可变的形参列表，这样使得调用函数时，形参接收实参的值，形成一个数组，一个函数最多只能有一个可变参数
+	格式：func 函数名(_ 参数名: 类型...) -> 返回值类型	//在参数名的类型后紧跟3个点，表示这个参数是可变参数，在函数体内充当数组
+			{函数体}									//下划线_表示调用函数时不写参数名
+
+
 
 
 	
