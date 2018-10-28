@@ -438,9 +438,10 @@
     //?
 
 六、枚举
-枚举类型是一种将一组有关联的值合并到一起的类型
+枚举类型是一种将一组有关联的值合并到一起的类型，并根据情况，取且只能取有限个成员的值
 1.枚举类型的定义
     在枚举类型名称前加关键字enum，枚举类型的内容用一对大括号括起来，里面的各个成员值前用关键字case和一个空格分隔
+    枚举类型名的首字母最好大写，名字最好用单数而不是复数
     Swift中的枚举类型在定义时不初始化
     enum CompassPoint {     //定义了一个枚举类型叫CompassPoint，包含四个成员
     case north
@@ -449,8 +450,58 @@
     case west
     }
 
-    多个成员
+    多个成员可以写在一行，用逗号和空格分隔
+    enum CompassPoint {case north, south, east, west}
 
+    定义一个枚举类型的变量并初始化时，Swift将自动推断这个变量的类型是枚举类型
+    将一个枚举类型赋值给一个变量后，下次改变这个变量的值为枚举类型的其他值，不需要再写出枚举类型名，用一个点.代替其类型名，如：
+    var direction = CompassPoint.west   //定义了一个CompassPoint类型的枚举变量，并初始化赋值为west
+    direction = .east                   //改变这个枚举变量的值为CompassPoint类型的east
+2.枚举类型与switch语句
+    switch 枚举类型变量
+    {
+        case .值1: {语句段1}
+        case .值2: {语句段2}
+        ...
+    }
+    由于switch语句需要列出所有情况，所以如果枚举类型的所有取值没有在switch case语句中全部列出，会使得编译错误
+    可以在switch语句里加入default分支（与switch语句的其他用法相同）
+3.枚举类型的遍历
+    如果要使枚举类型取遍所有值，要在定义枚举类型时在枚举类型名后加关键字: CaseIterable，在使用这个枚举类型时加.allCases属性就会返回其所有值形成的数组，如
+    enum Beverage: CaseIterable
+    {case coffee, tea, juice}                       //定义了一个叫Beverage的枚举类型，可以取遍其所有值
+    let numberOfChoices = Beverage.allCases.count   //Beverage.allCases返回一个数组，包含了Beverage的所有可能值，再加.count，返回这个数组的元素个数，所以这里numberOfChoices=3
+    for beverage in Beverage.allCases
+    {
+        print(beverage)                             //遍历Beverage中的所有取值，并打印输出
+    }
+4.取不同类型作为取值的枚举类型
+    可以将不同的类型作为一个枚举类型的取值
+    enum Barcode                        //定义了一个Barcode枚举类型，包含两种取值，一种取值是元组(Int, Int, Int, Int)类型，一种取值是元组(String)类型
+    {
+        case upc(Int, Int, Int, Int)    
+        case qrCode(String)
+    }
+    var productBarcode = Barcode.upc(8, 85909, 51226, 3)    //定义了一个productBarcode类型的枚举变量，其值是upc
+
+    可以在switch语句中的case分支提取一个将不同类型作为取值的枚举类型的变量的值
+    switch productBarcode 
+    {
+        case .upc(let numberSystem, let manufacturer, let product, let check):
+            print("UPC: \(numberSystem), \(manufacturer), \(product), \(check).")
+        case .qrCode(let productCode):
+            print("QR code: \(productCode).")
+    }
+    如果在一个case分支里提取的枚举类型的变量的值全部作为常量或变量，可以将let或var关键字写在case关键字之后，枚举类型的取值之前
+    如上例可以写成：
+        switch productBarcode 
+        {
+            case let .upc(numberSystem, manufacturer, product, check):
+                print("UPC : \(numberSystem), \(manufacturer), \(product), \(check).")
+            case let .qrCode(productCode):
+                print("QR code: \(productCode).")
+        }
+    
 
 
 
