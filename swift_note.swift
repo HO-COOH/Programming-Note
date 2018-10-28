@@ -378,12 +378,78 @@
 		（3）闭包表达式是一种轻量化的闭包，没有名字，能捕获包围他的上下文中的值
 2.闭包表达式
 	2.1形式：
-		{(参数) -> 返回值类型 in {语句段}
+		{(参数: 类型) -> 返回值类型 in {语句段}
 		}
-        
+        Swift标准库中提供一种方法sorted(by:)，by:后需要调用一种闭包(类型, 类型) -> Bool 来处理排序，如要处理多个字符串的排序，按字符串相反于字母表顺序排序，可以使用这个方法：
+            第一种闭包写法：
+                let names = ["Chris", "Alex", "Ewa", "Barry", "Daniella"]   //定义了一个字符串数组names
+                func backward(_ s1: String, _ s2: String) -> Bool           //定义了一个函数backward，它属于第一种闭包
+                {
+                    return s1 > s2                                          //若s1>s2，即s1字符串（第一个字母相同则比较第二个，直至不同）的字母比s2大，这个函数返回true，所以整个字符串从大到小排序
+                }
+                var reversedNames = names.sorted(by: backward)              //调用sorted(by:)方法，并将结果存于reversedNames中
 
-    
-    
+            闭包表达式写法：
+                let names = ["Chris", "Alex", "Ewa", "Barry", "Daniella"]
+                var reversedNames = names.sorted(by:{(s1: String, s2: String) -> Bool in {return s1 > s2}}) //闭包表达式为：{(s1: String, s2: String) -> Bool in {return s1 > s2}}，其类型为(String, String) -> Bool
+    2.2闭包表达式的类型推断
+        当闭包表达式作为函数或方法的参数时，Swift会自动推断出闭包的参数类型和返回值类型，所以闭包表达式中的参数的类型和返回值的类型可以省略不写
+        如上例闭包表达式可以进一步简写为：
+            var reversedNames = names.sorted(by: { s1, s2 in {return s1 > s2} })    //省略了s1，s2的类型String，和返回值类型Bool
+        又由于这里闭包表达式的语句段部分只有一行，所以语句段的一对花括号可以省略，简写为：
+            var reversedNames = names.sorted(by: { s1, s2 in return s1 > s2 })
+    2.3闭包表达式的隐式返回
+        当闭包表达式的语句段部分只有一行时，return关键词可以省略
+        如上例中的闭包表达式，Swift会推断出要返回一个布尔类型值，而且语句段部分只有一行，所以return的内容很明确，可省略return关键字，简写为：
+            var reversedNames = names.sorted(by: { s1, s2 in s1 > s2 } )
+    2.4闭包表达式的参数缩写
+        可以用$0,$1...代替传递给闭包表达式的第1,2...个参数，并省略闭包表达式的参数列表
+        如上例可以进一步简写为：
+            var reversedNames = names.sorted(by: { $0 > $1 } )  //传递给闭包表达式的两个分别赋值给$0，$1，并返回($0 > $1)的布尔值
+    2.5操作符写法
+        Swift的>运算符对字符串提供了一种特殊方法，这个方法接收两个字符串，然后返回布尔值，这正是sorted(by:)需要的方法，所以可以把一个大于号“>”作为闭包表达式
+        如上例可以进步一简写为：
+            var reversedNames = names.sorted(by: >)
+    2.6尾随闭包
+        在需要在调用函数时用闭包作为函数参数之一，而闭包又太长，可以用尾随闭包的形式调用函数，尾随闭包写在调用函数的括号之后，并且不用给尾随闭包写出参数名和参数别名，格式
+            func someFuncThatTakesAClosure(closure: () -> Void)             //定义了一个闭包作为参数之一的函数
+            {}
+
+            someFuncThatTakesAClosure(closure: {() -> Void in {语句段}})    //用正常调用函数的形式将闭包传递给函数的闭包参数
+            someFuncThatTakesAClosure()                                     //用尾随闭包的形式调用函数，闭包写在调用函数的括号之后
+            {
+                () -> Void in {语句段} //这是闭包
+            }
+        所以上例在调用sorted(by:)传递给他的闭包可以写成尾随闭包的形式：
+        var reversedNames = names.sorted() {$0 > $1}
+        
+        如果一个尾随闭包是调用函数时的唯一参数，可以省略调用函数的括号，直接在函数名后加尾随闭包
+        上例可以进一步简写为：
+        var reversedNames = names.sorted {$0 > $1}
+3.闭包捕获值
+    闭包能捕获值的意思就是在闭包内，能直接引用包含了闭包的外围函数内的某些变量
+4.闭包是一种引用类型
+    意思是你可以把一个闭包同时赋值给两个变量或常量，那么这两个变量或常量就是同一个闭包的引用，他们的值是相等的，都等于同一个闭包，所以他们的值（就是同一个闭包）的内容（闭包的内容）也是相等的
+5.逃逸闭包
+    如果一个闭包作为参数传递给函数，但是在函数返回之后才被调用，那么这个闭包称为逃逸闭包
+
+    //?
+6.自动闭包
+    //?
+
+六、枚举
+枚举类型是一种将一组有关联的值合并到一起的类型
+1.枚举类型的定义
+    在枚举类型名称前加关键字enum，枚举类型的内容用一对大括号括起来，里面的各个成员值前用关键字case和一个空格分隔
+    Swift中的枚举类型在定义时不初始化
+    enum CompassPoint {     //定义了一个枚举类型叫CompassPoint，包含四个成员
+    case north
+    case south
+    case east
+    case west
+    }
+
+    多个成员
 
 
 
