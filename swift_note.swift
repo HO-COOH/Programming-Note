@@ -438,12 +438,12 @@
     //?
 
 六、枚举
-枚举类型是一种将一组有关联的值合并到一起的类型，并根据情况，取且只能取有限个成员的值
+枚举类型是一种将一组有关联的值合并到一起的类型，并根据情况，取且只能取有限个值
 1.枚举类型的定义
-    在枚举类型名称前加关键字enum，枚举类型的内容用一对大括号括起来，里面的各个成员值前用关键字case和一个空格分隔
+    在枚举类型名称前加关键字enum，枚举类型的内容用一对大括号括起来，里面的各个取值前用关键字case和一个空格分隔
     枚举类型名的首字母最好大写，名字最好用单数而不是复数
     Swift中的枚举类型在定义时不初始化
-    enum CompassPoint {     //定义了一个枚举类型叫CompassPoint，包含四个成员
+    enum CompassPoint {     //定义了一个枚举类型叫CompassPoint，包含四个取值
     case north
     case south
     case east
@@ -501,8 +501,34 @@
             case let .qrCode(productCode):
                 print("QR code: \(productCode).")
         }
-    
-
+5.预定义值
+    5.1显示预定义值
+        枚举类型可以预定义默认值，如
+        enum ASCIIControlCharacter: Character   //定义了一个取值都是字符型的枚举类型，并预定义了取值的取值
+        {
+            case tab = "\t"                     //当ASCIIControlCharacter = .tab时，他的值是"\t"
+            case lineFeed = "\n"
+            case carriageReturn = "\r"
+        }
+    5.2隐式预定义值
+        当枚举类型在定义时Swift会自动给各个成员赋值
+        当枚举类型的成员都是Int型时，Swift自动给各个成员赋值0,1,2,3...。如果预定义了第一个成员的值，Swift自动给下面的各个成员按顺序赋+1后的值，如
+            enum Planet: Int 
+            {
+                case mercury = 1, venus, earth, mars, jupiter, saturn, uranus, neptune  //venus=2,earth=3...以此类推
+            }
+        
+        当枚举类型的成员都是String型时，Swift自动给各个成员赋值其名字的字符串字面值，如：
+        enum CompassPoint: String 
+        {
+            case north, south, east, west   //north = "north",south = "south"...以此类推
+        }
+    5.3访问枚举变量成员的预定义值
+        用枚举变量成员的.rawValue属性访问，如：
+            let sunsetDirection = CompassPoint.west.rawValue    //sunsetDirection = "west"
+6.递归枚举
+    在一个枚举类型里包含了其他枚举类型的成员值，称为递归枚举
+    在定义递归枚举时，需要在其枚举类型的成员值的case关键字前加indirect关键字
 
 
 */
