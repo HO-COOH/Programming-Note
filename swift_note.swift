@@ -550,6 +550,7 @@
         class SomeClass {}
 3.实体的定义
     定义结构体和类的实体与定义变量或常量的方式相同，用赋值语句，在结构体名和类名后加一对圆括号
+    注意类和结构体的实体名与类和结构体本身的名字不能相同
         var someInstance = SomeStructure()
 4.访问属性
     用点.操作符来访问一个实体的属性，点.操作符的后面是属性名
@@ -561,7 +562,6 @@
 6.结构体和枚举类型是值的类型
     值的类型是当他们对变量或常量赋值或者作为参数进行函数调用时，实体的值会被复制，从而形成了两个单独的实体
     目前为止，所有的基本类型：整形、浮点型、布尔型、字符串型、数组型、字典都是值型
-
 7.类是引用类型
     7.1引用类型的特性
         引用类型是当他们对一个变量或常量赋值，或是作为参数传递给一个函数时，实际上是形成了一个新引用
@@ -570,12 +570,143 @@
     7.2判断引用是否是对同一个实体的引用
         用三等号===操作符，判断两个引用是否是对同一个类的实体的引用；用!==操作符判断是否不是对同一个实体的引用
         这两个操作符的结果都是布尔值
-        
 
+八、属性
+1.存储属性
+    1.1存储属性的定义
+        最简单的存储属性是在类或结构体里内，用var或let关键字定义的变量或常量
+    1.2常量实体的存储属性
+        如果将一个结构体的实体用let关键字赋值给一个常量，那么他的任何存储属性都不能被修改，如：
+            struct FixedLengthRange{                                            //定义了一个结构体FixedLengthRange，包含两个Int类型的存储属性
+                var firstValue: Int
+                let length: Int
+            }   
+            let rangeOfFourItems = FixedLengthRande(firstValue: 0, length: 4)   //定义了一个常量实体rangeOfFourItems，并对其中的存储属性的值进行初始化
+            rangeOfFourItems.firstValue = 6 //编译时报错，不可以改变常量实体的存储属性的值
+        对于类，即使将类的一个实体赋值给一个常量，也可以改变其中的存储属性的值，因为类是引用类型
+    1.3延迟存储属性
+        延迟存储属性是定义其一个实体时不对其值进行初始化，直到使用时才赋值的属性，也就是说一个延迟存储属性不使用他，他不存在
+        在定义前加lazy关键字定义一个延迟存储属性，如：
+            class DataImporter {
+                var filename = "data.txt"
+                ...                         //定义了一个DataImporter类，其他函数省略
+            }
 
-
-
-
+            class DataManager {
+                lazy var importer = DataImporter()  //定义了一个DataImporter类的实体为延迟存储属性，
+                var data = [String]()
+                ...                                 //DataManager类的其他函数省略
+            }
+            let manager = DataManager()             //定义了一个DataManager类的实体
+            manager.data.append("Some data")        //写入一些数据
+            manager.data.append("Some more data")   //写入更多数据
+            //到此为止，manager中的importer属性并没有产生，因为其被定义为延迟存储属性，而且未被使用
+            print(manager.importer.filename)        //到此，manager中的importer属性才产生了，输出：data.txt
+ 2.计算属性
+    2.1计算属性的定义
+        类、结构体、枚举类型可以定义计算属性，计算属性不存储值，而是提供了get和set方法来取出或更改其他存储属性的值
+        所有的计算属性都必须用var关键字定义，因为他们的值不确定
+            struct Point {
+                var x = 0.0, y = 0.0
+            }
+            struct Size {
+                var width = 0.0, height = 0.0
+            }
+            struct Rect {
+                var origin = Point()
+                var size = Size()
+                var center: Point 
+                {                                                   //center是一个计算属性，返回类型是Point类型
+                    get {                                           //center这个计算属性的get方法
+                        let centerX = origin.x + (size.width / 2)
+                        let centerY = origin.y + (size.height / 2)
+                        return Point(x: centerX, y: centerY)
+                        }
+                    set(newCenter) {                                //center这个计算属性的set方法，使用时接受一个Point类型的值
+                        origin.x = newCenter.x - (size.width / 2)
+                        origin.y = newCenter.y - (size.height / 2)
+                    }
+                }
+            }
+            var square = Rect(origin: Point(x: 0.0, y: 0.0),
+                            size: Size(width: 10.0, height: 10.0))  //定义了一个Rect的实体square，并对一些存储属性初始化
+            let initialSquareCenter = square.center                 //调用了square的计算属性center的get方法，get方法计算并返回一个Point类型值，所以initialSquareCenter = (x: 5, y: 5)
+            square.center = Point(x: 15.0, y: 15.0)                 //调用了square的计算属性center的set方法，set方法计算并对square内的其他存储属性赋值
+            print("square.origin is now at (\(square.origin.x), \(square.origin.y))")
+            // 输出：square.origin is now at (10.0, 10.0)
+    2.2简写计算属性的set方法
+        如果计算属性的set方法没有定义一个接受新值的变量，则会隐式使用一个名字叫newValue的名字
+        如上例的center计算属性的set(newCenter)，如果没有定义newCenter来接受新值，会隐式使用newValue，即上例的Rect可以改写为：
+            struct AlternativeRect {
+            var origin = Point()
+            var size = Size()
+            var center: Point {
+                get {
+                    let centerX = origin.x + (size.width / 2)
+                    let centerY = origin.y + (size.height / 2)
+                    return Point(x: centerX, y: centerY)
+                }
+                set {                                       
+                    origin.x = newValue.x - (size.width / 2)
+                    origin.y = newValue.y - (size.height / 2)
+                }
+            }
+        }
+    2.3只读计算属性
+        一个只有get没有set的计算属性是只读计算属性，只读计算属性总是只返回一个计算结果
+        只读计算属性的定义由于只有get，所以可以省略get关键字和他的一对花括号，如：
+            struct Cuboid {
+            var width = 0.0, height = 0.0, depth = 0.0
+            var volume: Double {                        //定义了一个只读计算属性volume
+                return width * height * depth           
+            }
+        }
+        let fourByFiveByTwo = Cuboid(width: 4.0, height: 5.0, depth: 2.0)   //初始化一个Cuboid的实体fourByFiveByTwo，并对一些存储属性赋值
+        print("the volume of fourByFiveByTwo is \(fourByFiveByTwo.volume)") //调用这个实体的volume只读计算属性
+        // 输出：the volume of fourByFiveByTwo is 40.0
+3.属性观察器
+    属性观察器会观察属性的值，并在属性的值改变时（即使是重新赋一个跟原来相同的值）做出反应
+    有两种属性观察器：willSet，在赋值前被调用
+                    didSet，在赋值后被调用
+    在一个所要观察的存储属性的定义后跟一对花括号，写willSet和didSet函数
+    3.1willSet的使用
+        在定义一个willSet观察器时，给属性赋新值时，新值会作为一个常量参数传递给观察器
+        如果没有显式写出willSet观察器的参数名和一对圆括号，那么会自动默认使用名为newValue的常量参数
+    3.2didSet的使用
+        在定义一个didSet观察器时，给属性赋新值时，这个属性的原值会作为一个常量参数传递给观察器
+        如果没有显式写出didSet观察器的参数名和一对圆括号，那么会自动默认使用名为oldValue的常量参数
+        如果在didSet函数中对属性有赋值操作，那么对属性赋新值时，didSet中的赋值会覆盖掉所赋的新值
+            class StepCounter 
+            {
+                var totalSteps: Int = 0 
+                {
+                    willSet(newTotalSteps) 
+                    {
+                        print("About to set totalSteps to \(newTotalSteps)")
+                    }
+                    didSet                                                      //没有显式写出didSet的参数名，所以默认使用oldValue作为参数名
+                    {
+                        if totalSteps > oldValue  
+                        {
+                            print("Added \(totalSteps - oldValue) steps")
+                        }
+                    }
+                }
+            }
+            let stepCounter = StepCounter()
+            stepCounter.totalSteps = 200
+            //输出：About to set totalSteps to 200
+                    Added 200 steps
+    3.3属性作为函数参数
+        属性作为函数输入输出参数时，willSet和didSet总是会被调用，因为作为函数的输入输出参数时，属性会被拷贝进内存，函数执行完毕后再覆盖掉属性原来的值
+4.全局与局部属性
+    所有上述的属性的特性都适用于全局属性和局部属性
+    全局属性是定义在函数、方法、闭包外的属性，包括前面涉及的各种全局变量
+    全局变量和常量作为全局属性，他们总是作为延迟存储属性使用的，但是不需要加lazy关键字
+    局部属性，除非定义为延迟存储属性，否则总是在定义时就产生（即分配内存）
+5.类型属性
+    可以定义一种属性，这种属性独立于任何实体，称为类型属性
+    存储类型属性可以是变量或常量，计算类型属性必须是变量，就像定义在类或结构体实体中的计算属性那样        
 */
 
 //T9 Button clicking example
