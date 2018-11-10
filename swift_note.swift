@@ -706,7 +706,174 @@
     局部属性，除非定义为延迟存储属性，否则总是在定义时就产生（即分配内存）
 5.类型属性
     可以定义一种属性，这种属性独立于任何实体，称为类型属性
-    存储类型属性可以是变量或常量，计算类型属性必须是变量，就像定义在类或结构体实体中的计算属性那样        
+    存储类型属性可以是变量或常量，计算类型属性必须是变量，就像定义在类或结构体实体中的计算属性那样，如：
+        struct SomeStructure 
+        {
+            static var storedTypeProperty = "Some value."
+            static var computedTypeProperty: Int 
+            {
+                return 1
+            }
+        }
+        enum SomeEnumeration 
+        {
+            static var storedTypeProperty = "Some value."
+            static var computedTypeProperty: Int 
+            {
+                return 6
+            }
+        }
+        class SomeClass 
+        {
+            static var storedTypeProperty = "Some value."
+            static var computedTypeProperty: Int 
+            {
+                return 27
+            }
+            class var overrideableComputedTypeProperty: Int 
+            {
+            return 107
+            }
+        }
+
+九、方法
+        方法是与一种特定类型相关联的函数，类、结构体、枚举类型都可以定义方法
+        方法将一种类型需要执行的任务和实现的功能包裹起来
+    1.实体的方法
+        定义实体的方法与函数相同，把方法写在一个类、结构体、枚举类型的定义中，如：
+            class Counter                           //定义了一个Counter类，包含一个变量count，和三个方法
+            {
+                var count = 0
+                func increment() 
+                {
+                    count += 1
+                }
+                func increment(by amount: Int) 
+                {
+                    count += amount
+                }
+                func reset() 
+                {
+                    count = 0
+                }
+            }
+        let counter = Counter() //定义了Counter类的一个实体counter
+        1.1 self属性
+            每一种类型的实体都存在一个隐式的属性叫self，self属性是在实体本身的方法中对自身的引用
+            所以上例中Counter类的方法func increment()可以改写为：
+                func increment()
+                {
+                    self.count +=1
+                }
+            当在一个实体中使用一个已知的方法名时，Swift总是推断你使用的是当前这个实体的方法，所以不需要显式写self
+
+            一个例外的情况是一个方法的形参名跟实体内的某个变量名相同时，由于形参名在调用函数发生数据拷贝时优先级更高，所以需要显式写出self表示形参接受的是实体内那个与形参重名的属性名，如：
+                struct Point 
+                {
+                    var x = 0.0, y = 0.0
+                    func isToTheRightOf(x: Double) -> Bool 
+                    {
+                        return self.x > x               //返回一个布尔值，当这个实体内的x比形参大时，返回值为真
+                    }
+                }
+                let somePoint = Point(x: 4.0, y: 5.0)   //定义了一个Point类的实体somePoint，初始化x=4，y=5
+                if somePoint.isToTheRightOf(x: 1.0)     //调用somePoint实体的isToTheRightOf方法，并赋值给形参x=1.0
+                {   
+                    print("This point is to the right of the line where x == 1.0")  //由于self.x比形参的x大，所以输出这一行字符串
+                }
+                // 输出：This point is to the right of the line where x == 1.0
+        1.2在实体的方法中更改值类型
+            结构体和枚举类型是值类型，默认情况下，一个值类型的方法不能修改实体中定义的变量的值
+            可以在方法前加mutating关键字，使得一个值类型的实体的方法可以改变这个实体内的变量的值，如：
+                struct Point 
+                {
+                    var x = 0.0, y = 0.0
+                    mutating func moveBy(x deltaX: Double, y deltaY: Double)    //mutating关键字使得结构体或枚举类型里的方法可以改变结构体或枚举类型内的变量 
+                    {
+                        x += deltaX                                             //Point内的成员x=x+deltaX
+                        y += deltaY
+                    }
+                }
+                var somePoint = Point(x: 1.0, y: 1.0)       //定义了一个Point类型的实体somePoint，初始化x=1.0，y=1.0
+                somePoint.moveBy(x: 2.0, y: 3.0)            //调用somePoint的方法，给形参deltaX赋值2.0，deltaY赋值3.0
+                print("The point is now at (\(somePoint.x), \(somePoint.y))")
+                // 输出：The point is now at (3.0, 4.0)
+            同样的，可以在mutating方法中使用self关键字来表示是对实体内成员变量的引用
+            不可以对一个常量实体使用mutating来改变这个实体内的成员变量，如上例将somePoint用let关键字定义，调用moveBy方法会编译报错
+    2.类型的方法
+        实体的方法是在定义实体之后才能调用的方法，类型的方法是对一个类型的所有实体都适用的方法
+        在方法之前用static关键字来表明这是一个类型的方法
+        对于类，可以使用class关键字使得子类可以覆盖在父类中定义的方法
+        调用类型的方法同样使用点.操作符，然而操作符的左操作数不是一个实体，而是一个类型名，格式： 类型名.类型的方法名
+        在类型的方法中，同样有隐式的self关键字来表示对这个类的成员变量的引用，如：
+            struct LevelTracker 
+            {
+                static var highestUnlockedLevel = 1     //定义了一个static的变量highestUnlockedLevel，表示这个变量的值在所有LevelTracker的实体中都相同
+                var currentLevel = 1
+
+                static func unlock(_ level: Int) 
+                {
+                    if level > highestUnlockedLevel { highestUnlockedLevel = level }
+                }
+
+                static func isUnlocked(_ level: Int) -> Bool 
+                {
+                    return level <= highestUnlockedLevel
+                }
+
+                @discardableResult
+                mutating func advance(to level: Int) -> Bool 
+                {
+                    if LevelTracker.isUnlocked(level) 
+                    {
+                        currentLevel = level
+                        return true
+                    } 
+                    else 
+                    {
+                        return false
+                    }
+                }
+            }
+            class Player 
+            {
+                var tracker = LevelTracker()        //Player类中包含一个LevelTracker的实体tracker
+                let playerName: String
+                func complete(level: Int) 
+                {
+                    LevelTracker.unlock(level + 1)
+                    tracker.advance(to: level + 1)
+                }
+                init(name: String) 
+                {
+                    playerName = name
+                }
+            }
+            var player = Player(name: "Argyrios")   //定义了一个Player的实体player，并通过init构造函数给其中的playerName成员赋值为Argyrios
+            player.complete(level: 1)               //调用这个player实体的complete方法
+            print("highest unlocked level is now \(LevelTracker.highestUnlockedLevel)")
+            // 输出：highest unlocked level is now 2
+            player = Player(name: "Beto")           //调用init构造函数给其中的playerName成员赋值为Beto
+            if player.tracker.advance(to: 6)        //调用这个player实体的tracker实体中的advance方法
+            {
+                print("player is now on level 6")   //由于advance方法检查形参level是否unlocked，这里形参level=6，没有unlocked，所以返回假
+            } 
+            else 
+            {
+                print("level 6 has not yet been unlocked")
+            }
+            //输出：level 6 has not yet been unlocked
+
+十、下标
+    下标是访问一个集合、列表或序列中元素的快捷方式，可以用索引号来访问他们，而无需分别定义方法
+    可以在类、结构体、枚举类型中定义下标
+    可以对一种类型定义多个下标，也可以对多种不同的索引号使用重载方法，来对不同类型的索引号使用不同下标
+    1.下标的语法
+
+            
+
+@discardableResult->?
+
 */
 
 //T9 Button clicking example
