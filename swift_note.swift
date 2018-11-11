@@ -637,21 +637,22 @@
     2.2简写计算属性的set方法
         如果计算属性的set方法没有定义一个接受新值的变量，则会隐式使用一个名字叫newValue的名字
         如上例的center计算属性的set(newCenter)，如果没有定义newCenter来接受新值，会隐式使用newValue，即上例的Rect可以改写为：
-            struct AlternativeRect {
-            var origin = Point()
-            var size = Size()
-            var center: Point {
-                get {
-                    let centerX = origin.x + (size.width / 2)
-                    let centerY = origin.y + (size.height / 2)
-                    return Point(x: centerX, y: centerY)
-                }
-                set {                                       
-                    origin.x = newValue.x - (size.width / 2)
-                    origin.y = newValue.y - (size.height / 2)
+            struct AlternativeRect 
+            {
+                var origin = Point()
+                var size = Size()
+                var center: Point {
+                    get {
+                        let centerX = origin.x + (size.width / 2)
+                        let centerY = origin.y + (size.height / 2)
+                        return Point(x: centerX, y: centerY)
+                    }
+                    set {                                       
+                        origin.x = newValue.x - (size.width / 2)
+                        origin.y = newValue.y - (size.height / 2)
+                    }
                 }
             }
-        }
     2.3只读计算属性
         一个只有get没有set的计算属性是只读计算属性，只读计算属性总是只返回一个计算结果
         只读计算属性的定义由于只有get，所以可以省略get关键字和他的一对花括号，如：
@@ -866,9 +867,78 @@
 
 十、下标
     下标是访问一个集合、列表或序列中元素的快捷方式，可以用索引号来访问他们，而无需分别定义方法
+    索引号用一对方括号括起来
     可以在类、结构体、枚举类型中定义下标
     可以对一种类型定义多个下标，也可以对多种不同的索引号使用重载方法，来对不同类型的索引号使用不同下标
     1.下标的语法
+        用subscript关键字定义下标，用一对圆括号把形参括起来，set方法的newValue的类型与subscript的返回值类型必须相同
+        subscript也有get和set(newValue)方法
+            subscript(index: Int) -> Int    //这个下标返回一个整形值，所以get方法要返回一个整形值，set方法要接受一个整形值
+            {
+                get {
+                    // return an appropriate subscript value here
+                }
+                set(newValue) {
+                    // perform a suitable setting action here
+                }
+            }
+        与计算属性类似，set的参数名可以省略不写，Swift会自动使用隐式的newValue作为set的参数
+        只读的下标只有get方法，没有set方法，所以get关键字也可以省略不写，如：
+            subscript(index: Int) -> Int    //这个下标返回一个整形值，所以get方法返回一个整形值
+            {
+                // return an appropriate subscript value here
+            }
+        例：
+        struct TimesTable 
+        {
+            let multiplier: Int
+            subscript(index: Int) -> Int 
+            {
+                return multiplier * index
+            }
+        }
+        let threeTimesTable = TimesTable(multiplier: 3)
+        print("six times three is \(threeTimesTable[6])")   //使用下标访问threeTimesTable，调用其中的subscript方法
+        //输出： six times three is 18  
+    2.下标的使用
+        下标主要用于作为访问一个集合、列表、序列中元素的捷径
+        例如Swift中的字典Dictionary类型提供了一种下标方法访问字典中的元素或者对他们赋值，可以通过与字典的索引相同的类型的值来访问一个元素，然后用对这个元素赋与元素相同类型的值
+            var numberOfLegs = ["spider": 8, "ant": 6, "cat": 4]    //定义了一个numberOfLegs的字典，索引值是一个字符串，元素的值是一个整形数，所以这个字典的类型是[String: Int]
+            numberOfLegs["bird"] = 2                                //给这个字典添加了一个项目 "bird": 2
+            numberOfLegs["spider"]=nil                              //通过给一个元素赋值nil来删除这个元素，此时这个字典有3个元素
+            print("numbers in this dictionary: \(numberOfLegs.count)")
+            //输出：numbers in this dictionary: 3
+    3.下标的重载
+        一个类或结构体可以定义多个下标，根据实际的参数类型来调用不同的下标，称为下标重载
+        下例是一个包含多参数下标的结构体Matrix 
+        struct Matrix 
+        {
+            let rows: Int, columns: Int
+            var grid: [Double]
+            init(rows: Int, columns: Int)       //结构体Matrix的构造函数，接受一个(Int, Int)类型作为参数
+            {
+                self.rows = rows                //注意由于init构造函数的形参参数名与结构体内的成员变量重名，所以要显式写出self
+                self.columns = columns
+                grid = Array(repeating: 0.0, count: rows * columns) //Array中的元素全部初始化为0.0，这个一位数组长度为rows*columns
+            }
+            func indexIsValid(row: Int, column: Int) -> Bool 
+            {
+                return row >= 0 && row < rows && column >= 0 && column < columns
+            }
+            subscript(row: Int, column: Int) -> Double                                  //这个下标接受类型为[Int, Int]的参数，返回一个双精度浮点型
+            {
+                get {
+                    assert(indexIsValid(row: row, column: column), "Index out of range")    //assert方法接受一个函数作为参数，来检查下标所接受的参数是否超出范围
+                    return grid[(row * columns) + column]
+                }
+                set {
+                    assert(indexIsValid(row: row, column: column), "Index out of range")
+                    grid[(row * columns) + column] = newValue
+                }
+            }
+        }
+        var matrix = Matrix(rows: 2, columns: 2)    //定义了一个Matrix的实体matrix，并调用构造函数
+        matrix[0, 1] = 1.5                          //访问并修改matrix中的元素
 
             
 
