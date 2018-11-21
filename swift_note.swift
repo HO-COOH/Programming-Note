@@ -910,7 +910,7 @@
             //输出：numbers in this dictionary: 3
     3.下标的重载
         一个类或结构体可以定义多个下标，根据实际的参数类型来调用不同的下标，称为下标重载
-        下例是一个包含多参数下标的结构体Matrix 
+        下例是一个包含多参数下标的结构体Matrix：
         struct Matrix 
         {
             let rows: Int, columns: Int
@@ -940,7 +940,76 @@
         var matrix = Matrix(rows: 2, columns: 2)    //定义了一个Matrix的实体matrix，并调用构造函数
         matrix[0, 1] = 1.5                          //访问并修改matrix中的元素
 
-            
+十一、继承
+    一个类可以从其他类继承方法、属性和其他特性，被继承的类称为父类，继承他的类称为子类
+    类可以访问和调用从父类继承而来的方法、属性和下标，并可以覆盖继承而来的方法、属性、下标，这些从而拥有新的方法、属性、下标
+    Swift会检查所覆盖的内容，确保在父类中有对应被覆盖的内容的定义
+    类也可以对继承而来的属性添加属性观察器，使得这些属性发生更改时执行相应的动作
+    1.定义一个基类
+        只要不是继承而来的类就是基类，用class关键字定义一个基类
+            class SomeClass{}
+    2.子类
+        子类从基类继承方法、属性、下标，并添加自己的新特性
+        要表示一个子类是从父类继承而来，需要在子类类名后加冒号:和空格，跟上父类的类名，格式：class SomeSubclass: SomeSuperclass{}
+        class Vehicle                                                               //定义了一个基类Vehicle
+        {
+            var currentSpeed = 0.0
+            var description: String 
+            {
+                return "traveling at \(currentSpeed) miles per hour"
+            }
+            func makeNoise() 
+            {
+            // do nothing - an arbitrary vehicle doesn't necessarily make a noise
+            }
+        }
+        class Bicycle: Vehicle      //定义了Vehicle类的一个子类Bicycle，此时Bicycle继承了Vehicle的属性：currentSpeed（存储属性）、description（计算属性）和方法：makeNoise()
+        {
+            var hasBasket = false
+        }
+        class Tandem: Bicycle                   //定义了Bicycle类的一个子类Tandem，同样继承了Bicycle的所有属性和方法，所以也继承了Bicycle所继承的Vehicle的所有属性和方法
+        {
+            var currentNumberOfPassengers = 0
+        }
+        用点.操作符来访问属性、方法，包括继承的属性和方法
+    3.覆盖
+        子类可以覆盖从父类继承而来的同名的实体的方法、类型方法、属性、下标，在同名的这些东西前加override 关键字，表示覆盖掉父类继承而来的同名的方法、属性、下标
+        Swift将在编译时检查override后的方法、属性、下标在父类中是否有同名的方法属性下标，如果没有，将产生编译时错误
+        3.1访问父类中的同名方法、属性、下标
+            有时需要在子类的覆盖方法、属性、下标中访问父类的某些操作，可以在覆盖的方法、属性、下标中使用：super.函数名 的方式来调用父类中的同名操作
+            如：在子类中有个override someMethod()方法，可以在函数体内通过：super.someMethod()来调用父类中的someMethod()方法
+            在子类中的overrride someProperty可以在其getter和setter方法内通过super.Property来调用父类中的setter和getter方法
+            子类中有个override someIndex可以通过super[someIndex]调用父类中的下标
+        3.2覆盖方法
+        3.3覆盖属性
+            注意，当你覆盖了一个属性，并重写了setter方法时，也必须提供新的getter方法，如果getter方法与父类中的getter一致，可以用super.来直接调用父类的getter方法
+            class Car: Vehicle  //定义了Vehicle父类的一个子类Car
+            {
+                var gear = 1                        //Car子类拥有一个新存储属性gear，并初始化为1
+                override var description: String    //Car子类覆盖了父类的description属性，并在属性内调用了父类属性的操作
+                {
+                    return super.description + " in gear \(gear)"
+                }
+            }
+        3.4覆盖属性观察器
+            可以使用覆盖属性的方法来给从父类继承而来的属性添加属性观察器，属性观察器可以在继承而来的属性发生改变时执行相应操作
+            不可以对继承来的常数属性或只读的计算属性添加属性观察器
+            不可以对一个重写了setter方法的属性同时添加属性观察器，因为可以直接在setter里面对这个覆盖的新属性进行操作
+            class AutomaticCar: Car 
+            {
+                override var currentSpeed: Double       //覆盖了Car父类中的currentSpeed属性（Car父类的currentSpeed属性是从Vehicle类继承而来），并对其添加属性观察器来修改gear的值
+                {
+                    didSet 
+                    {
+                        gear = Int(currentSpeed / 10.0) + 1
+                    }
+                }
+            }
+        3.5禁止覆盖
+            可以在方法、属性、下标名前加final关键字，来防止他们在子类中被覆盖，如果发生了覆盖，会产生编译时错误
+            可以在类名前使用final关键字，表示这个类不可被继承，如果发生了继承，会产生编译时错误
+
+
 
 @discardableResult->?
 
