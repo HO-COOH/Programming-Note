@@ -504,7 +504,7 @@
 5.预定义值
     5.1显示预定义值
         枚举类型可以预定义默认值，如
-        enum ASCIIControlCharacter: Character   //定义了一个取值都是字符型的枚举类型，并预定义了取值的取值
+        enum ASCIIControlCharacter: Character   //定义了一个情况都是字符型的枚举类型，并预定义了情况的取值
         {
             case tab = "\t"                     //当ASCIIControlCharacter = .tab时，他的值是"\t"
             case lineFeed = "\n"
@@ -1009,7 +1009,249 @@
             可以在方法、属性、下标名前加final关键字，来防止他们在子类中被覆盖，如果发生了覆盖，会产生编译时错误
             可以在类名前使用final关键字，表示这个类不可被继承，如果发生了继承，会产生编译时错误
 
+十二、初始化
+    1.对存储属性初始化
+        类和结构体必须给其中的所有存储属性赋初始值，可以通过构造函数和在定义时就直接赋值的方法对其进行初始化
+        1.1构造函数
+            构造函数在定义一个新实体时被调用，构造函数的最简形式是一个没有参数的方法，如：init(){}
+            struct Fahrenheit 
+            {
+                var temperature: Double
+                init()                  //结构体Fahrenheit包含了一个构造函数，这个构造函数对temperature存储属性初始化赋值
+                {
+                    temperature = 32.0
+                }
+            }
+            var f = Fahrenheit()
+            print("The default temperature is \(f.temperature)° Fahrenheit")
+            //输出： The default temperature is 32.0° Fahrenheit
+        1.2初始值法
+            直接在定义时就赋初始值，效果与写在构造函数内相同，但是直接赋值在继承时简化了继承后的子类的构造函数
+            如上例可以写成：
+            struct Fahrenheit 
+            {
+                var temperature = 32.0
+            }
+    2.自定义初始化
+        2.1初始化参数
+            可以在构造函数中加入参数，在定义新实体时，这个构造函数被调用，实际参数的值传递给构造函数的形式参数
+            构造函数的参数的用法与一般函数相同
+            struct Celsius                                          //Celsius结构体包含两个构造函数，形参别名不同
+            {
+                var temperatureInCelsius: Double
+                init(fromFahrenheit fahrenheit: Double) 
+                {
+                    temperatureInCelsius = (fahrenheit - 32.0) / 1.8
+                }
+                init(fromKelvin kelvin: Double) 
+                {
+                    temperatureInCelsius = kelvin - 273.15
+                }
+            }
+            let boilingPointOfWater = Celsius(fromFahrenheit: 212.0)//定义一个新实体时根据形参别名来调用Celsius结构体内不同的构造函数
+            let freezingPointOfWater = Celsius(fromKelvin: 273.15)
+            2.1.1构造函数的形参别名
+                由于一个结构体或类可以存在多个构造函数，而构造函数的名字都是init，所以需要通过使用形参别名来区分调用不同的构造函数
+                可以在定义构造函数时省略形参别名，而在调用构造函数时使用构造函数的形参名
+                不可以同时省略定义构造函数时的形参别名和调用构造函数时的形参名，这样会产生编译时错误，但是可以用下划线_代替形参别名，表明可以在调用时省略形参名，如：
+                struct Celsius 
+                {
+                    var temperatureInCelsius: Double
+                    init(fromFahrenheit fahrenheit: Double) 
+                    {
+                        temperatureInCelsius = (fahrenheit - 32.0) / 1.8
+                    }
+                    init(fromKelvin kelvin: Double) 
+                    {
+                        temperatureInCelsius = kelvin - 273.15
+                    }
+                    init(_ celsius: Double)                             //这个构造函数用下划线_代替形参别名
+                    {
+                        temperatureInCelsius = celsius
+                    }
+                }
+                let bodyTemperature = Celsius(37.0) //调用构造函数没有形参名，所以调用有下划线_代替形参别名的那个构造函数
+        2.2可选类型属性
+            如果一个存储属性在定义结构体或类的一个实体时没有取值，可以将其定义为可选类型
+            可选类型在初始化时自动初始化为nil
+            可选类型的定义已经在上文提到过，格式为：变量名: 类型?
+        2.3常量的初始化
+            常量必须在初始化时赋值，而且一旦赋值不可更改
+            对于类，一个常量在继承他的子类中也不能被更改
+    3.默认构造函数
+        对于一个类，Swift自动生成一个构造函数，如果没有显式写构造函数，Swift实际上将直接赋值的那些值作为一个构造函数init(){...//}给整个类进行初始化
+        对于一个结构体，Swift实际上自动给每个成员属性生成构造函数，最后在整个结构体中生成一个构造函数，成员属性的名字作为init()的参数，所以可以用init(成员变量名:)的方法来给结构体的实体初始化，也可以不显示写构造函数
+    4.对值类型的构造函数的委托
+        构造函数可以调用其他的构造函数来完成对实体的初始化，这称为构造函数的委托，这种方法可以避免代码的重复
+        对于值类型（结构体和枚举类型），构造函数的委托通过调用其他结构体内定义的构造函数来完成
+        struct Size 
+        {
+            var width = 0.0, height = 0.0
+        }
+        struct Point 
+        {
+            var x = 0.0, y = 0.0
+        }
+        struct Rect 
+        {
+            var origin = Point()
+            var size = Size()
+            init() {}
+            init(origin: Point, size: Size) 
+            {
+                self.origin = origin
+                self.size = size
+            }
+            init(center: Point, size: Size) 
+            {
+                let originX = center.x - (size.width / 2)
+                let originY = center.y - (size.height / 2)
+                self.init(origin: Point(x: originX, y: originY), size: size)    //在Rect结构体中引用自己的init，相当于调用Rect内相应的构造函数来完成这个复杂的构造函数的初始化操作
+            }
+        }
+        let basicRect=Rect()    //这种初始化方式调用Rect结构体内没有参数的init()构造函数，这个构造函数分别调用Size和Point的构造函数
+        let originRect = Rect(origin: Point(x: 2.0, y: 2.0),size: Size(width: 5.0, height: 5.0))    //这种方法与在结构体内不显式写出构造函数等效，分别给origin和size赋值，然后这个构造函数再调用Point和Size的隐式构造函数
+        let centerRect = Rect(center: Point(x: 4.0, y: 4.0),size: Size(width: 3.0, height: 3.0))    //这种方法调用了第三个构造函数，这个构造函数调用结构体内的相应的构造函数来完成对origin和size的初始化
+    5.类的继承与初始化
+        一个类的所有存储属性都必须在初始化时赋初始值，Swift提供了两种构造函数来确保所有存储属性都被初始化
+        5.1指定构造函数和方便构造函数
+            指定构造函数是类的主要构造函数，指定构造函数将一个子类所有新引进的存储属性初始化，并调用父类的相应的构造函数来完成继承而来的属性的初始化
+            每个类都必须有至少一个指定构造函数
+            方便构造函数是类的辅助性构造函数，可以定义一个方便构造函数来调用主要构造函数并设置不同参数，也可以定义一个方便构造函数来创建一个有特殊用途的类的实体
+            5.1.1指定构造函数的语法
+                与对于值类型（结构体、枚举类型）的构造函数格式相同：
+                init(参数)
+                {
+                    语句
+                }    
+            5.1.2方便构造函数的语法
+                在init关键字前加convenience关键字：
+                convenicence init(参数)
+                {
+                    语句
+                }
+        5.2类的构造函数的委托
+            Swift对构造函数的委托有以下3条规定：
+                一个指定构造函数必须调用其直接继承的父类的一个指定构造函数（指定构造函数必须向上委托）
+                一个方便构造函数必须调用同一个类的另一个构造函数
+                一个方便构造函数必须最终调用一个指定构造函数（方便构造函数必须横向委托）
+        5.3二相初始化
+            类的初始化分为两个步骤，第一步，所有新引进的存储属性由所引进他们的类完成赋初始值的操作
+            第二步，在新实体定义完成前，每个类有机会来修改这些存储属性
+            二相初始化能防止存储属性在初始化前就被访问，也能防止存储属性被另一个构造函数赋了不同的值
+            Swift编译器会执行四个步骤来确保二相初始化完成无误：
+                一个指定构造函数必须确保在委托父类的构造函数前，这个类新引进的存储属性都被初始化
+                一个指定构造函数必须先委托父类的构造函数，才能对一个继承的属性赋值，如果不这样，新值会被父类的初始化过程覆盖
+                一个方便构造函数必须先委托另一个构造函数，才能对任何属性赋值，如果不这样，新值会被一个指定构造函数覆盖
+                一个构造函数不能调用任何实体的方法、不能访问一个实体的属性、不能在第一个初始化步骤完成前用self关键字引用自己
+            5.3.1二相初始化的步骤
+                第一相：
+                    1.一个指定构造函数或方便构造函数被调用
+                    2.内存分配给这个类内的新实体，但是内存未被初始化
+                    3.这个类的一个指定构造函数确保这个类新引进的属性都分配了内存，并有一个值，所以这些属性的内存被初始化
+                    4.这个指定构造函数委托父类的构造函数，执行3中的操作
+                    5.3与4步随着继承链一次执行，直到基类
+                    6.到达基类之后，这个类的所有属性均已分配内存并赋值，所以这个类的实体已经被完全初始化，内存已经完全初始化，第一相完成
+                第二相：
+                    1.从基类开始，每个指定构造函数可以选择修改所在类新引进的属性，构造函数现在可以用self关键字引用自己所在的类
+                    2.最后，所有的方便构造函数可以修改自己所在类新引进的属性，可以用self关键字引用自己所在的类
+        5.4构造函数的继承和覆盖
+            Swift中的子类不会从父类继承构造函数
+            如果在子类中的构造函数与父类中的某个指定构造函数冲突，需要加override关键字
+            如果在子类中的构造函数与父类中的某个方便构造函数冲突，由于父类的方便构造函数永远不会被子类调用（根据3条规定的规定1），所以不需要写override关键字
+            class Vehicle 
+            {
+                var numberOfWheels = 0
+                var description: String 
+                {
+                    return "\(numberOfWheels) wheel(s)"
+                }
+            }//Vehicle类给每一个存储属性都赋有初值，所以他自动产生一个默认构造函数init()，这个构造函数把初值赋给存储属性，而一个默认构造函数总是作为指定构造函数
+            class Bicycle: Vehicle 
+            {
+                override init()     //Bicycle类继承Vehicle类，由于这个构造函数同样名为init()同样没有参数，所以需要用override关键字
+                {
+                    super.init()        //由于规定1，这里需要调用Vehicle类的指定构造函数，来先完成Vehicle类的初始化，才能在下面修改其内容
+                    numberOfWheels = 2  
+                }
+            }
+            如果一个子类的构造函数没有执行二相初始化的第二相操作，而且父类中有一个无参数的构造函数init()，则可以省略对父类构造函数的调用super.init()
+            class Hoverboard: Vehicle   //Hoverboard类继承了Vehicle类
+            {
+                var color: String
+                init(color: String) 
+                {
+                    self.color = color
+                    //由于这个类的构造函数没有对父类的numberOfWheels进行修改，而且Vehicle父类有自动产生的init()构造函数，所以这里可以省略super.init()
+                }
+                override var description: String    //由于已经对Vehicle父类的description进行初始化，所以这里可以用override覆盖继承而来的description计算方法
+                {
+                    return "\(super.description) in a beautiful \(color)"
+                }
+            }
+            子类在任何情况下都不可以修改从父类继承而来的常量
+            5.4.1构造函数的自动继承
+                如果在子类中所有新引进的属性都赋了初值，则有以下两条规定：
+                    如果子类没有定义指定构造函数，他会自动继承所有父类的指定构造函数
+                    如果子类继承了所有父类的指定构造函数，无论是通过上一条规定继承的，还是通过自定义初始化的方式在方便构造函数中委托，那么所有父类的方便构造函数也会被继承
+                class Food 
+                {
+                    var name: String
+                    init(name: String)  //这是一个指定构造函数，因为在这个构造函数中给这个类的所有存储属性赋了值
+                    {
+                        self.name = name
+                    }
+                    convenience init()  //这是一个方便构造函数，他委托这个类的指定构造函数，并将一个参数值传递给指定构造函数
+                    {
+                        self.init(name: "[Unnamed]")
+                    }
+                }
+                let namedMeat = Food(name: "Bacon") //这个实体的初始化调用了指定构造函数init(name: String)
+                let mysteryMeat = Food()            //这个实体的初始化调用了方便构造函数init()，这个方便构造函数将"[Unnamed]"作为参数传递给指定构造函数init(name: String)，并委托他进行初始化
+                class RecipeIngredient: Food 
+                {
+                    var quantity: Int               //RecipeIngredient类继承Food类，并新引入了quantity属性
+                    init(name: String, quantity: Int) 
+                    {
+                        self.quantity = quantity
+                        super.init(name: name)
+                    }
+                    override convenience init(name: String) 
+                    {
+                        self.init(name: name, quantity: 1)
+                    }
+                }
 
+CoreGraphics
+    使用CoreGraphics来绘制低级的2D图形
+一、几何数据类型
+    1.struct CGFloat
+        是一种浮点类型，其精度根据所要编译的目标平台的CPU位数决定，如果是64位，等同于Double，如果是32位，等同于Float
+        1.1方法
+            1.1.1func addingProduct(_ lhs: CGFloat, _ rhs: CGFloat) ->CGFloat
+                返回一个CGFloat类型，值为两个CGFloat类型参数的和
+
+    2.struct CGPoint
+        一种代表一个点的两个坐标的结构体
+    3.struct CGSize
+        一种包含了宽度、长度值的结构体
+    4.struct CGRect
+        代表了一个包含了位置和维度的矩形的结构体
+    5.struct CGVector
+        一种二维向量结构体
+    6.struct CGAffineTransform
+        一种代表仿射变换矩阵的结构体，用来绘制二维图形
+        仿射变换是一个向量空间进行线性变换和平移
+        一个仿射变换矩阵是3*3矩阵，[[a,b,0],[c,d,0],[tx,ty,1]]，由于第三列永远是[0,0,1]，所以CGAffineTransform只包含前两列数据
+二、二维绘图
+    1.class CGContext
+        一个二维绘图环境
+        1.1绘制图形
+            1.1.1func clear(_ rect: CGRect)
+                绘制一个透明矩形
+            1.1.2func fill(_ rect: CGRect)
+                在当前绘图状态定义的填充颜色下填充一个矩形区域
+            1.1.3
 
 @discardableResult->?
 
