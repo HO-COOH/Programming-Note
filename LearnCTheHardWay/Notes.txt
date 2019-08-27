@@ -1123,6 +1123,7 @@ STL
             void sort (RandomAccessIterator first, RandomAccessIterator last, Compare comp);
             需要三个参数，最后一个参数时一个自定义比较函数，参数接受两个操作数并返回一个布尔值
         copy()方法需要三个迭代器参数，第一和第二个迭代器参数指向源的范围（包括第一参数，而不包括第二参数），第三个迭代器参数指向目的地
+        copy_backward()
         unique()方法需要两个迭代器参数，分别是容器的第一个元素和指向超尾的迭代器，返回的迭代器指向最后一个不重复的元素的下一个元素（超尾元素）
             所以包含的不重复元素的个数是容器起始位置的迭代器-unique返回的超尾元素
             应当在使用unique方法用resize()函数后对容器重新调整大小，所以这个容器包含的都是不重复的元素
@@ -1279,7 +1280,85 @@ string类：C++标准类
             size_type copy(charT* s, size_type n, size_type pos=0) const;   //将调用字符串从pos开始的连续n个字符复制到s所指的内存空间，如果调用字符串到达末尾则停止复制，函数返回复制的字符数，该方法不检查s的空间是否足够，也不追加结尾空字符'\0'
         swap()：使用一个时间恒定的算法来交换两个string对象的内容
             void swap(basic_string& str);
-
+<chrono> C++11:
+    所有的chrono函数都在std::chrono名称空间内
+    1.时间段：
+        seconds类：
+            class seconds
+            {
+                int64_t sec_;   //或long long
+                ...
+            }
+            默认构造函数：sec_赋值为0
+            构造函数为explicit，不能从int隐式转换为seconds类
+                seconds s=3;  //错误，应为seconds s(3)或统一初始化方法{3}
+            重载的各种算数运算符：
+            重载的各种比较运算符：
+            范围：用seconds::min()和seconds::max()返回，通常为+-2920亿年
+            输出：count()成员函数返回成员变量sec_的值，然后用cout<<s.count();输出
+        milliseconds类：
+            与seconds类相同
+            范围是2920万年
+            允许从seconds类到milliseconds类的隐式类型转换（由于这是不损失精度的转换），但不允许从milliseconds到seconds的隐式类型转环
+        hours类：
+        minutes类：
+        microseconds类：
+        nanoseconds类：
+    2.duration_cast<type>函数
+        将不允许隐式类型转换的转换（损失精度的转换）用向下取整的方式转换
+        只有当隐式类型转换不允许时才用duration_cast<type>函数
+        如seconds s=duration_cast<seconds>(milliseconds(3400));   //s=3s
+    3.自定义内部数据类型
+        如果默认采用long long成员类型的seconds类占空间过多，可以用chrono的duration模板来建立自定义的内部数据类型，如：
+            using seconds32=chrono::duration<int32_t>  //使用32位整形来创建seconds类，然后用using声明来声明类型别名
+        如果要对其他类型（milliseconds类...）也使用自定义的数据类型，格式为：
+            using alias=duration<type, ratio>   //将alias作为duration模板类的别名，其中第一参数type是要自定义内部数据类型的类型，ratio是其他时间段类相对于标准seconds的比例，已经预定义为nano, milli, micro
+                using nano=ratio<1,1'000'000'000>;
+                using micro=ratio<1,1'000'000>;
+                using milli=ratio<1,1000>;
+            对于minutes类和hours类，没有预定义名称，所以显示使用ratio模板来定义：
+                ratio<60>
+                ratio<3600>
+            所以using seconds32=chrono::duration<int32_t>声明又可以写为：using seconds32=chrono::duration<int32_t, ratio<1>>
+        所有的时间段类都是以下形式的实例化：
+        template<typname Type, typename Period=ratio<1>> //模板参数Period的默认参数时ratio<1>，所以自定义seconds类时不需要ratio参数
+        class duration
+        {
+            Type rep_;   //自定义的内部数据类型
+        }
+    4.通用化时间段单位
+        可以通过ratio模板参数来控制一个自定义时间段的长度
+        using frame_time=duration<float, ratio<1,60>>   //将1/60秒作为一个frame_time类
+    5.时间点
+        时间点与时间段的内部实现可能类似，但时间点表达的是某个具体时刻
+        template<class Clock, class Duration=typename Clock::duration>
+        class time_point
+        {
+            Duration d_;
+        public:
+            using clock=Clock;
+            using duration=Duration;
+            ...
+        }
+        成员函数：
+            duration time_since_epoch() const;  //返回从1970年1月1日到内部所记录的时间点的秒数
+        两种时钟：
+            system_clock类:
+                静态成员函数：
+                    time_point now()        //返回一个当前时间的time_point对象
+                    time_t to_time_t(const time_point& tp)              //将tp表示的时间点转换为time_t类型
+                    from_time_t()
+            steady_clock:
+        构造函数：
+            默认构造函数：
+        重载了各种操作符：
+            两个时间点可以相减，结果是一个时间段
+            一个时间点可以与一个时间段相加，结果是一个新时间点
+            两个时间点不能相加，因为没有意义
+    6.时钟类
+    7.暂停程序：
+        std::this_thread::sleep_for(duration<type> t)   //参数是一个时间段
+        
 
 
 范围for循环
@@ -1407,7 +1486,48 @@ C++14:
         {
             return ...
         }
+    2.二进制字面值
+        二进制字面值用0b或0B开头 int a=0b110;   //a=6
+        八进制字面值用0开头 int b=011;  //b=9
+        十六进制字面值用0x或0X开头 int c=0x11;  //c=17
+    3.字面值分隔符
+        可以在数字字面值上用一个单引号'来分割一个长数   int a=100'000;
+        注意，分隔符前面必须要有除了二进制字面值标志的其他数位，不能在标志符后紧跟一个分隔符
+    4.变量模板
+        可以对单个变量定义成模板，变量的取值在编译器根据模板参数生成
+        template<typename T>
+        T pi=T(3.1415926535897L);
 
+        cout<<pi<int>;      //输出3
+        cout<<pi<float>;    //输出3.1415...
+        cout<<pi<double>;   //输出3.1415926...
+
+C++17：
+    1.结构化绑定
+        绑定指定名称到初始化器的子对象或元素
+        三种形式：
+            attr(可选) cv-auto ref-运算符(可选) [ 标识符列表 ] = 表达式;
+            attr(可选) cv-auto ref-运算符(可选) [ 标识符列表 ] { 表达式 };
+            attr(可选) cv-auto ref-运算符(可选) [ 标识符列表 ] ( 表达式 );
+        cv-auto是可能使用const限定的auto关键字
+        ref-运算符是可能使用的引用符号（右值引用或左值引用）
+        标识符列表是需要绑定名称的子对象的名称
+        表达式是可以是返回数组、元组、结构体的函数，或相应的数组、元组、结构体
+        绑定数组：
+            标识符列表 中的每个标识符均成为指代数组的对应元素的左值。标识符的数量必须等于数组的元素数量。每个标识符的被引用类型都是数组的元素类型
+            int a[2] = {1,2};
+            auto [x,y] = a; // 创建 e[2]，复制 a 到 e，然后 x 指代 e[0]，y 指代 e[1]
+            auto& [xr, yr] = a; // xr 指代 a[0]，yr 指代 a[1]
+        绑定元组：
+        绑定数据成员：
+            标识符列表 中的各个标识符，按声明顺序依次成为指代 e 的各个成员的左值的名字    
+            struct A
+            {
+                int a;
+                int b;
+            }t;
+            ...//初始化t
+            auto [x,y]=t;   //x=a,y=b
 多线程C++11 std::thread：
     1.一个最简单的多线程（用第二个线程打印hello world）
         #include<iostream>
