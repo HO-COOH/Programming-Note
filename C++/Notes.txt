@@ -163,7 +163,7 @@ atoi()  将nptr所指的字符串的开头部分转化为相应的整数，长�
     以后每次调用va_arg(argp,SOMETYPE)时返回的就是可变参数列表的下一个变量，类型由SOMETYPE决定
 
 
-/*C++
+C++
 1. 字符串输入
     cin.getline(char *s, int n);//读取一行，最多读取n-1个字符拷贝给s所指的字符串，并添加'\0'，丢弃用户输入的换行符
     cin.get(char *s, int n);//读取一行，最多读取n-1个字符拷贝给s所指的字符串，并添加'\0'，不丢弃用户输入的换行符，保留在输入队列中
@@ -412,18 +412,18 @@ cctype函数
 12.函数重载
     函数的参数的数目和类型，排列顺序不同，则称函数的特征标不同
     函数返回值类型不属于特征标，故若函数名、参数类型、参数顺序都一样，返回值类型不同，会产生冲突
-    所以无法重载近返回值类型不同的函数
+    所以无法重载仅返回值类型不同的函数
     可以对重载的函数添加参数默认值
     例外：注意在类中的运算符重载函数的重载（同一个运算符被重载两次），如果参数相同，const方法与非const方法不冲突，而返回const与返回非const会冲突
 13.函数模板
     是对函数的描述
     编译器自动根据描述来生成与调用时的实参类型符合的具体函数的定义
     声明和定义函数模板加语句：
-    template <typename AnyType>//在声明和定义前都需要
+    template <typename variantType>//在声明和定义前都需要
     剩下的函数描述与一般函数的声明和定义方法相同
-    returnType func(AnyType para)
-    编译器生成具体函数时将template声明中的Anytype替换掉func中的所有Anytype
-    常常用T代替Anytype：
+    returnType func(variantType para)
+    编译器生成具体函数时将template声明中的varianttype替换掉func中的所有varianttype
+    常常用T代替varianttype：
         template <typename T>
         returnType func(T para){}
     显式具体化：有时，可能需要对特殊的类型执行不同的操作，所以需要为这些特殊类型定义不同的函数，方法是通过显示具体化指定模板类型参数
@@ -511,7 +511,7 @@ cctype函数
         ::globalName
         比如在这个文件内编写了某个函数，而在下面的函数中要使用这个函数而不是其他名称空间内的函数，就使用名称空间解析运算符显式表明是本文件内的这个函数
     using声明：将特定的名称添加到他所属的声明区域中（本文件全局、函数内、代码块内）
-        using nameSpaceName::memberName;    //相当于声明了一个名称memberName，为其开辟了内存
+        using nameSpaceName::memberName;    //相当于将nameSoaceName中定义的memberName在当前作用域中可见
         与其他局部变量一样，若在局部（函数、代码块内）使用using 声明，则会隐藏同名的全局变量
             #include <iostream>
             namespace Jill
@@ -523,7 +523,7 @@ cctype函数
 
             int main()
             {
-                using Jill::fetch;  //相当于在main内声明了一个Jill名称空间内的double变量，并为其开辟了内存，该变量为局部变量
+                using Jill::fetch;  //相当于将Jill内声明的fetch在main中可见，使得可以在main()中使用它
                 fetch = 3;  //由于局部变量会隐藏全局变量，故这个fetch是Jill内的fetch
                 std::cout << fetch << std::endl;    //输出3
                 std::cout << ::fetch << std::endl;  //双冒号全局运算符，输出全局的fetch：a
@@ -731,7 +731,7 @@ cctype函数
             需要将基类中的同名函数原型声明为virtual虚函数，在函数的原型的类型前加关键字virtual
             派生类中的同名函数加不加virtual关键字没有影响
             注意虚函数和派生后的同名函数参数必须一样，返回类型都可以不一样（协变：返回类型可以是一个对象，这个对象的类是另一个派生类的基类）
-            ？？ class A
+            class A
             {
             public: 
                 virtual int func();
@@ -1034,7 +1034,9 @@ cctype函数
     2.shared_ptr
         当程序会使用多个指向同一个对象的指针，就用shared_ptr
         允许复制和赋值，在复制时会增加引用计数，退出作用域后将指向同一内存的shared_ptr的引用计数减少1，当引用计数减少到0时释放这一块内存
-
+    3.unique_ptr<T> make_unique<Type>(para)
+        make_unique模板函数将para传递给Type类型的构造函数来构造一个堆区对象，然后返回一个unique_ptr
+        这个函数的效果与return unique_ptr<T>(new T(para));  一致
 STL
     容器：
         顺序容器：
@@ -1110,20 +1112,61 @@ STL
             vector类定义了rbegin() 返回指向超尾的反向迭代器和rend() 返回指向第一个元素的反向迭代器
     方法：
         #include <algorithm>
-        sort()：
-            template <class RandomAccessIterator>
-            void sort (RandomAccessIterator first, RandomAccessIterator last);
-            需要两个迭代器参数，分别是容器的第一个元素和指向超尾的迭代器
-            由于指针也是迭代器，所以可以对普通数组运用sort方法
-                const int size=100;
-                double data[size];
-                sort(data,data+size);   //或sort(&data[0],&data[size]);
-            sort()函数需要使用<运算符，所以对于自定义结构体、对象，需要sort的话需要定义一个重载<运算符函数
-            template <class RandomAccessIterator, class Compare>
-            void sort (RandomAccessIterator first, RandomAccessIterator last, Compare comp);
-            需要三个参数，最后一个参数时一个自定义比较函数，参数接受两个操作数并返回一个布尔值
-        copy()方法需要三个迭代器参数，第一和第二个迭代器参数指向源的范围（包括第一参数，而不包括第二参数），第三个迭代器参数指向目的地
-        copy_backward()
+        排序：
+            排序算法中的函数对象参数comp必须是一个接受两个参数的函数，并返回第一参数<第二参数的真值（或是第一参数在第二参数之前）
+            comp函数对象不能修改参数，所以comp的形参可以声明为const引用，或者是可以被复制的值传递类型（比如各种基本类型）
+            形参的类型应该是对迭代器解除引用后的类型或者能被隐式转换的类型
+            sort()：
+                template <class RandomAccessIterator>
+                void sort (RandomAccessIterator first, RandomAccessIterator last);
+                需要两个迭代器参数，分别是容器的第一个元素和指向超尾的迭代器
+                由于指针也是迭代器，所以可以对普通数组运用sort方法
+                    const int size=100;
+                    double data[size];
+                    sort(data,data+size);   //或sort(&data[0],&data[size]);
+                sort()函数需要使用<运算符，所以对于自定义结构体、对象，需要sort的话需要定义一个重载<运算符函数
+                template <class RandomAccessIterator, class Compare>
+                void sort (RandomAccessIterator first, RandomAccessIterator last, Compare comp);
+                需要三个参数，最后一个参数是一个自定义比较函数
+            partial_sort(): 将从[first,last)中的元素按从小到大的顺序排到[first,middle)中，剩余的元素的顺序未定义
+                template< class RandomIt >
+                void partial_sort( RandomIt first, RandomIt middle, RandomIt last );
+
+                template< class RandomIt, class Compare >
+                void partial_sort( RandomIt first, RandomIt middle, RandomIt last, Compare comp );
+
+                可选参数comp是一个自定义的比较函数
+            stable_sort():
+
+            nth_element():将第n个元素（索引n-1）放到正确的位置，并且保证从[first,n-1)的元素都不比[n,last)大
+                template< class RandomIt >
+                void nth_element(RandomIt first, RandomIt nth, RandomIt last );
+
+                template< class RandomIt, class Compare >
+                void nth_element(RandomIt first, RandomIt nth, RandomIt last, Compare comp );
+            sort_heap():
+            inplace_merge():
+            is_sorted():
+            is_sorted_until():
+        查找：
+            accumulate():求从[first,last)的和
+                template< class InputIt, class T >
+                T accumulate( InputIt first, InputIt last, T init );    //使用元素的operator+
+
+                template< class InputIt, class T, class BinaryOperation >
+                T accumulate( InputIt first, InputIt last, T init, BinaryOperation op );    //使用一个接受两个参数的函数
+                函数的原型需符合：returnType fun(const Type1& a, const Type2& b);   //不一定需要const&限定，但T需要可以被隐式转换为Type1和Type2
+
+        复制：        
+            copy()方法需要三个迭代器参数，第一和第二个迭代器参数指向源的范围（包括第一参数，而不包括第二参数），第三个迭代器参数指向目的地
+            copy_backward()
+        裸内存：
+        值修改：
+        distance()：
+            template< class InputIt >
+            typename std::iterator_traits<InputIt>::difference_type distance( InputIt first, InputIt last );
+            返回从first迭代器到last迭代器需要++（向前迭代）的次数
+            从C++11开始，如果迭代器是随机访问迭代器，则当可以从first通过--（向后迭代）到达last迭代器时（此时last在位置上比first前）返回--操作的次数
         unique()方法需要两个迭代器参数，分别是容器的第一个元素和指向超尾的迭代器，返回的迭代器指向最后一个不重复的元素的下一个元素（超尾元素）
             所以包含的不重复元素的个数是容器起始位置的迭代器-unique返回的超尾元素
             应当在使用unique方法用resize()函数后对容器重新调整大小，所以这个容器包含的都是不重复的元素
@@ -1389,6 +1432,19 @@ C++11:
             //函数中使用类似容器和迭代器的方法
         }
     auto关键字：根据显示初始化所赋值的类型自动判断变量的类型
+    constexpr关键字：
+        对于常量，constexpr声明的变量需要一个初始化器，所以允许类内静态常量的初始化，旧标准的类中静态常量成员需要类内声明类外定义
+        class A
+        {
+            static const int a;
+            static constexpr b=10; 
+        };
+        A::a=3;
+        constexpr还可以作用于函数，使得函数成为一个常量表达式，在编译期就调用并计算结果
+        所以被声明为constexpr的函数调用必须能在编译期被计算为常量
+        由于函数调用成为了常量表达式，所以可以用作数组的大小
+    static_assert(布尔常量表达式,"消息")：在编译期进行的断言检查
+        当表达式为false时，在编译期中编译期会发出错误，错误内容是消息字符串
     decltype关键字：将y声明为与表达式x的类型相同
         decltype(x) y;
     返回类型后置：可以在函数名前加auto关键字，将返回值类型用一个指针运算符放到函数头后面
@@ -1528,6 +1584,32 @@ C++17：
             }t;
             ...//初始化t
             auto [x,y]=t;   //x=a,y=b
+    2.std::optional<Type>
+        #include <optional>
+        一个带有返回值的函数如果某些情况下会出错而不能返回一个有效值，可以使用optional模板
+            将原先接收函数返回值的变量类型改为optional<Type>，或者由于函数的返回值已经确定，可以使用auto关键字
+            原先的可能返回无效值的函数将返回一个默认构造的optional对象，此对象无值
+            Type不能是引用类型，因为引用肯定有值，所以不需要optional
+        optional模板对象还可以做函数形参
+        方法：
+            has_value()：当有值的时候返回true
+            ParaType value_or(para)：当没有值的时候将para传递给optional内存储的类型的构造函数并返回这个构造的对象，当有值的时候返回这个值
+            重载的比较运算符：比较两个optional对象，仅当lhs和rhs都有值，才比较容纳的值，这时将调用容纳的对象的类中定义的比较运算符
+                当有一个操作数没值时，有值的optional对象大于没值的
+                当两个optional对象都没值，则相等
+    3.std::variant
+        #include <variant>
+        variant是一个可以存储多种可能类型的对象，与union作用类似，但union只能存储内置类型（比如不能存std::string），union的大小与所存储的最大的成员相同，而variant则是所有所存储的类型的大小相加
+        variant<Types...> var;  //定义一个可能存Types...(尖括号内的所有Type)类型的variant对象var
+        当variant对象中实际存的是T类型的数据时，可以使用auto* pt=std::get_if<T>(&var); 这样当var中实际存储的确实是T类型时，返回一个指向这个数据的指针，如果类型不符，或者没有数据，返回一个nullptr
+    4.std::any
+        #include <any> 
+        any是一个可以存储任何类型的对象，可以在构造any对象时初始化赋值，也可以先定义后赋值
+        any var;    //定义了一个没有存储任何数据的any对象var  
+        当any对象中实际存的是T类型的数据时，可以使用any_cast<T>(var)运算符来返回一个所存储的对象的拷贝，如果是T*则返回指针，T&则返回引用，如果类型不符，则抛出bad_any_cast异常
+            bool has_value()
+            const type_info& type(); //返回一个type_info对象的引用，有name()方法可以返回一个类型的C风格字符串
+
 多线程C++11 std::thread：
     1.一个最简单的多线程（用第二个线程打印hello world）
         #include<iostream>
@@ -2172,11 +2254,11 @@ More Effective C++
             void init()                     //由于构造函数和赋值构造函数都执行同样的步骤，所以单独提出来一个函数，减少重复代码
             {
                 if(numObjects>maxObjects)
-                    throw TooManyObjects();//超出最大对象数抛出异常，如果不需要可以省略
+                    throw TooMvariantObjects();//超出最大对象数抛出异常，如果不需要可以省略
                 ++numObjects;
             }
         public:
-            class TooManyObjects    //自定义一个异常，超过最大对象数时抛出，也可以不要
+            class TooMvariantObjects    //自定义一个异常，超过最大对象数时抛出，也可以不要
             {
                 ...
             }

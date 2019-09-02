@@ -1,0 +1,369 @@
+一、基本类型
+    OpenCV的很多基础类型都是模板，然而大部分都不用C++实例化一个模板的具体类型，而是使用预定义好的模板别名typedef
+    比如cv::Vec<>是模板，然而通常直接使用cv::Vec2i（表示两个元素的整形向量），cv::Vec4d(表示4个元素的双精度浮点向量)
+    通常形式为cv::Vec{2,3,4,6}{b,w,s,i,f,d}
+    b=unsigned char
+    w=unsigned short
+    s=short
+    i=int
+    f=float
+    d=double
+    0.基元类型：
+        #include <opencv2/core/hal/interface.h>
+        schar - signed 1 byte integer
+        uchar - unsigned 1 byte integer
+        short - signed 2 byte integer
+        ushort - unsigned 2 byte integer
+        int - signed 4 byte integer
+        uint - unsigned 4 byte integer
+        int64 - signed 8 byte integer
+        uint64 - unsigned 8 byte integer
+    1.Point类：
+        默认构造函数：
+        复制构造函数：
+        值构造函数：Point p(x0, x1, x2);    //构造了一个三维点p
+        成员访问：数据成员是x和y（可能有第三维z），所以用点操作符加xyz表示三个维度 p.x
+        点乘（点乘是对应元素相乘再相加，结果是一个标量（一个数））：dot(Point p)
+        双精度点乘：ddot(Point p)
+        叉乘（叉乘是矩阵乘法）
+    2.Scalar类：
+        其实是个四维向量的继承，是个四维点类
+        template<typename T>
+        class Scalar_:public Vec<_Tp, 4)
+        typedef Scalar_<double> Scalar
+        默认构造函数：
+        复制构造函数：
+        值构造函数：Scalar s(x0, x1, x2, x3)
+        共轭：s.conj()
+    3.Size类：
+        与Point类类似，可以相互转换，数据成员是width height
+        默认构造函数：
+        复制构造函数：
+        值构造函数：Size2f size(w,h)
+        成员访问：
+        计算面积：size.area();
+    4.Rect类：
+        包含一个Point类成员表示左上角，和一个Size类成员
+        默认构造函数：
+        复制构造函数：
+        重载的构造函数：
+            值构造函数：Rect r(x,y,w,h);
+            由一个点和一个Size对象构造：
+            由对角的两个点构造：
+        成员访问：数据成员x y width height
+        计算面积：r.area()
+        提取左上角：r.tl()
+        提取右下角：r.br()
+        判断一个点p是否在矩形r内：r.contains(p)
+        重载的操作符：
+            
+    5.RotatedRect类：
+    6.固定矩阵类：
+    7.固定向量类：
+    8.Range类：
+二、图像和大型数组
+    1.Mat类：
+        Mat类可以作为任意维度的数组使用
+        如果其中的数据是多个数字，被称为多通道数组
+        一个n维单通道数组和(n-1)维的多通道数组类似，区别是内存读取方式，多通道数组将一每一个元素（这儿元素是多个数字）作为一个整体，并对这个整体进行数据对齐
+        数组的类型type决定包含什么样的元素，一个有效的数据类型需要同时声明数据的类型和通道数，如：CV_{8U,16S,16U,32S,32F,64F}C{1,2,3}，如CV_32FC3表示一个三通道32位浮点数据
+            对于超过3通道的数据类型，需要调用函数CV_{8U,16S,16U,32S,32F,64F}C(int channels) 
+            • CV_8U - 8-bit unsigned integers ( 0..255 )
+
+            • CV_8S - 8-bit signed integers ( -128..127 )
+
+            • CV_16U - 16-bit unsigned integers ( 0..65535 )
+
+            • CV_16S - 16-bit signed integers ( -32768..32767 )
+
+            • CV_32S - 32-bit signed integers ( -2147483648..2147483647 )
+
+            • CV_32F - 32-bit ﬂoating-point numbers ( -FLT_MAX..FLT_MAX, INF, NAN )
+
+            • CV_64F - 64-bit ﬂoating-point numbers ( -DBL_MAX..DBL_MAX, INF, NAN )
+        构造函数：
+                Mat(int rows, int cols, int type)   //指定类型的二维数组
+                Mat(int rows, int cols, int type, const Scalar& s)  //指定类型的二维数组，并指定初始值
+                Mat(int rows, int cols, int type, void* data, size_t step=AUTO_STEP)    //指定类型的二维数组，并用data所指的内存区域初始化值
+                Mat(Size sz, int type)  //创建大小由sz指定的二维数组
+                Mat(int ndims, const int* sizes, int type)  //创建ndims维，各维大小由size所指向的数组的元素确定的数组
+                默认构造函数
+            复制构造函数：
+                Mat(const Mat& mat)
+                Mat(const Mat& mat, const Range& rows, const Range& cols)   //从指定的行列中复制数据
+                Mat(const Mat& mat, const Rect& roi)    //从指定的区域中复制数据
+            模板构造函数：
+                Mat(const Vec<T,n>& vec, bool copyData=true)    //构造一个如同vec所指定的数据类型为T，大小为n的一维数组
+                Mat(const Matx<T,m,n>& matx, bool copyData=true)    //构造一个如同matx所指定的数据类型为T，大小为m*n的二维数组
+                Mat(const std::Vector<T>& vec, bool copyData=true)  //构造一个如同vec所指定的数据类型为T，大小为vec的元素数的一维数组
+            静态构造方法：
+                zeros(rows, cols, type)
+                ones(rows, cols, type)
+                eye(rows, cols, type)
+                注意：使用eye和ones如果创建多通道数组，只有第一个通道被设置为1，其余通道保持为0
+        区间访问：
+            m.row(i)
+            m.col(j)
+            m.rowRange(i0,i1)   //m中第i0行到第i1-1行
+            m.rowRange(Range(i0,i1))
+            m.colRange(j0,j1)
+            m.colRange(Range(j0,j1))
+            m.diag(d)   //当d==0时返回主对角，如果d为正数，返回相对于主对角线向数组往上偏移d单位的数组，如果d为负数，返回相对于主对角线向数组往下偏移d单位的数组
+            m(Range(i0,i1),Range(j0,j1))    //m中从点(i0,j0)到点(i1-1,j1-1)所包含的数据的数组
+            m(Rect(i0,i1,w,h))  //m中从点(i0,j0)到点(i0+w-1,j0+h-1)的数组
+            m(Range* ranges)   //m中依据ranges[0]到ranges[ndim-1]所索引区域构成的数组，ranges是一个Range数组指针，是唯一从高维矩阵中获取一个子区域的方法
+    2.稀疏矩阵类 SparesMat
+        稀疏矩阵类采用哈希表存储非0元素
+        访问元素：
+            uchar* ptr(int i0, bool createMissing, size_t* hashval=0)
+                //i0为请求元素的索引，creatingMissing表示如果元素不存在是否要被创建，hashval表示计算所得的哈希值，如果为0则会重新计算，如果已经计算过，则直接使用hashval指针所指的计算值，加快运行速度
+                //若访问成功则返回所请求的元素的指针（一个指向无符号字符型的指针），一般需要类型转换
+                此函数有重载版本可以接受两个或三个索引，还有重载版本的第一参数接受一个指向整形数的数组指针
+            访问器模板函数：（都是成员函数）
+                ref<type>()返回指向数组中所请求元素的引用，参数类似于ptr()，没有createMissing参数（因为没有空引用）
+                    //type为元素的类型
+                value<type>()返回所请求元素的值，所以也称为 只读方法
+                find<type>() 返回所请求const元素的指针，所以不可以通过这个指针来修改所指向元素的值
+                    //指针被直接转换为指向const type类型的指针，即指针的类型为const type*
+            迭代器：
+                SparseMatIterator_<type>
+                SparseMatConstIterator_<type>
+                SparseMatIterator
+                SparseMatConstIterator
+三、矩阵操作
+    1.规则：
+        饱和（saturation_cast)：
+            计算的输出值会被整合到输出矩阵的类型的范围内
+            将高于或低于目标类型的取值的数值限制为目标类型取值范围的最小或最大值
+            比如uchar的取值范围是0-255，如果将大于255的数赋值给uchar，则会将255赋值给uchar，如果将小于0的数赋值给uchar，则会将0赋值给uchar
+        输出：
+            如果输出矩阵的类型和尺寸不符合，将调用create()重新创建
+        标量：
+            许多函数都允许两个矩阵相加或一个矩阵和一个标量相加
+        掩码：
+            在一个函数中存在掩码参数时，只会计算对应于掩码值不为0的位置的元素计算
+        dtype：
+            许多算法和函数不需要输入矩阵的类型相同，当dtype参数存在时，可以将dtype设置为任何基本类型，则计算结果为此类型
+            dtype==-1，则设置为与输入矩阵的类型相同
+        原位操作：
+            如果函数用一个矩阵作为输入一个矩阵作为输出，且尺寸和类型都相同，可以对输入输出使用相同矩阵（将输出写入输入矩阵中）
+        多通道：
+            对于不需要使用多通道的操作，如果给定多通道参数，则每个通道都被单独处理
+四、基本绘图
+
+五、函数子（函数对象）
+    1.主成分分析PCA
+    2.奇异值分解SVD
+    3.随机数发生器RNG
+        构造函数：
+            RNG(uint64 state);  //使用64位无符号整形state作为随机数种子
+            默认构造函数：使用一个定制（通常是2^32-1）初始化
+        重载的operator()：
+            operator uchar()
+            operator schar()
+            operator ushort()
+            operator short int()
+            operator int()
+            operator unsigned()
+            operator float()
+            operator double()
+            unsigned int operator() //返回一个从0-UINT_MAX的随机值
+            unsigned int operator(unsigned int N)   //返回从0-（N-1）的随机值
+        uniform()：产生平均分布的随机数
+            int uniform(int a, int b);  //a~(b-1)
+            float uniform(float a, float b) //[a,b)
+            double uniform(double a, double b)//[a,b)
+        gaussian()：
+            double gaussian(double sigma)
+        fill()：
+            void fill(InputOutputArray& mat, int distType, InputArray a, InputArray b); 
+            第二参数distType可以是RNG::UNIFORM或RNG::NORMAL
+            第三参数a表示所填充的元素的均值
+            第四参数b表示所填充元素的标准差
+            a与b的大小是n*1或1*n，n是mat的通道数
+
+六、图像、视频与数据文件
+    1.图像的载入
+        Mat imread(const string& filename, int flags=IMREAD_COLOR)
+        第二参数flags的取值：
+            IMREAD_COLOR        以三通道8位格式读取，即使原始文件中的图像是灰度图像，读到内存中也是三通道，每个通道数据相同
+            IMREAD_GRAYSCALE    以单通道读取
+            IMREAD_ANYCOLOR     根据文件实际通道数读取（不超过3）
+            IMREAD_ANYDEPTH     允许超过8位
+            IMREAD_UNCHANGED    可能会保留图像的alpha通道（第四通道），同时允许超过8位
+        imread()载入失败时不抛出异常，而是返回一个空的Mat，所以最好用Mat::empty()成员函数来判断是否读取成功
+    2.图像的保存
+        bool imwrite(const string& filename, InputArray image, 
+            const vector<int>& params=vector<int>() //特殊类型的文件写入时的参数，这些参数先写参数名，再接取值
+            )
+            第三参数的参数名和取值：
+            IMWRITE_JPG_QUALITY 取值0-100，越大表示质量越高，默认为95
+            IMWRITE_PNG_COMPRESSION 取值0-9，越大表示压缩越多，默认为3
+            IMWRITE_PXM_BINARY  取值0或1，表示对PPM，PGM或PBM文件是否使用二值格式，默认为1
+        若保存成功，返回true，否则返回false
+    3.图像的编码
+        void imencode(const string& ext,                //文件扩展名，由这个拓展名确定编码方式
+            InputArray img,                         
+            vector<uchar>& buf,                         //编码后的缓冲区
+            const vector<int>& params=vector<int>())    //与imwrite()的第三参数相同
+    4.图像的解码
+        Mat imdecode(InputArray buf, int flags=IMREAD_COLOR)
+            //第一参数buf应为vector<uchar>类型，第二参数与imread的第二参数相同
+        失败时返回一个空的Mat
+        imdecode()不需要文件拓展名参数，因为它可以从输入字节流数据的前几个字节推断出应该使用哪种编码器
+    5.视频流的读取
+        创建一个VideoCapture对象：
+            VideoCapture(const string& filename)
+            VideoCapture(int device)    //当前系统只有一个摄像机时device参数为0
+            VideoCapture()
+            打开成功，则成员函数isOpened()返回true
+        从视频流读取图像：
+            bool read(OutputArray image)
+            如果读取不成功（例如已经读取到文件的最后一帧），则返回false
+            VideoCapture& operator>>(Mat& image)    //重载的>>运算符，与read()一样
+            一个read()实际上分为两步，grab()和retrieve()
+            bool grab(void);    //将图像数据拷贝到一个用户看不见的缓冲区
+            bool retrieve(OutputArray image, int channel=0) //第二参数channel是在某些设备有多个传感头时的特殊设备使用
+            视频元数据的读取：
+                打开视频时可能有相关的信息，会写入VideoCapture对象的内部数据区
+                double get(int propid)
+                bool set(int propid, double value)
+                参数propid：
+                    CAP_PROP_POS_MSEC
+                    CAP_PROP_POS_FRAMES
+                    CAP_PROP_POS_AVI_RATIO
+                    CAP_PROP_FRAME_WIDTH
+                    CAP_PROP_FRAME_HEIGHT
+                    CAP_PROP_FPS
+                    CAP_PROP_FOURCC         四个字符代码指示编解码，每个字符占8位，所以由double get()返回时需要用类型转换和移位操作符分别提取出四个字符
+                    CAP_PROP_FRAME_COUNT
+                    CAP_PROP_FORMAT
+    6.写入视频
+        要写入视频前与读取类似，要创建一个VideoWriter对象：
+            VideoWriter(const string& filename,
+                int fourcc,             //编解码格式，应该使用CV_FOURCC(char c0, c1, c2, c3)宏，宏参数是四个字符，每个字符分别用单引号括起来
+                double fps,             //帧率
+                Size frame_size,        //每一帧的大小
+                bool is_color=true);    //是否是彩色
+            VideoWriter();
+            若写入就绪，isOpened()成员函数返回true，如果返回false，可能是写入的文件夹没有权限或者指定的编解码器无效
+        写入：
+            write(const Mat& image) 图像必须和所创建的VideoWriter对象有相同尺寸，即frame_size应与image.size()返回的Size相同
+            operator<<(const Mat& image)
+    7.数据存储（序列化与反序列化）
+        可以将不同的数据类型（基本元类型、cv的数据类型）写入一个独立文件中
+        创建一个FileStorage对象：
+            FileStorage(string filename, int flag);
+            FileStorage();
+            当写入时，flag参数可以为FileStorage::WRITE 或 FileStorage::APPEND
+            当写入时为FileStorage::READ
+        写入数据：有两种形式：
+            mapping（键值对）：
+                用<<操作符，先插入一个string类型对象作为键名，然后再<<"{"表示键值开始，然后<<要插入的元素，用<<"}"表示结束
+                最终所得的形式是string对象: 元素
+            sequence（序列，未命名的值）：
+                用<<操作符先插入一个string类型对象作为序列名，然后再<<"["表示序列开始，然后<<要插入的元素，用<<"]"表示结束
+                最终所得的形式是string对象:
+                    -元素
+                    -元素
+            无论是是sequence还是mapping，都没有将{}和[]写入到文件中
+        读取文件：
+            FileNode operator[](const char* nodeName)
+            通过重载的[]运算符加键名或序列名来读取，[]操作符内的nodeName是用一对双引号括起来的C风格字符串，读取返回一个FileNode对象
+            FileNode对象重载了>>运算符，可以将值加载到对应类型的变量中
+            如果FileNode中的值是基本数据类型，则可以用强制类型转换直接获取，即重载了operator 基本数据类型()操作符
+        关闭文件：
+            release()
+七、UI
+    1.HighGUI原生图形接口
+        int namedWindow(const string& name, int flags=0);   //创建一个窗口
+            第二参数flags指定是否要调整窗口大小，0表示用户可以调整窗口大小，WINDOW_AUTOSIZE表示窗口大小根据图像自适应调整，但用户不能调整
+        int destoryWindow(const string& name);  //销毁一个窗口
+        void imshow(const string& name, InputArray image);  //在name命名的窗口中显示image，此时显示的是图像的一个拷贝，而不是图像本身的数据
+        int waitKey(int delay=0);   //对键盘事件等待delay毫秒，0表示无限等待，如果在delay好秒后没有输入，返回-1
+        void moveWindow(const char* name, int x, int y) //移动窗口，使得窗口左上角的坐标位于屏幕的(x,y)点
+        void destoryAllWindow();    //关闭所有窗口
+        int startWindowThread();    //尝试启动一个线程来自动更新窗口，如果没有线程可以启动则返回0
+    2.鼠标事件
+        需要自己定义一个鼠标事件的回调函数来响应事件，这个函数的参数必须如下来接收从主线程传递的信息：
+        void mouse_callback(int event, int x, int y, int flags, void* param)
+        x和y是鼠标的坐标，event是鼠标事件，param是一个指针，可以用来接收任何其他的信息
+        注册鼠标回调函数：
+            void setMouseCallback(const string& windowName, MouseCallback on_mouse, void* param=NULL);  //第二个参数便是所要注册的回调函数的函数名
+    3.滑动条
+        创建一个滑动条：
+            int createTrackbar(const string& trackbarName,  //要创建的滑动条的名称，充当句柄 
+                const string& windowName,                   //将滑动条添加到窗口的窗口名称
+                int* value,                                 //存储滑动条的位置
+                int count,                                  //可以滑动的最大值
+                TrackbarCallback onChange=NULL,             //回调函数，当滑动条被移动时，回调函数会被调用
+                void *param=NULL )                          //要传递给回调函数的参数
+            滑动条可能出现在窗口的顶部或底部，由平台决定，滑动条不会遮挡图像，所以窗口会变大
+            滑动条的回调函数必须要有如下的参数：
+            void trackbar_callback(int pos, void* param=NULL);  //pos是要接收的滑动条的位置信息
+        获取和设置滑动条的位置：
+            int getTrackbarPos(const string& trackbarName, const string& windowName)
+
+            void setTrackbarPos(const string& trackbarName, const string& windowName, int pos)
+八、滤波与卷积
+    void copyMakeBorder(
+        InputArray src,
+        OutputArray dst,
+        int top,            //下面四个整数表示边框上下左右四个方向的尺寸
+        int bottom,
+        int left, 
+        int right,
+        int borderType,     //像素填充的方式
+        const Scalar& value=Scalar())
+        参数borderType的取值：
+            cv::BORDER_CONSTANT
+            cv::BORDER_WRAP         复制对边的像素扩展边界
+            cv::BORDER_REPLICATE    复制边缘的像素扩展边界
+            CV::BRODER_REFLECT      复制这个边的距离边缘相同距离的像素扩展边界
+            cv::BORDER_REFLECT_101  复制这个边的距离边缘(n+1)的像素到边界距离边缘为n的像素扩展边界，与上面一个相似
+            cv::BORDER_DEFAULT      等于cv::BORDER_REFLECT_101
+    double threshold(InputArray src, OutputArray dst, double thresh, double maxValue, int thresholdType)
+        函数只对一个通道上的每个像素值做阈值化操作，如果是彩色图像，应该调用split()函数将图像分成三个单独通道，然后对每个通道调用
+        当第四参数设定为cv::THRESH_OTSU时表示自适应阈值
+        第五参数thresholdType的取值：
+            cv::THRESH_BINARY
+            cv::THRESH_BINARY_INV
+            cv::THRESH_TRUNC
+            cv::THRESH_TOZERO
+            cv::THRESH_TOZERO_INV
+    void adaptiveThreshold(
+        InputArray src,         //
+        OutputArray dst,        //
+        double maxValue,        //
+        int adaptiveMethod,     //cv::ADAPTIVE_THRESH_MEAN_C 或 cv::GAUSSIAN_C
+        int thresholdType,      //与threshold()的第五参数相同
+        int blocksize,
+        double C)
+        函数计算每个像素周围b*b区域内的加权平均值然后减去常熟C，如果第四参数是mean，则权值是相等的，如果是gaussian，则权值根据其到中心点的距离通过高斯方程得到
+    void blur(InputArray src, OutputArray dst, Size ksize, Point anchor=Point(-1,-1), int borderType=BORDER_DEFAULT);
+        目标图像的每个像素都是源图像中相应位置的一个窗口（核）中像素的平均值，窗口的尺寸由kszie指定，anchor指定计算时核与源图像的对齐方式，缺省值(-1,-1)表示核相对于滤波器居中
+        blur()的一般形式：
+            void boxFilter(InputArray src, OutputArray dst, int ddepth, Size ksize, Point anchor=Point(-1,-1), bool normalize=true, int borderType=BORDER_DEFAULT); 
+                与blur()相比，boxFilter()可以实现非归一化（将normalize设置为false），且深度ddepth可以控制，如果为-1，表示目标图像深度与源图像一致
+    void medianBlur(InputArray src, OutputArray dst, Size ksize);
+        中值滤波器将每个像素替换为围绕这个像素的矩形区域内的中间值（而不是平均值），比如噪点将严重影响均值滤波，对中值滤波影响就不那么显著
+    void GaussianBlur(InputArray src, OutputArray dst, Size ksize, double sigmaX, double sigmaY=0.0, int borderType=BORDER_DEFAULT);
+        sigmaX和sigmaY参数分别指定高斯核在x和y方向上的sigma值（最大值半宽），如果给定x值，y值取0表示y与x相等，如果两者都设为0，则按以下公式计算
+        sigmaX=(ksize.width-2)*0.3/2+0.8
+        sigmaY=(ksize.height-2)*0.3/2+0.8
+    void bilateralFilter(InputArray src, OutputArray dst, int d, double sigmaColor, double sigmaSpace, int borderType=BORDER_DEFAULT);
+        双边滤波器
+        第3参数d为像素邻域的直径，设置为-1时函数将自动为图像计算sigmaSpace的值
+    void Sobel(InputArray src, OutputArray dst, int ddepth, int xorder, int yorder, Size ksize=3, double scale=1, double delta=0, int borderType=BORDER_DEFAULT);
+        索贝尔导数
+    void morphologyEx(InputArray src, OutputArray dst, int op, InputArray element, Point anchor=Point(-1,-1), int iterations=1, int borderType=BORDER_DEFAULT, const Scalar& borderValue=morphologyDefaultBorderValue())
+九、常见图像变换
+    1.拉伸、收缩、扭曲、旋转
+        void resize(InputArray src, OutputArray dst, Size dsize, double fx=0, double fy=0, int interpolation=CV::INTER_LINEAR)
+            可以直接用参数dsize设置为输出图像dst的绝对大小，也可以将dsize设置为Size(0,0)然后将fx和fy设置为x轴和y轴的缩放比例因子
+            第五参数interpolation的可选值：
+                INTER_NEAREST
+                INTER_LINEAR
+                INTER_AREA
+                INTER_CUBIC
+                INTER_LANC0S4
