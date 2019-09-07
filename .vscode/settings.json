@@ -3,6 +3,7 @@
         "iosfwd": "cpp",
         "iostream": "cpp",
         "chrono": "cpp",
-        "*.txt": "cpp"
+        "*.txt": "cpp",
+        "type_traits": "cpp"
     }
 }

@@ -453,6 +453,14 @@ cctype函数
     当调用一个函数时，名称匹配的顺序是非模板函数>具体化模板函数>常规模板函数
 函数模板重载
     函数名相同，而参数的模板类型不同或者个数不同的函数也可以重载
+初始化：
+    聚合初始化：
+        T object = {arg1, arg2, ...};	(1)	
+        T object {arg1, arg2, ...};	(2)	(C++11 起)
+        T object = { .指派符 = arg1 , .指派符 { arg2 } ... };	(3)	(C++20 起)
+        T object { .指派符 = arg1 , .指派符 { arg2 } ... };	(4)	(C++20 起)
+        T object (arg1, arg2, ...);	(5)	(C++20 起)
+
 
 内存模型
     自动变量：在声明他的一对花括号内有效，退出销毁
@@ -1150,6 +1158,7 @@ STL
             is_sorted_until():
         查找：
             accumulate():求从[first,last)的和
+            #include <numeric>
                 template< class InputIt, class T >
                 T accumulate( InputIt first, InputIt last, T init );    //使用元素的operator+
 
@@ -1212,6 +1221,14 @@ RTTI:运行阶段类型识别
         int somefunc();
         funcPtrArray[0]=reinterpret_cast<FuncPtr>(&somefunc); 
         这个类型转换运算符几乎总是与编译平台有关，所以不具有移植性
+    可以用std::is_same<type1, type2>在模板函数中判断类型type1与type2是否相同
+        #include <type_traits>
+        template<typename T>
+        void func()
+        {
+            if(is_same<T, int>::value)
+            //...
+        }
 string类：C++标准类
     #include <string>
     template<class charT, class traits=char_traits<charT>, class Allocator=allocator<charT>>
