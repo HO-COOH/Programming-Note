@@ -4,6 +4,8 @@
         "iostream": "cpp",
         "chrono": "cpp",
         "*.txt": "cpp",
-        "type_traits": "cpp"
+        "type_traits": "cpp",
+        "*.tcc": "cpp",
+        "list": "cpp"
     }
 }

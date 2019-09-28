@@ -451,9 +451,9 @@ cctype函数
         }   //如果上面使用隐式实例化Add(x,y)，则会提示没有与参数模板T匹配的参数实例
     显式具体化在关键字template后有一对<>，显示实例化没有
     当调用一个函数时，名称匹配的顺序是非模板函数>具体化模板函数>常规模板函数
-函数模板重载
+14.函数模板重载
     函数名相同，而参数的模板类型不同或者个数不同的函数也可以重载
-初始化：
+15.初始化：
     聚合初始化：
         T object = {arg1, arg2, ...};	(1)	
         T object {arg1, arg2, ...};	(2)	(C++11 起)
@@ -637,8 +637,22 @@ cctype函数
                 有个例外是重载[]运算符
                     object.operator[](int i)
                     object[i]
+        注意前置++和后置++运算符的重载：
+            后置++、--操作符函数的重载需要在函数的参数内加一个int（为了区分前置和后置的标准）
+            前置++、前置--，需要返回一个加完（减完）后的自身的引用，定义
+                someClass& operator++() 
+                {   ...//一些操作
+                    return *this;
+                }
+            后置++、后置--，需要返回一个加和减之前的临时对象，再对自身操作，定义
+                someClass operator++(int) 
+                {
+                    someClass temp(...) //构造一个临时对象，通常是使用复制构造函数直接将*this复制给temp
+                    ...//一些操作
+                    return this;
+                }
         只能通过成员函数重载的运算符：
-        = 赋值运算符 () 函数调用运算符  [] 下标运算符  -> 指针访问类成员运算符
+            = 赋值运算符 () 函数调用运算符  [] 下标运算符  -> 指针访问类成员运算符
     友元函数：可以访问类的私有成员的函数
         在普通函数声明（函数原型）的类型前加friend，放在类声明中
         定义与普通函数相同，不加friend，也不加名称空间解析运算符::
@@ -1059,6 +1073,9 @@ STL
                 可以用数组表示方法[]访问array元素，有越界检查（越界时直接引起异常）
             vector：template < class T, class Alloc = allocator<T> > class vector; 
                 与array类似，也是在内存中使用连续的空间线性存储，所以随机位置访问效率高，不同的是vector大小可变，当空间不够时重新分配一段连续内存并拷贝原来的数据
+                vector类的性能优化方法：
+                    当预先知道大概会在vector容器中存储几个对象时，可以先定义一个vector对象，然后用成员函数reserve(size_t numberOfElements)方法，避免过多的自动重新分配resize()
+                    由于push_back()函数首先调用类构造函数来构造一个临时对象，再用复制构造函数复制这个临时对象到容器中，然后释放这个临时对象，造成浪费，所以使用emplace_back()函数直接就在容器内空间构造来优化性能 
             deque：template < class T, class Alloc = allocator<T> > class deque;
                 是双端队列，内部实现可能不同，但是要求在队头和队尾插入和删除元素效率高，通常不能使用一个随机访问迭代器，因为内存分配可能不是连续的空间
                 功能上与vector类似，但当队列很大时，vector重新分配整块内存开销很大，而deque开销较小
@@ -1096,7 +1113,9 @@ STL
             tuple：
                 #include <tuple>
                     
-    迭代器：每个STL容器类都定义了一个迭代器，能用某种方式遍历容器中存储的各个元素
+    迭代器：
+        当使用函数实现某一算法时，由于参数的确定性，就需要为各种数据容器写不同的函数，为了简化，可以将函数写成模板，对容器的访问通过传入迭代器实现，从而将数据结构和算法分开，只为一个算法写一个函数，访问所有支持的容器
+        每个STL容器类都定义了一个迭代器，能用某种方式遍历容器中存储的各个元素
         指针也是迭代器的一种
         每个容器类都有begin()和end()方法，分别返回一个指向容器第一个元素和最后一个元素的下一个位置（超尾）的迭代器
         迭代器种类：输入    输出    正向    双向    随机访问
@@ -1118,6 +1137,74 @@ STL
             这个输出流迭代器可以用作copy()的第三个参数，使得可以输出一个容器的指定范围
         reverse_iterator：反向迭代器，对反向迭代器执行递增会使其递减
             vector类定义了rbegin() 返回指向超尾的反向迭代器和rend() 返回指向第一个元素的反向迭代器
+    迭代器特性：#include <iterator> http://c.biancheng.net/view/471.html
+        对于使用迭代器作为参数的函数模板，存在一个问题，就是我们不知道在调用函数（实例化后）传给形参的迭代器所指的数据的类型
+        template<typename Iter>
+        void my_swap(Iter a, Iter b)
+        {
+            ? temp=*a;      //这里temp的类型应该是Iter a解除引用后的数据类型，当然，这里我们可以使用auto
+            *a=*b;
+            *b=temp;
+        }
+
+        然而有时候auto可能不能使用，为了这些情形，可以要求每种迭代器都包含一个公共定义的类型别名，这样就可以在模板函数中使用这些类型别名
+        比如要求所有迭代器都定义一个其所指向对象的类型的类型别名value_type
+        template<typename Iter>
+        void my_swap(Iter a, Iter b)
+        {
+            typename Iter::value_type temp=*a;      //这里的typename表示Iter::value_type是一个类型，而不是Iter类中的某个静态变量或静态方法名
+            *a=*b;
+            *b=temp;
+        }
+        class my_int_iterator   //自定义的一个类，模仿一个迭代器
+        {
+            typedef int value_type; //将value_type作为我自定义的类的int的别名，这样可以在上面的swap函数中获得这个Iter对象的value_type的类型，这个类型是int
+            //...
+        }
+        然而这种的方法的缺陷是原始指针无法使用，因为原始指针不是类，不包含value_type的定义，为了解决这个问题，C++标准在<iterator>头文件中定义了一套标准类型别名，使得算法既可以用迭代器，也可以用原始指针
+            template<typename Iter>
+            struct iterator_traits
+            {
+                typedef typename Iter::difference_type difference_type; //将differnece_type作为模板参数Iter::difference_type的别名
+                typedef typename Iter::value_type value_type;
+                typedef typename Iter::pointer pointer;
+                typedef typename Iter::reference reference;
+                typedef typename Iter::iterator_category iterator_category;
+            };
+            /*下面针对原始指针也提供iterator_traits的偏特化*/
+            template<typename T>
+            struct iterator_traits<T*>  //T*指针的偏特化iterator_traits
+            {
+                typedef std::ptrdiff_t difference_type;
+                typedef T value_type;
+                typedef T* pointer;
+                typedef T& reference;
+                typedef random_access_iterator_tag iterator_category;
+            }
+            由于优先匹配的原则，对原始指针实例化的iterator_traits会优先使用偏特化的版本
+        这样，对于任何定义了这五种typedef的迭代器，都可以在接受迭代器的算法函数中使用std::iterator_traits<迭代器形参类型>获得相应需要的类型，从而提供统一的获得迭代器的各种类型参数的接口
+        所以上面的swap函数可以写成：
+        template<typename Iter>
+        void my_swap(Iter a, Iter b)
+        {
+            typename std::iterator_traits<Iter>::value_type temp=*a;
+            *a=*b;
+            *b=temp;
+        }
+    自定义迭代器类：
+        为了能让自定义的迭代器类兼容既有STL的算法，就应该在其中定义五种typedef
+        在<iterator>头文件中定义了一个迭代器模板，包含了这五种typedef的定义，只需在自定义迭代器类中public继承这个类模板，并赋值给相应的模板参数，就可以省去全部重写typedef和名称的麻烦
+        template <class Category, class T, class Distance = ptrdiff_t, class Pointer = T*, class Reference = T&>
+        struct iterator 
+        {
+            typedef T         value_type;
+            typedef Distance  difference_type;
+            typedef Pointer   pointer;
+            typedef Reference reference;
+            typedef Category  iterator_category;
+        };
+        class my_int_iterator: public std::iterator<std::random_access_iterator_tag, int>
+        {...}   //此时my_int_iterator中的value_type为int，pointer为int*, reference为T&, iterator_category为random_access_iterator_tag
     方法：
         #include <algorithm>
         排序：
@@ -1182,6 +1269,12 @@ STL
             resize(distance(容器.begin,unique返回的迭代器))
             使用unique方法前需要保证数组有序，所以无需容器需要先sort()
         merge()方法需要五个迭代器参数，第一和第二个是第一个容器的头尾迭代器，第三和第四个是第二个容器的头尾迭代器，最后一个迭代器指向合并后输出的迭代器
+        fill()：需要两个迭代器参数，将[first,last)的范围用value填满
+            template< class ForwardIt, class T >
+            void fill(ForwardIt first, ForwardIt last, const T& value)
+        fill_n()：需要1个迭代器参数，从first开始的连续n个元素填充为value
+            template< class OutputIt, class Size, class T >
+            void fill_n( OutputIt first, Size count, const T& value );
     for_each()循环:
         #include <algorithm>
     Allocator 分配器：
@@ -1426,12 +1519,14 @@ string类：C++标准类
     for(double x:a) {...}
     for循环的圆括号内声明一个与容器存储内容的类型相同的变量，后跟冒号和容器名，花括号内的语句用这个声明的变量一次访问容器中的各个元素
     不同于for_each循环，for循环可以在括号内声明一个引用参数来修改容器存储的值
+    范围for循环适用于任何带有begin(), end()方法的类
+    注意begin()和end()方法应该返回一个迭代器类型（包括指针）
 C++11:
     新类型：
         longlong, unsigned longlong 64位整形
         wchar_t的字面值用L做前缀：wchar_t title[]=L"something"; 一个wchar_t占用2字节
-        char16_t的字面值用u做前缀
-        char32_t的字面值用U做前缀
+        char16_t的字面值用u做前缀，表示UTF-16
+        char32_t的字面值用U做前缀，表示UTF-32
     统一的初始化：
         用花括号列表初始化所有内置类型、用户定义类型（类、结构体），初始化列表可以加=号，也可以不加
         用初始化方法如果有赋值缩短（赋值的范围超过变量的类型所能存储的范围），将产生编译错误
@@ -1471,6 +1566,11 @@ C++11:
         using strv_it=std::vector<std::string>::iterator;
         用于模板部分具体化：using arr12=std::array<T,12>;
     空指针：nullptr，更安全
+        如果有个重载函数，一个重载版本接受指针，另一个重载版本接受整数，如果将一个NULL指针作为实参调用函数，将会引起多义错误，而新的nullptr则不会
+        void foo(int i) {...}
+        void foo(char* pt) {...}
+        foo(NULL);      //多义错误
+        foo(nullptr);   //调用void foo(char*)
     作用域内枚举：传统的枚举在作用域内枚举成员不能重名，由于底层实现可能不同所以可能不可移植
         C++11在作用域内枚举，用enum class 枚举名{枚举值}或enum struct 枚举名{枚举值}定义
         enum class seasons{spring, summer, autumn, winter};
@@ -1514,7 +1614,13 @@ C++11:
         如果特征标不同，会导致基类的方法被隐藏，从而无法调用基类方法
         可以在派生类的这样的特征标与基类相同的方法的定义的函数头后显式加override关键字，表明要覆盖基类虚函数，这样编译器会检查特征标是否相同
         可以在派生类与基类相同特征标的函数的定义的函数头后显式加final关键字，表明禁止以后从这个派生类继续派生的类覆盖这个方法
-
+    final关键字管理派生体系：
+        可以在类定义时在类名后加final关键字，表明禁止任何类从这个类派生
+        class someClass final
+        {
+            ...
+        }
+        class anotherClass: someClass {...} //错误
     lambda表达式：在需要函数指针、函数符的地方可以用lambda函数，有点类似于内联函数，在用lambda函数的地方需要完整定义整个函数
         lambda函数的一般形式的定义：中括号 [] (参数列表) {函数体}
             [](int a) {return a%3==0;}  //一个用于判断参数是否可以被3整除的lambda函数，将返回一个布尔值
@@ -1549,9 +1655,27 @@ C++11:
         注意应当再额外定义一个函数只有一个参数的函数模板，有时还需要空参数的模板
         例如求一个可变参数的参数的和的函数，应当定义一个只有一个参数的函数模板，返回参数自己，否则会在参数减少到1的时候找不到要使用的函数
     delete关键字：在类定义的函数原型后加=delete，表明此方法禁止产生和调用（也可以禁止编译器隐式提供的各种默认函数，常用于禁止复制和赋值重载）
+        由于C++在函数调用时优先调用最佳匹配函数，如果没有最佳匹配，则可能进行隐式类型转换，所以可以在一个方法后加delete关键字，来禁止调用已声明为delete的方法，从而阻止隐式类型转换
+        class someClass
+        {
+        public:
+            void func(int a) {}
+            void func(double b)=delete;
+        }
+        someClass a;
+        a.func(2);
+        a.func(2.0);    //由于已经存在void func(double)，所以2.0不会被隐式转换为int然后调用void func(int)，而void func(double)被声明为delete，所以调用错误
     default关键字：有时可能希望使用自动生成的默认函数（构造、复制构造、重载赋值），可以写出函数原型后加=default，表明使用这些方法的默认版本
         someClass()=default;//使用默认构造函数的同时也可以自定义其他的构造函数
     委托构造函数：有时由于定义了多个构造函数，可能产生重复代码，所以可以在一个构造函数中用成员初始化列表的方法调用一个已经定义的另一个构造函数，然后在函数体中再执行别的操作
+        C++11之前的常见做法是定义一个private的init()方法，做一些所有构造函数都要执行的公共操作，然后在构造函数中调用这个方法
+        class someClass
+        {
+            int a;
+        public:
+            someClass():a(0) {...}
+            someClass(int v):someClass() {//do other things}
+        }
 
 C++14:
     1.函数返回值类型auto
