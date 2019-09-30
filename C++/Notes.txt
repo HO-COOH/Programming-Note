@@ -1600,6 +1600,8 @@ C++11:
             定义了移动构造函数后，exp就可以作为右值引用，避免不必要的复制，常发生在exp作为函数返回临时变量时
             例如：vector<string>a;  a.push_back(string("hello")); //这里string类定义了移动构造函数，当用hello构造一个string的临时对象后，可以用移动构造函数对vector中存储的新对象进行构造
                 如果没有移动构造函数，就需要先用hello构造一个string临时对象，然后使用复制构造函数对vector中存储的新对象进行构造
+            将移动构造函数定义为noexcept，进一步节约移动时间
+            className(className && exp) noexcept;
         移动赋值运算符：
             原形：className& operator=(className && exp);
             定义：className& className::operator=(className && exp) {}
