@@ -1,0 +1,4 @@
+﻿  main.c
+LINK : warning LNK4098: 
+glew32s.lib(glew.obj) : warning LNK4099: 
+  OpenGL.vcxproj -> C:\Users\Peter\Desktop\Programming-Note\OpenGL\OpenGL\x64\Debug\OpenGL.exe

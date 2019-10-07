@@ -7,5 +7,6 @@
         "type_traits": "cpp",
         "*.tcc": "cpp",
         "list": "cpp"
-    }
+    },
+    "C_Cpp.errorSquiggles": "Disabled"
 }

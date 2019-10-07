@@ -161,7 +161,11 @@ atoi()  将nptr所指的字符串的开头部分转化为相应的整数，长�
     在可变参数的函数里声明一个va_list类型的变量，如：va_list argp;（argp其实是个指向参数栈的指针）
     然后va_start(argp, last);
     以后每次调用va_arg(argp,SOMETYPE)时返回的就是可变参数列表的下一个变量，类型由SOMETYPE决定
-
+15. 栈区动态内存分配(类似于C中的VLA)
+    void* alloca(size_t bytes);
+    函数在栈区分配bytes大小的空间并返回一个空类型的指针指向这个空间的首字节，分配的空间在当前作用域结束时被释放
+    通常要做类型转换，转换成所需的类型
+    可以用这个函数来模拟一个可变大小的栈区动态数组
 
 C++
 1. 字符串输入
@@ -443,6 +447,7 @@ cctype函数
         {
             return a+b;
         }
+        显示实例化：template int Add<int>(int, int);
         int main()
         {
             int x=6;
@@ -451,6 +456,42 @@ cctype函数
         }   //如果上面使用隐式实例化Add(x,y)，则会提示没有与参数模板T匹配的参数实例
     显式具体化在关键字template后有一对<>，显示实例化没有
     当调用一个函数时，名称匹配的顺序是非模板函数>具体化模板函数>常规模板函数
+    模板参数自动推导：模板参数自动推导要满足3个条件
+        1.模板参数必须与模板函数的形参在位置上一一对应
+        2.模板函数返回值的模板参数无法推导
+        3.需要推导的模板参数必须连续位于模板参数列表的尾部，中间不能有不可推导的模板参数，如：
+            template<typename T1, typename T2, typename T3>
+            double func(T1 a, T2 b) {...}   //这里T1 T2是可推导的模板参数，但不位于模板参数列表的尾部，所以不能自动推导
+    避免模板参数自动推导：(C++20)
+        C++20标准库定义了一个模板结构体std::type_identity
+            template<typename T>
+            struct type_identity
+            {
+                using type=T;
+            }
+        只需将using改成typedef就可以将其移植到C++98及以后的任何C++版本程序中
+            template<typename T>
+            struct type_identity
+            {
+                typedef T type;
+            };
+        在函数模板的函数形参中使用这个结构体的type成员作为类型名，可以避免这个形参的类型在这个函数被调用时发生隐式实例化被自动推导为另一种类型而发生冲突，比如：
+            template<typename Key, typename Value>
+            void replace_key(std::map<Key, Value>& container, const Key& oldKey, const Key& newKey) {...}   //这个模板函数修改一个map中的某个键值对的键
+            
+            std::map<std::string, int>my_map{{"one",1}, {"two", 2}, {"three", 3}};
+            replace_key(my_map, "two", "double");   //试图调用这个函数，把键"two"改为"double"
+            这个函数被调用时，my_map是一个map<std::string, int>类型，所以模板参数Key被推导为std::string，Value被推导为int，所以形参oldKey和newKey的类型应该是const std::string&
+            然而实参却是一个C风格字符串，类型为const char*，所以会编译报错，原因是两次Key的类型推导的结果不一致，导致函数根本没有被实例化
+        使用type_identity可以解决这个问题：
+            template<typename Key, typename Value>
+            void replace_key(std::map<Key, Value>& container, const typename type_identity<T>::type& oldKey, const typename type_identity<T>::type& newKey) {...}
+        这是因为C++不会自动推导模板类的类型，所以当编译器已经知道Key的类型是std::string时，就不会再在隐式实例化的过程中根据实参的类型去推导出type_identity<T>的模板参数T是const char*类型
+        所以当现在调用replace_key时实例化了一个replace_key<std::string, int>函数，形参中的C风格字符串被隐式类型转换为std::string，调用成功
+        type_identity<T>::value有一个类型别名
+        using type_identity_t=type_identity<T>::value
+        所以模板函数的形参的类型可以用type_identity_t<T>代替typename type_identity<T>::value
+
 14.函数模板重载
     函数名相同，而参数的模板类型不同或者个数不同的函数也可以重载
 15.初始化：
@@ -1030,6 +1071,9 @@ cctype函数
     智能指针就是在声明时分配堆内存，并在指针变量退出所在作用域后自动释放分配的内存
     1.unique_ptr
         声明方法：unique_ptr<Type> pt(new Type);  //创建了一个Type类型的智能指针pt
+            unique_ptr<Type[]> pt(size_t size); //创建了一个大小为size个Type类型的智能指针pt
+            unique_ptr<Type>pt=std::make_unique<T>();
+            unique_ptr<Type>pt=std::make_unique<T[]>();
         unique_ptr对象重点在于所有权的概念，即不允许复制（避免了auto_ptr在复制时导致两个指针指向同一块内存，然后超出作用域后释放同一块内存两次的问题）
         例外是可以将一个临时指针变量赋值给另一个，如：
         unique_ptr<Type> Create()
@@ -1053,6 +1097,7 @@ cctype函数
         作为函数实参时，如果形参是同样的智能指针，由于会发生复制，所以产生错误，正确的方法是将形参声明为引用
         方法：
             get()返回unique_ptr所管理的对象的指针
+            reset(*ptr=nullptr)释放当前所管理的对象，如果参数ptr是一个nullptr（同时也是缺省参数），则调用reset后当前的unique_ptr不拥有任何对象，如果ptr非空，则拥有ptr所指的对象（常用与重新分配一块新内存给当前的unique_ptr)
     2.shared_ptr
         当程序会使用多个指向同一个对象的指针，就用shared_ptr
         允许复制和赋值，在复制时会增加引用计数，退出作用域后将指向同一内存的shared_ptr的引用计数减少1，当引用计数减少到0时释放这一块内存
@@ -1433,6 +1478,48 @@ string类：C++标准类
             size_type copy(charT* s, size_type n, size_type pos=0) const;   //将调用字符串从pos开始的连续n个字符复制到s所指的内存空间，如果调用字符串到达末尾则停止复制，函数返回复制的字符数，该方法不检查s的空间是否足够，也不追加结尾空字符'\0'
         swap()：使用一个时间恒定的算法来交换两个string对象的内容
             void swap(basic_string& str);
+    stringstream字符串流
+        #include <sstream>
+        stringstream类继承自iostream类，所以继承了iostream类的所有方法
+        注意，stringstream类当完成了一次>>输出后，会将eof置1，此时不可再向stringstream对象输入，否则会引起failbit和badbit置1，应当使用clear()成员方法清空eof位
+            float b{ 3.14 };
+            stringstream ss;
+            ss << b;
+            ss << "abcd";       //可以多次向同一个stringstream对象输入数据
+            if (ss.eof())
+                cout << "eof";
+            if (ss.fail())
+                cout << "fail";
+            if (ss.bad())
+                cout << "bad";
+            if (!ss)
+                cout << "!";
+            string s;
+            ss >> s;            //此时eof置1，不可再继续输入
+            cout << endl;
+            if (ss.eof())
+                cout << "eof";
+            if (ss.fail())
+                cout << "fail";
+            if (ss.bad())
+                cout << "bad";
+            if (!ss)
+                cout << "!";
+            ss << "abcd";       //此时"abcd"字符串并没有输入到ss中，而且eof、badbit、failbit都置1，且重载的!操作符返回true
+            cout << endl;
+            if (ss.eof())
+                cout << "eof";
+            if (ss.fail())
+                cout << "fail";
+            if (ss.bad())
+                cout << "bad";
+            if (!ss)
+                cout << "!";
+        常见应用：类型转换
+        成员方法：
+            string str() const;         //返回一个字符串，是当前stringstream内容的拷贝
+            void str(const string& s);  //丢弃当前stringstream的内容，并将s的值拷贝进stringstream内，常用于调用str("")的方法来释放内存
+
 <chrono> C++11:
     所有的chrono函数都在std::chrono名称空间内
     1.时间段：
@@ -1545,7 +1632,25 @@ C++11:
         {
             //函数中使用类似容器和迭代器的方法
         }
-    auto关键字：根据显示初始化所赋值的类型自动判断变量的类型
+    auto关键字：根据显式初始化所赋值的类型自动判断变量的类型
+    std::enable_if：
+        C++11引入一个概念SFINAE (substituion failure is not an error)匹配失败不是错误，意思是当编译器根据函数调用来实例化模板函数时，可能会有几个函数模板在推导模板参数时无法编译通过，但只要有一个可以正确推导出来，就不会产生编译错误
+        enable_if与函数模板和type_traits配合，可以实现这个目的，让只满足特定要求的模板函数的调用才能让模板函数实例化，不满足要求的调用就组织函数模板实例化
+        enable_if是一个模板结构体，一个可能的实现：
+            template<bool b, typename T=void>
+            struct enable_if{};
+
+            template<typename T=void>
+            struct enable_if<true, T=void>
+            {
+                typedef T type;
+            }
+        第一个是通用模板，第二个是部分具体化后的模板，所以当模板参数b为false时将匹配通用模板，此时这个结构体为空，当模板参数b为true时，按优先原则将匹配第二个部分具体化后的模板，这个模板内将类型type作为模板参数T的别名
+        例如想要一个模板函数在形参为整数时才实例化，而且返回TYPE类型，可以
+        template<typename T>
+        typename std::enable_if<std::is_integral<T>::value, TYPE>::type func(T a) {...}
+        根据enable_if的模板定义，当形参T的类型是整数时，is_integral<T>的value为true，所以type的值就是TYPE，如果不指定TYPE，则根据定义，type的值是void
+        当形参T的类型不是整数时，is_integral<T>的value为false，所以与enable_if的第一个通用模板匹配，此时这个结构体中没有定义type，所以编译出错，函数不会实例化
     constexpr关键字：
         对于常量，constexpr声明的变量需要一个初始化器，所以允许类内静态常量的初始化，旧标准的类中静态常量成员需要类内声明类外定义
         class A
@@ -1561,6 +1666,11 @@ C++11:
         当表达式为false时，在编译期中编译期会发出错误，错误内容是消息字符串
     decltype关键字：将y声明为与表达式x的类型相同
         decltype(x) y;
+        C++14：当decltype()与auto连用时分为两种情况
+            用decltype(auto)声明变量的类型时，变量需要被立即初始化（就是必须定义赋值），此时所声明的变量的类型是用初始化的值替换auto关键字所得的decltype
+                即：decltype(auto) 变量名=初始化值; 相当于 decltype(初始化值) 变量名=初始化值;
+            用decltype(auto)声明函数的返回值类型时，与声明变量的情况类似，相当于将返回语句替换掉auto关键字
+                即：decltype(auto) func() {return 表达式;} 相当于 decltype(表达式) func() {return 表达式;}
     返回类型后置：可以在函数名前加auto关键字，将返回值类型用一个指针运算符放到函数头后面
         auto func() ->  returnType
         多与decltype合用在模板里
@@ -1574,10 +1684,16 @@ C++11:
         foo(NULL);      //多义错误
         foo(nullptr);   //调用void foo(char*)
     作用域内枚举：传统的枚举在作用域内枚举成员不能重名，由于底层实现可能不同所以可能不可移植
+        还有个潜在的类型安全问题是由于枚举成员被视为整数，所以可以在两种不同的枚举类型、枚举类型与整数之间比较
         C++11在作用域内枚举，用enum class 枚举名{枚举值}或enum struct 枚举名{枚举值}定义
         enum class seasons{spring, summer, autumn, winter};
         enum struct freq{never, sometimes, often, always};
         新型枚举需要显式用作用域运算符来引用枚举值，如: seasons::spring
+        新型枚举类、枚举结构体不能隐式转换为整数、不能与整数比较、也不能与不同枚举类的枚举值比较，否则发生编译期错误
+        指定枚举类的数据类型：
+            新型枚举类还能指定枚举类的类型，语法与类继承类似
+            比如要指定枚举类My_Enum的数据类型是Type类型
+            enum class My_Enum:Type {value1=(Type),...};
     类内初始化：在定义类时对成员初始化赋值
     新STL的const方法：cbegin()和cend()，与begin()和end()一样，返回指向第一个元素和指向超尾的迭代器，不过他们将元素视为const，不能使用迭代器修改元素
     尖括号嵌套：之前为了避免和抽取运算符>>混淆，C++11不要求在嵌套的尖括号（尤其是模板类型的指定）中使用空格分开
@@ -1735,7 +1851,7 @@ C++17：
             将原先接收函数返回值的变量类型改为optional<Type>，或者由于函数的返回值已经确定，可以使用auto关键字
             原先的可能返回无效值的函数将返回一个默认构造的optional对象，此对象无值
             Type不能是引用类型，因为引用肯定有值，所以不需要optional
-        optional模板对象还可以做函数形参
+        optional模板类还可以做函数形参
         方法：
             has_value()：当有值的时候返回true
             ParaType value_or(para)：当没有值的时候将para传递给optional内存储的类型的构造函数并返回这个构造的对象，当有值的时候返回这个值
@@ -1746,7 +1862,14 @@ C++17：
         #include <variant>
         variant是一个可以存储多种可能类型的对象，与union作用类似，但union只能存储内置类型（比如不能存std::string），union的大小与所存储的最大的成员相同，而variant则是所有所存储的类型的大小相加
         variant<Types...> var;  //定义一个可能存Types...(尖括号内的所有Type)类型的variant对象var
-        当variant对象中实际存的是T类型的数据时，可以使用auto* pt=std::get_if<T>(&var); 这样当var中实际存储的确实是T类型时，返回一个指向这个数据的指针，如果类型不符，或者没有数据，返回一个nullptr
+        当variant对象中实际存的是T类型的数据时，可以使用
+            auto* pt=std::get_if<T>(&var)   //这样当var中实际存储的确实是T类型时，返回一个指向这个数据的指针，如果类型不符，或者没有数据，返回一个nullptr
+            auto& rf=std::get<T>(var)       //这样当var中实际存储的确实是T类型时，返回一个这个数据的引用，如果类型不符，抛出std::bad_variant_access异常
+            bool std::holds_aternative<T>(var)  //查询var是否实际存储了T类型的数据，如果是，返回true，否则返回false
+        template<class callable, class... variants>
+        std::visit(callable f, variants var1...)
+            相当于将variant var1...中的数据传递给可调用对象f（函数、函数对象（重载了()操作符的结构体、类）），然后调用这个可调用对象f
+            visit的返回值就是可调用对象f的返回值
     4.std::any
         #include <any> 
         any是一个可以存储任何类型的对象，可以在构造any对象时初始化赋值，也可以先定义后赋值
