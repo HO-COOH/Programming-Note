@@ -1290,14 +1290,29 @@ STL
             is_sorted_until():
         查找：
             accumulate():求从[first,last)的和
-            #include <numeric>
+                #include <numeric>
                 template< class InputIt, class T >
                 T accumulate( InputIt first, InputIt last, T init );    //使用元素的operator+
 
                 template< class InputIt, class T, class BinaryOperation >
                 T accumulate( InputIt first, InputIt last, T init, BinaryOperation op );    //使用一个接受两个参数的函数
                 函数的原型需符合：returnType fun(const Type1& a, const Type2& b);   //不一定需要const&限定，但T需要可以被隐式转换为Type1和Type2
-
+            equal():
+                比较从[first1,last1)的元素是否与[first2, first2+(last1-first1-1) )的相同
+                如果first2迭代器所指向的容器的元素比first1的多，则只比较与first1到last1相等个数的元素
+                如果first1迭代器所指向的容器元素比first2的多，一定返回false
+                template <class InputIterator1, class InputIterator2>
+                bool equal (InputIterator1 first1, InputIterator1 last1, InputIterator2 first2);
+                相当于：
+                {
+                    while(first1 != last1)
+                    {
+                        if(*first1 != *first2)
+                            return false;
+                        ++first1;
+                        ++first2;
+                    }
+                }
         复制：        
             copy()方法需要三个迭代器参数，第一和第二个迭代器参数指向源的范围（包括第一参数，而不包括第二参数），第三个迭代器参数指向目的地
             copy_backward()
@@ -1617,22 +1632,43 @@ C++11:
     用户定义字面值：
         
     统一的初始化：
-        用花括号列表初始化所有内置类型、用户定义类型（类、结构体），初始化列表可以加=号，也可以不加
-        用初始化方法如果有赋值缩短（赋值的范围超过变量的类型所能存储的范围），将产生编译错误
-        对结构体初始化，将按顺序线性初始化，如：
-        struct A
-        {
-            int a;
-            char b[2];
-        }
-        A a{1,2}; //a.a=1,a.b[0]=2,a.b[1]=0;
-        初始化列表可以用作函数参数，要包含头文件
-        #include <initializer_list>
-        returnType func(std::initializer_list<type> para)
-        {
-            //函数中使用类似容器和迭代器的方法
-        }
+        C++11前（C++98 C++03）：
+            int i1;     //未定义的值
+            int i2=0;   //内置类型的C风格初始化，注意不是赋值运算符
+            int i_arr[]={1,2,3};    //内置类型的C风格数组初始化
+            class A_int{public: A(int v){} }; A_int a(1);   //圆括号的对象构造函数初始化
+            于是对于内置类型也增加了原本用于对象的圆括号初始化
+            int i3(4);      //后增加的圆括号初始化
+            int i4=int();   //后增加的圆括号默认值初始化，i4=0
+            注意，不能int i4() 因为这是声明一个函数
+            不要用圆括号初始化一个变量
+        这产生了一个问题，由于存在typedef类型别名，无法知道这是一个内置类型（可以用圆括号、赋值符）或是类（可以用圆括号）或是数组（可以用花括号）
+        C++11后：
+            用花括号列表初始化所有内置类型、用户定义类型（类、结构体），初始化列表可以加=号，也可以不加
+            用花括号初始化方法如果有赋值缩短（赋值的范围超过变量的类型所能存储的范围），将产生编译错误
+            对内置类型的花括号初始化，如果没有参数，将初始化为默认0以及可能被转换为0的值，如布尔值被默认初始化为false
+            bool b{};   //b==false
+            对结构体初始化，将按顺序线性初始化，如：
+            struct A
+            {
+                int a;
+                char b[2];
+            }
+            A a{1,2}; //a.a=1,a.b[0]=2,a.b[1]=0;
+            初始化列表可以用作函数参数，要包含头文件
+            #include <initializer_list>
+            returnType func(std::initializer_list<type> para)
+            {
+                //函数中使用类似容器和迭代器的方法
+            }
+        与auto关键字合用的特殊情况：
+            auto i5{5};     //C++11: std::initializier_list<int>, C++14: int
+            auto i6={6};    //std::initializer_list<int>
+        所以最好不要将auto = {} 连用，最好不要在花括号初始化里用=
+            auto i7=int{7}  //i7=7
     auto关键字：根据显式初始化所赋值的类型自动判断变量的类型
+        auto x{initializer};
+        当需要显式指明一个类型时 auto x=type{initializer};
     std::enable_if：
         C++11引入一个概念SFINAE (substituion failure is not an error)匹配失败不是错误，意思是当编译器根据函数调用来实例化模板函数时，可能会有几个函数模板在推导模板参数时无法编译通过，但只要有一个可以正确推导出来，就不会产生编译错误
         enable_if与函数模板和type_traits配合，可以实现这个目的，让只满足特定要求的模板函数的调用才能让模板函数实例化，不满足要求的调用就组织函数模板实例化
@@ -1877,6 +1913,9 @@ C++17：
         当any对象中实际存的是T类型的数据时，可以使用any_cast<T>(var)运算符来返回一个所存储的对象的拷贝，如果是T*则返回指针，T&则返回引用，如果类型不符，则抛出bad_any_cast异常
             bool has_value()
             const type_info& type(); //返回一个type_info对象的引用，有name()方法可以返回一个类型的C风格字符串
+C++20：
+    1.模块
+        模块名：[模块名]
 
 多线程C++11 std::thread：
     1.一个最简单的多线程（用第二个线程打印hello world）
@@ -2572,3 +2611,59 @@ More Effective C++
     HRESULT->long (winnt.h)初始化COM库的函数的返回值
     LPTSTR 字符串指针
     LPTCSTR 常量字符串指针
+
+
+#include <iostream>
+#include <array>
+#include <vector>
+
+using namespace std;
+
+struct A_value
+{
+	int v;
+	A_value(int _v) :v(_v) { cout << "value struct!\n"; }
+};
+
+class A
+{
+	int value;
+public:
+	A() { cout << "default constructor! value=" << value<<endl; }
+	A(A_value b) :value(b.v) { cout << "Value constructor! value=" << value<<endl; }
+	//A(int v) :value(v) { cout<<"Explicit constructor! value="<<value<<endl; }
+	A(const A& a) :value(a.value) { cout << "Copy constructor! value=" << value << endl; }
+	A(A&& a) { cout << "Move constructor! value=" << value << endl; }
+	~A()
+	{
+		cout << "Destructor!\n";
+	}
+};
+
+A Return_temp_A()
+{
+	return A();
+}
+
+A Return_local_A()
+{
+	A a(3);
+	return a;
+}
+
+int main()
+{
+	
+	cout << "/*std::array*/\n";
+	array<A, 5> A_array;
+	
+	cout << "\n/*std::vector without anything.*/\n";
+	vector<A> A_vector;
+	A_vector.reserve(3);
+	cout << "/*std::vector push_back A()*/\n";
+	//A_vector.push_back(3);
+	cout << "\n/*std::vector emplace_back A()*/\n";
+	A_vector.emplace_back(4);
+	
+	cout << "\n/*Out of scope*/\n";
+}
