@@ -1621,8 +1621,28 @@ string类：C++标准类
     for(double x:a) {...}
     for循环的圆括号内声明一个与容器存储内容的类型相同的变量，后跟冒号和容器名，花括号内的语句用这个声明的变量一次访问容器中的各个元素
     不同于for_each循环，for循环可以在括号内声明一个引用参数来修改容器存储的值
+    常用auto或auto& 来声明循环变量的类型
     范围for循环适用于任何带有begin(), end()方法的类
     注意begin()和end()方法应该返回一个迭代器类型（包括指针）
+    工作原理：
+    for(range_declaration : range_expression)
+    {
+        ... 
+    }
+    与下面的普通for循环完全等价
+    {
+        auto&& range=range_expression;  //注意这里的range由于用auto&&声明，所以是一个通用引用，可以是左值引用也可以是右值引用
+        for(auto b=beginExpr, e=endExpr; b!=e; ++b)
+        {
+            range_declaration=*b;
+        }
+    }
+    这里的beginExpr和endExpr分为三种情况：
+        1）若range_expression是一个普通数组类型，则beginExpr为range，endExpr为range+数组大小
+        2）若range_expression是一个带有begin()和end()方法的类，则beginExpr为range_expression.begin()，endExpr为range_expression.end()
+        3）不满足上述两种情况的，在当前名称空间内查找begin(range)和end(range)函数
+            如果range是一个内置类型，则在std名称空间中查找
+            所以可以在一个range_expression类中不定义begin和end方法，而在类外定义一个函数或函数模板叫begin end，接受一个这个类的对象
 C++11:
     新类型：
         longlong, unsigned longlong 64位整形
@@ -1738,15 +1758,79 @@ C++11:
         右值：所有的C++的值要么是左值，要么是右值，左值是表达式结束后依然存在的持久化对象，右值是表达式结束后就不存在的临时对象
             所有的具名变量、对象都是左值，而右值没有命名
             能取地址的值是左值，不能的是右值
-            常见的右值包括常量表达式、变量表达式（等号右边的表达式）、函数返回的临时对象（包括返回的临时变量）
+            常见的右值包括常量表达式、变量表达式（等号右边的表达式）、函数返回的临时对象（包括返回的临时变量）注意：永远不要将函数的返回值定义为返回右值引用！
             用将右值赋给一个类型名+两个取地址符&&+变量名，得到一个命名的右值，名字是变量名，这就形成了一个新的左值，多用于移动构造
                 如：int &&a =1;   int && b=c+d;     int && e=somefunc();    //somefunc()返回一个int
             将右值赋值给右值引用后将延长这个右值的生存周期，在右值引用退出所在的作用域后才失效
             左值引用（一个取地址符）只能绑定左值，右值引用（两个取地址符）只能绑定右值
-            而常量左值引用可以绑定右值、非常量左值、常量左值
+            而常量左值引用可以绑定右值、非常量左值、常量左值，而且也可以延长所绑定的对象的生存期
             const int & a=1;    //绑定常量右值
             const int & b=x;    //绑定非常量左值（复制构造函数的参数就是常量左值引用绑定非常量右值）
             const int y=2; const int & b=y; //绑定常量左值
+            例如：
+                class A{};
+                A Return_temp_A()
+                {
+                    return A();
+                }
+
+                A Return_local_A()
+                {
+                    A a;
+                    return a;
+                }
+
+                void func(A a)
+                {
+                    cout << "Standard.\n";
+                }
+
+                void func(A& a)
+                {
+                    cout << "Lvalue ref.\n";
+                }
+
+                void func(const A& a)
+                {
+                    cout << "Const Lvalue ref.\n";
+                }
+
+                void func(A&& a)
+                {
+                    cout << "Rvalue ref.\n";
+                }
+
+                int main()
+                {
+                    A a;
+                    func(a);    //可以匹配A, A&, const A&
+                    const A b;
+                    func(b);    //可以匹配A, const A&
+                    func(Return_local_A()); //可以匹配A, A&&
+                    func(Return_temp_A());  //可以匹配A, A&&
+                }
+        通用引用：
+            两个&&符不一定就是右值引用，当且仅当发生类型推断时（函数模板实例化、用auto&&声明一个变量的类型），&&可能会是一个左值引用，规则如下，而且形式必须是T&&中的T发生类型推断
+            引用折叠：
+                T& &    T& &&   T&& & -> T& 左值引用
+                T&& && -> T&& 右值引用或通用引用
+            由于发生类型推断时的&&可以成为左值引用也可以成为右值引用，所以称为通用引用
+            auto&& x=0;             //右值引用
+            int i=0;   auto&& x=i;  //左值引用
+            template<typename T>
+            void func(T&& x)        //通用引用，实例化时可以绑定左值也可以绑定右值
+        完美转发：所谓转发，就是通过一个函数将参数继续转交给另一个函数进行处理，原参数可能是右值，可能是左值，如果还能继续保持参数的原有特征，那么它就是完美的
+            不完美转发：在一个接收右值引用参数的函数func1内将这个参数直接传给另一个函数func2，就是不完美转发，这是由于func1的右值引用参数有名字，所以在func1函数体他是一个左值，传递给另一个函数是作为左值或左值引用来传递的，改变了原有特性
+            std::forward()模板函数：将具名的右值引用（左值）仍然作为右值引用传递给另一个接受右值引用参数的函数，而不改变左值引用的性质
+                然而只有forward并不能完美转发，因为在非模板函数中引用参数只能是左值引用或右值引用中的一种，要实现两种都接受，必须借助模板实现通用引用参数
+            将std::forward()与函数模板结合，使得函数既能接受左值引用，又能接收右值引用
+            void somefunc(int&& a);
+            void somefunc(int& a);  //假设有一个重载函数，既能处理右值引用也能处理左值引用
+            template <typename T>
+            void myforward(T&& a)   //自定义一个函数，既能接受左值引用又能接受右值引用，并转发给somefunc()处理
+            {
+                somefunc(std::forward<T>(a));
+            }
         移动构造函数：形式上类似于用右值表达式做引用参数的构造函数，由于移动构造函数要修改引用参数的内容，所以不能将形参声明为const
             移动语义：将一个对象所占有的资源（常常是动态分配所得的指针）转移到自身，将对方对象的这个指针设置为nullptr，本质上是偷过来，由于这个指针所指向的内存区域没有变化，所以避免了不必要的复制
             原型：className(className && exp);
@@ -1764,7 +1848,7 @@ C++11:
             使用了move()函数后的左值不应该再继续使用，因为其中的动态分配的内存已经失效，例如此时不应该再输出temp字符串的值
             如果对象所属的类没有定义移动构造函数，move将使用复制构造函数，这是由于常量左值引用可以绑定右值，此时被复制的源对象没有失效，可以继续使用
         C++11中的所有容器都实现了移动构造，所以容器之间的赋值会使用移动赋值函数，从而不需要将整个容器中存储的所有对象一个个的复制 
-        通用引用：
+
     override和final管理虚方法：
         如果在继承类中包含与基类同名且特征标相同的函数，基类这个函数被声明为虚的，则可以用基类指针或引用来调用派生类的相应方法
         如果特征标不同，会导致基类的方法被隐藏，从而无法调用基类方法
@@ -1913,6 +1997,32 @@ C++17：
         当any对象中实际存的是T类型的数据时，可以使用any_cast<T>(var)运算符来返回一个所存储的对象的拷贝，如果是T*则返回指针，T&则返回引用，如果类型不符，则抛出bad_any_cast异常
             bool has_value()
             const type_info& type(); //返回一个type_info对象的引用，有name()方法可以返回一个类型的C风格字符串
+    5.返回值优化
+        C++17中，函数返回局部变量（对象）有两种情况
+        假设有类A
+        class A
+        {
+            int value;
+        public:
+            A() { cout << "default constructor! value=" << value<<endl; }
+            A(const A& a) :value(a.value) { cout << "Copy constructor! value=" << value << endl; }
+            A(A&& a) { cout << "Move constructor! value=" << value << endl; }
+            ~A() { cout << "Destructor!\n"; }
+        };
+        当调用返回具名局部变量的函数时，有可能有优化从而就地构造（在函数被调用的地方直接构造），也可能没有优化，从而先调用构造函数构造函数内的局部变量，再在被调用的地方调用移动构造函数
+        当然，如果这个局部变量被在函数中被改动，还有其他操作，肯定是调用移动构造函数
+        如果没有定义移动构造函数，就调用复制构造函数
+            A Return_local()
+            {
+                A a;
+                return a;
+            }   //VS2019输出"default constructor!" "Move constructor!"
+        当调用直接返回临时变量的函数时，一定会发生返回值优化
+            A Return_temp()
+            {
+                return A();
+            }   //VS2019输出"default constructor!"
+        所以无论如何也不应该定义一个函数返回右值引用
 C++20：
     1.模块
         模块名：[模块名]
@@ -2075,7 +2185,7 @@ Effective C++
             return result(lhs.numerator*rhs.numerator, lhs.denominator*rhs.denominator);    //返回一个临时对象的引用
         }
         错误的设计二：返回一个临时对象的指针
-        错误的设计三：返回一个堆区new对象，这会导致客户无法调用delete释放new对象的内存
+        错误的设计三：返回一个堆区new对象，这会导致客户不知情，没有调用delete释放内存
         const Rational& operator*(const Rational& lhs, const Rational& rhs)
         {
             Rational* result=new Rational(lhs.numerator*rhs.numerator, lhs.denominator*rhs.denominator);
