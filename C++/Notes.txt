@@ -1627,8 +1627,30 @@ string类：C++标准类
     7.暂停程序：
         std::this_thread::sleep_for(duration<type> t)   //参数是一个时间段
         
-
-
+<random>C++11
+    1.随机数生成引擎 random engine
+        随机数引擎是一种状态机，状态决定所生成的随机数，所以如果状态一样，生成的随机数也一样
+        随机数引擎生成的随机数的最小和最大值不能更改
+        std::default_random_engine
+        std::mt19937（推荐）
+        构造函数：接受一个无符号整形数参数作为随机数种子（通常可以用chrono::steady_clock::now().time_since_epoch().count()作为随机数种子）
+        成员函数：
+            min()
+            max()   //返回当前随机数生成引擎的所生成的随机数的最大最小值
+            operator()  //生成一个随机数
+            seed(unsigned int seed)   //用seed作为引擎的随机数种子
+            operator==(const default_random_engine& e2)    //比较两个随机数引擎的状态是否相同
+        非成员函数：
+            operator<< 通常用于保存当前引擎的状态
+            operator>> 通常用于从保存了当前引擎状态的stringstream恢复之前的状态
+    2.随机数分配器
+        std::uniform_int_distribution<int>  //int是缺省模板参数，C++17后可省略<int>
+            构造函数：接收两个整数参数int a, int b，产生范围是[a,b]的随机分布的整数
+            成员函数：
+                operator(engine& e) //用随机引擎e生成一个随机数
+        std::uniform_real_distribution<double>
+            构造函数：接收两个double参数double a, double b，产生范围是[a,b)的随机分布小数
+            
 范围for循环
     double a[5]={...};
     for(double x:a) {...}
