@@ -1313,6 +1313,9 @@ STL
                         ++first2;
                     }
                 }
+            advance(InputIterator& it, Distance n)
+                将迭代器it向前推进n个元素的位置
+                如果it是随机存取迭代器，函数直接用迭代器运算+或-，否则用++或--移动n次
         复制：        
             copy()方法需要三个迭代器参数，第一和第二个迭代器参数指向源的范围（包括第一参数，而不包括第二参数），第三个迭代器参数指向目的地
             copy_backward()
@@ -1575,6 +1578,9 @@ string类：C++标准类
                 ratio<60>
                 ratio<3600>
             所以using seconds32=chrono::duration<int32_t>声明又可以写为：using seconds32=chrono::duration<int32_t, ratio<1>>
+            std::ratio类是一个表示比例的模板，第一模板参数N表示分子，第二模板参数D表示分母
+                template<intmax_t N, intmax_t D=1> class ratio;
+                ratio类包含两个静态成员常量num和den，分别表示化简后的分子和分母，比如ratio<2,10>::num==1, ratio<2,10>::den==5
         所有的时间段类都是以下形式的实例化：
         template<typname Type, typename Period=ratio<1>> //模板参数Period的默认参数时ratio<1>，所以自定义seconds类时不需要ratio参数
         class duration
@@ -1584,8 +1590,22 @@ string类：C++标准类
     4.通用化时间段单位
         可以通过ratio模板参数来控制一个自定义时间段的长度
         using frame_time=duration<float, ratio<1,60>>   //将1/60秒作为一个frame_time类
+    6.时钟类
+        system_clock:                
+            静态成员函数：
+                time_point now()                            //返回一个当前时间的time_point<system_clock, nanoseconds>对象，即now是用纳秒做单位的
+                time_t to_time_t(const time_point& tp)      //将tp表示的时间点转换为time_t类型
+                time_point from_time_t(time_t t)            //将t表示的时间转换为一个时间点
+        steady_clock:
+            静态成员函数：
+                time_point now()
+        以上两个时钟的区别在于system_clock可以手动更改，比如直接在系统时间设置内修改，所以可能会两次得到的时间与实际程序运行的顺序不同（时间倒流）
+        而steady_clock一定以稳定的速率前进，一定与程序运行的顺序关联，所以要度量一段时间的话最好采用steady_clock
+        high_resolution_clock:
     5.时间点
         时间点与时间段的内部实现可能类似，但时间点表达的是某个具体时刻
+        对于一个时间点，肯定需要一个另一个时间点做参考，然后计算从参考点开始到这个时间点之间的时间段，才能得出这个时间点
+        所以时间点需要两个模板参数，第一个模板参数是时钟的类型，第二个模板参数是时间段的类型
         template<class Clock, class Duration=typename Clock::duration>
         class time_point
         {
@@ -1597,20 +1617,13 @@ string类：C++标准类
         }
         成员函数：
             duration time_since_epoch() const;  //返回从1970年1月1日到内部所记录的时间点的秒数
-        两种时钟：
-            system_clock类:
-                静态成员函数：
-                    time_point now()        //返回一个当前时间的time_point对象
-                    time_t to_time_t(const time_point& tp)              //将tp表示的时间点转换为time_t类型
-                    from_time_t()
-            steady_clock:
         构造函数：
             默认构造函数：
         重载了各种操作符：
-            两个时间点可以相减，结果是一个时间段
-            一个时间点可以与一个时间段相加，结果是一个新时间点
+            两个时间点可以相减，结果是一个时间段 duration
+            一个时间点可以与一个时间段相加，结果是一个新时间点 time_point
             两个时间点不能相加，因为没有意义
-    6.时钟类
+
     7.暂停程序：
         std::this_thread::sleep_for(duration<type> t)   //参数是一个时间段
         
@@ -1879,6 +1892,10 @@ C++11:
         std::function<returnType(paraType)> name;   //定义了一个叫name的可以用来包装返回值类型为returnType，参数类型为paraType的函数的函数包装器
         然后可以赋值给这个函数包装器相应类型的可调用物（任何返回值和参数类型个数相同的函数的函数名、对象的成员函数、lambda表达式等）
         然后像使用普通函数一样使用函数包装器，调用
+        std::mem_fn:
+            template<class ReturnType, class T>
+            mem_fn(ReturnType T::*function_ptr)
+            将指向T类的成员函数的指针转换为一个函数对象
     可变参数模板：
         定义：
             template<typename... Args>
@@ -1891,6 +1908,12 @@ C++11:
         {
             //处理第一个参数a
             func(args...);//递归调用自己
+        }
+        template<typename T>
+        returnType func(T a)
+        {
+            //...
+            return ...;
         }
         注意应当再额外定义一个函数只有一个参数的函数模板，有时还需要空参数的模板
         例如求一个可变参数的参数的和的函数，应当定义一个只有一个参数的函数模板，返回参数自己，否则会在参数减少到1的时候找不到要使用的函数
@@ -2040,18 +2063,110 @@ C++20：
             std::thread t(hello);   //创建一个线程对象t，并赋值给hello函数（这里可以用任何可调用的函数对象赋值）
             t.join();               //显式地表明要等待线程执行完毕，可以确保在函数退出前该线程执行完毕
         }
+        std::thread 的构造函数可以接收可调用对象（函数、lambda、可调用对象（重载了()操作符的类、结构体））
         而对线程对象调用detach(void)方法表明这个函数不等待线程的完成，函数返回时线程可能还在运行
         detach()打破了thread对象与线程的联系，确保thread对象被销毁时terminate()不会被调用
-        可以用joinable()方法检查这个线程是否可以与thread对象结合或分离，已经分离的线程不能再与任何thread对象结合，称为守护进程
+        如果对thread对象既不适用join()又不使用detach()，则在线程对象因为主线程main退出作用域被销毁时，新线程会terminate
+        可以用joinable()方法检查这个线程是否可以与thread对象结合或分离，已经分离的线程不能再与任何thread对象结合，称为守护进程，joinable()函数返回一个布尔值
+        每个线程都有一个独特的id，获取当前线程的id，使用std::this_thread::get_id()函数
+        获取线程对象的id，使用get_id()成员方法
     2.获取资源即初始化
-        当thread对象绑定的函数有参数时，需要在thread对象的构造函数内传值调用
-        如果函数参数是引用，需要将构造函数内的参数做ref()显式转换
+        当thread对象绑定的函数有参数时，需要在thread对象的构造函数内传值调用，这是由于默认情况下创建新线程时，参数是拷贝到新线程的独立内存中
+        如果函数参数是引用，需要将构造函数内的参数用std::ref()显式转换
         void add(int & a) {++a;}
         int main() 
         {
             int x=0;
-            std::thread t(add,ref(x));  //x->1
+            std::thread t(add,std::ref(x));  //x->1
         }
+        当然，也可以用指针的方式来实现
+        void add(int* a){++(*a);}
+        int x=0;
+        std::thread t(add,&x);
+        对于可调用对象而言，thread的构造函数的传递一个成员函数指针作为线程函数，第二参数是一个合适的对象的指针，后面的参数是线程函数的参数
+    3.线程数的理想上限
+        当创建的线程数多于CPU核心数时，会带来多余的上下文切换降低性能
+        使用unsigned int std::thread::hardware_concurrency()函数获取CPU线程数，返回一个无符号整形值
+    4.资源竞争
+        当同一个对象被多个线程共有，就会造成资源竞争问题，最简单的解决方法是对共享资源采取某种保护机制，确保只有修改资源的线程才能看到不变量被破坏的中间状态，其余线程要访问时，要么修改已经完成了，要么还没开始修改（用互斥量延迟访问）
+        保护数据的最基本方式，是C++标准库中的互斥量，std::mutex
+        
+    5.死锁
+        有锁情况：
+            当两个线程A、B以相反的顺序锁两个mutex M1、M2时，可能发生如下清醒：
+            A               B
+            lock(M1)        
+                            lock(M2)
+            lock(M2)
+                            lock(M1)
+            //...           //...
+            这时便发生了死锁，由于A线程先lock了M1，然后尝试lock M2，此时B线程又lock了M2，所以A线程无法继续，由于A线程先lock了M1，所以B线程尝试lock M1也不成功，所以B线程也无法继续
+        无锁情况：
+            当两个线程A、B互相调用join()
+            A                   B
+            ...                 ...
+            thread(B).join()    thread(A).join()
+            这时也发生了死锁，由于A线程等待B线程执行完毕才能执行完，B线程等待A线程执行完毕才能执行完，所以A、B线程都在互相等待对方执行完毕
+    6.避免死锁的方法
+        1）永远让线程使用相同的顺序来锁多个mutex
+        2）尽量只同时锁一个mutex，锁住之后做一些操作，释放这个mutex，再锁另一个mutex
+        3）使用std::lock()来锁mutex对象，std::lock()包含避免死锁的算法
+    7.各种C++ mutex包装器
+        std::mutex
+            C++标准库中的互斥量的类型
+        std::lock_guard<Mutex>(mutex& m)模板
+            在定义时自动锁上mutex m，在超出作用域后自动解锁mutex m，但是没有lock()和unlock()函数，锁和解锁的过程完全由所在的作用域决定
+        std::unique_lock<Mutex>(mutex& m)模板
+            可以人为调用lock()和unlock()任意次
+            可选的第二参数：unique_lock<Mutex>(mutex& m, std::defer_lock)表示在定义时不自动加锁
+            unique_lock比lock_guard更灵活，但成本更高
+            unique_lock和lock_guard都不可复制，只可移动
+        std::once_flag+std::call_once(once_flag& flag, Fn&& function) 
+            std::once_flag是一个多线程环境中只能被改变一次的对象，作为call_once()函数模板的第一参数，第二参数是一个函数对象，确保在多线程环境中function函数对象只被调用一次
+        std::condition_variable
+            #include <condition_variable>
+            当一个线程在做
+        std::promise+std::future+std::async
+            子线程->主线程传递信息
+                假设想要在子线程中接收来自主线程的一个引用参数来传递信息，比如子线程将处理结果返回给主线程，一个可能的做法是给子线程函数增加一个引用参数，然后主线程创建thread对象时用ref传递这个参数
+                然而此处需要保证在子线程写入这个引用参数时，主线程没有同时访问他，所以需要在两个线程分别写入和访问时上锁
+                然而还需要保证主线程访问这个参数前，子线程已经完成写入操作了，所以不会读取到无用数据，所以还可能需要一个condition_variable来使得子线程写入后唤醒主线程来访问
+                这使得代码变得复杂
+                template <class Fn, class... Args>
+                std::future<typename result_of<Fn(Args...)>::type> std::async(Fn&& fn, Args&&... args)
+                template <class Fn, class... Args>
+                std::future<typename result_of<Fn(Args...)>::type> std::async(launch policy, Fn&& fn, Args&&... args)
+                async函数接收一个函数对象Fn，并将args传递给函数Fn，返回一个std::future对象，这个future对象的模板参数类型是函数Fn的返回值类型
+                此时可以通过async函数返回的future对象来获取函数的返回值
+                async函数的第一参数控制新线程的创建方式
+                    默认值为std::launch::async|std::launch::deferred，表示新线程的创建与否取决于实现，也可能不创建新线程
+                    如果确实要创建新线程，用std::launch::async
+                    std::launch::deferred 表示不创建新线程，而且延迟执行，直到调用了所返回的future对象的get()方法，才执行函数Fn
+                
+                template <class T> future
+                template <class R&> future<R&>
+                template <> future<void>
+                future表示一个可以在未来获取其内容的对象
+            主线程->子线程传递信息
+                假设需要在主线程中传递信息给子线程，除了通过在创建新线程时直接将参数传递给函数，还可以在创建新线程之后先让新线程做别的事情，然后主线程继续执行，准备新线程所需的数据，完成后子线程从需要这个数据的地方开始继续执行
+                将子线程函数定义为接收std::future参数
+                returnType func(std::future<paraType>&& para)  //注意这里应该是右值引用，因为promise的get_future函数返回临时变量，或者就直接值传递
+                {
+                    //做一些其他事情
+                    paraType value=para.get();  //如果主线程此时没准备好信息，就暂停在此处，直到主线程传来信息
+                    ...//继续做另一些事情
+                }
+                int main()
+                {
+                    std::promise<paraType> p;   //表示当前数据还未准备好，但是将来某时刻会准备好，然后让子线程继续执行
+                    auto result=std::async(std::launch::async, func, p.get_future());   //async函数返回一个std::future<returnType>对象
+                    ...//主线程做别的事，准备数据给p
+                    p.set_value(...);    //数据准备好了，子线程此时继续执行
+                    ...//主线程可以继续做别的事，或者等待子线程返回
+                    auto result_value=result.get(); //主线程获取子线程的结果
+                }
+        std::packaged_task<>
+        st
 
 Effective C++
     1.C++的四个子语言
