@@ -6,7 +6,10 @@
         "*.txt": "cpp",
         "type_traits": "cpp",
         "*.tcc": "cpp",
-        "list": "cpp"
+        "list": "cpp",
+        "array": "cpp"
     },
-    "C_Cpp.errorSquiggles": "Disabled"
+    "C_Cpp.errorSquiggles": "Disabled",
+    "editor.cursorSmoothCaretAnimation": true,
+    "editor.smoothScrolling": true
 }

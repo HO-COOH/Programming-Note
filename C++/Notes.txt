@@ -438,6 +438,8 @@ cctype函数
         returnType func(Type para){}
         显式具体化的意思是不要使用通用模板来生成函数定义，而是根据Type类型生成一个专门给Type类型用的函数定义
     隐式实例化：函数模板本身不会生成函数定义，而在程序中，编译器根据函数调用导致生成一个函数模板的具体实例（这个实例就是根据实参类型生成的具体函数定义），这种实例化方法称为隐式实例化
+        注意，隐式实例化中，模板参数可以被推导为boid
+        如果函数的实参的类型不支持模板函数中的所有操作，会导致编译期错误
     显式实例化：直接命令编译器创建具体实例，格式是在template，后跟函数的模板声明式，在函数头后加一堆对尖括号<声明所需的类型>
         template returnType func<Type> (Type para);
         可以在函数调用中使用显示实例化，而不是隐式实例化，迫使编译器根据代码规定的模板参数来生成函数定义，而不是根据实参来推断
@@ -1098,12 +1100,27 @@ cctype函数
         方法：
             get()返回unique_ptr所管理的对象的指针
             reset(*ptr=nullptr)释放当前所管理的对象，如果参数ptr是一个nullptr（同时也是缺省参数），则调用reset后当前的unique_ptr不拥有任何对象，如果ptr非空，则拥有ptr所指的对象（常用与重新分配一块新内存给当前的unique_ptr)
+        3.unique_ptr<T> make_unique<Type>(para)
+        make_unique模板函数将para传递给Type类型的构造函数来构造一个堆区对象，然后返回一个unique_ptr
+        这个函数的效果与return unique_ptr<T>(new T(para));  一致
     2.shared_ptr
         当程序会使用多个指向同一个对象的指针，就用shared_ptr
         允许复制和赋值，在复制时会增加引用计数，退出作用域后将指向同一内存的shared_ptr的引用计数减少1，当引用计数减少到0时释放这一块内存
-    3.unique_ptr<T> make_unique<Type>(para)
-        make_unique模板函数将para传递给Type类型的构造函数来构造一个堆区对象，然后返回一个unique_ptr
-        这个函数的效果与return unique_ptr<T>(new T(para));  一致
+        在类内包含使用shared_ptr的成员可能造成循环引用的问题，如：
+        struct A
+        {
+            shared_ptr<B> ptr_to_B;
+            //A(shared_ptr<B> ptr):ptr_to_B(ptr){}
+        };
+        auto ptr_A=make_shared(A);
+        auto ptr_B=make_shared(A);
+        ptr_A.ptr_to_B=ptr_B;
+        ptr_B.ptr_to_B=ptr_A;   //此时ptr_A与ptr_B内包含的shared_ptr指针造成循环引用，彼此都引用另一个A的对象，所以当退出作用域后内存无法释放，造成内存泄漏      
+    3.weak_ptr
+        不参与引用计数的shared_ptr
+        方法:
+            long int use_count() const //返回这个weak_ptr所指向的对象被多少个shared_ptr所共有
+            
 STL
     容器：
         顺序容器：
@@ -1320,7 +1337,14 @@ STL
             copy()方法需要三个迭代器参数，第一和第二个迭代器参数指向源的范围（包括第一参数，而不包括第二参数），第三个迭代器参数指向目的地
             copy_backward()
         裸内存：
+            尚未构造内部元素的容器（只定义了大小，用默认构造函数构造内部元素），可以就地构造增加性能
+            #include <memory>
+            uninitialized_fill()
+            uninitialized_copy()
+            uninitialized_move()
         值修改：
+        remove()：需要2个迭代器参数，第3参数为需要remove的值，容器中等于第3参数的值被remove，容器中多余的空间是未定义的值
+            返回一个指向最后一个有效值的迭代器，所以应该用erase()方法删掉后面的值
         distance()：
             template< class InputIt >
             typename std::iterator_traits<InputIt>::difference_type distance( InputIt first, InputIt last );
@@ -1330,7 +1354,9 @@ STL
             所以包含的不重复元素的个数是容器起始位置的迭代器-unique返回的超尾元素
             应当在使用unique方法用resize()函数后对容器重新调整大小，所以这个容器包含的都是不重复的元素
             resize(distance(容器.begin,unique返回的迭代器))
-            使用unique方法前需要保证数组有序，所以无需容器需要先sort()
+            使用unique方法前需要保证数组有序，所以无序容器需要先sort()
+            如：1 2 99 99 99 -1 -2 99 0 1
+                1 2 99 -1 -2 99 0 1 X X 最后两个X是未定义的值，与remove()相同也应该对容器使用erase()方法
         merge()方法需要五个迭代器参数，第一和第二个是第一个容器的头尾迭代器，第三和第四个是第二个容器的头尾迭代器，最后一个迭代器指向合并后输出的迭代器
         fill()：需要两个迭代器参数，将[first,last)的范围用value填满
             template< class ForwardIt, class T >
@@ -1340,6 +1366,13 @@ STL
             void fill_n( OutputIt first, Size count, const T& value );
     for_each()循环:
         #include <algorithm>
+    transform():
+        template <class InputIterator, class OutputIterator, class UnaryOperation>
+        OutputIterator transform (InputIterator first1, InputIterator last1, OutputIterator result, UnaryOperation op);
+            将函数op作用于[first1, last1)区间的所有元素，并将输出结果保存到result迭代器所指的容器中，函数op应该接受一个InputIterator解除引用后的类型的参数，并返回一个OutputIterator解除引用的类型的值
+        template <class InputIterator1, class InputIterator2, class OutputIterator, class BinaryOperation>
+        OutputIterator transform (InputIterator1 first1, InputIterator1 last1, InputIterator2 first2, OutputIterator result, BinaryOperation binary_op);
+            与上面类似，函数op接受两个参数，分别是InputIterator1和InputIterator2解除引用后的参数，并返回一个值
     Allocator 分配器：
     函数符（函数对象）：是可以以函数方式与一对圆括号()结合使用的任意对象，包括函数名、函数指针和重载了()运算符的类对象（即定义了operator()函数的类）
         生成器：不用参数就可以调用的函数符
@@ -1537,6 +1570,10 @@ string类：C++标准类
         成员方法：
             string str() const;         //返回一个字符串，是当前stringstream内容的拷贝
             void str(const string& s);  //丢弃当前stringstream的内容，并将s的值拷贝进stringstream内，常用于调用str("")的方法来释放内存
+    string_view
+        由于string的构造在大多数情况下需要分配堆区内存，而且在使用string的大多数情况下只是需要获取其中的内容，所以大多数情况下可以避免新创建一个string，C++17以前可以通过char数组来解决，但是损失了string的灵活接口
+        string_view是这样的一个类，他只包括一个指向所需string部分内容的起始的指针，和一个大小，所以他无需构造新string
+        string_view有所有的string只读的常用方法
 
 <chrono> C++11:
     所有的chrono函数都在std::chrono名称空间内
@@ -1685,7 +1722,25 @@ C++11:
         char16_t的字面值用u做前缀，表示UTF-16
         char32_t的字面值用U做前缀，表示UTF-32
     用户定义字面值：
-        
+        字面值是一种常量
+        C++自带的四种字面值：整数、浮点数、字符、字符串
+        定义用户字面值函数的格式：
+            returnType operator"" _标识符(paraType para){...}
+        对应的字面值变量的声明：
+            returnType 变量名=para_标识符;
+        标识符一定是以下划线开头的名称，字面值是以数值+相应标识符后缀组成，实际的值由字面值函数（将值代入形参para）计算的返回值确定
+        假如有字面值函数：long double operator"" _cm(long double x){return x*10;} 
+        则有：long double height=3.4_cm;  //long double height=34;
+        也有接收两个参数的字面值函数，第二个参数一定是size_t类型，此时的字面值都是常量字符指针类型，所以第二参数的值是这个字面值字符串的长度
+        字面值的形参只能是以下的类型：
+            char const* (常量字符指针，C风格字符串)
+            unsigned long long
+            long double
+            char const*, size_t
+            wchar_t const*, size_t
+            char16_t const*, size_t
+            char32_t const*, size_t
+
     统一的初始化：
         C++11前（C++98 C++03）：
             int i1;     //未定义的值
@@ -1726,7 +1781,7 @@ C++11:
         当需要显式指明一个类型时 auto x=type{initializer};
     std::enable_if：
         C++11引入一个概念SFINAE (substituion failure is not an error)匹配失败不是错误，意思是当编译器根据函数调用来实例化模板函数时，可能会有几个函数模板在推导模板参数时无法编译通过，但只要有一个可以正确推导出来，就不会产生编译错误
-        enable_if与函数模板和type_traits配合，可以实现这个目的，让只满足特定要求的模板函数的调用才能让模板函数实例化，不满足要求的调用就组织函数模板实例化
+        enable_if与函数模板和type_traits配合，可以实现这个目的，让只满足特定要求的模板函数的调用才能让模板函数实例化，不满足要求的调用就阻止函数模板实例化
         enable_if是一个模板结构体，一个可能的实现：
             template<bool b, typename T=void>
             struct enable_if{};
@@ -1743,16 +1798,24 @@ C++11:
         根据enable_if的模板定义，当形参T的类型是整数时，is_integral<T>的value为true，所以type的值就是TYPE，如果不指定TYPE，则根据定义，type的值是void
         当形参T的类型不是整数时，is_integral<T>的value为false，所以与enable_if的第一个通用模板匹配，此时这个结构体中没有定义type，所以编译出错，函数不会实例化
     constexpr关键字：
-        对于常量，constexpr声明的变量需要一个初始化器，所以允许类内静态常量的初始化，旧标准的类中静态常量成员需要类内声明类外定义
-        class A
-        {
-            static const int a;
-            static constexpr b=10; 
-        };
-        A::a=3;
-        constexpr还可以作用于函数，使得函数成为一个常量表达式，在编译期就调用并计算结果
-        所以被声明为constexpr的函数调用必须能在编译期被计算为常量
-        由于函数调用成为了常量表达式，所以可以用作数组的大小
+        constexpr值：
+            定义对象（包括内置类型）
+            定义静态数据
+                对于常量，constexpr声明的变量需要一个初始化器，所以允许类内静态常量的初始化，旧标准的类中静态常量成员需要类内声明类外定义
+                class A
+                {
+                    static const int a;
+                    static constexpr b=10; 
+                };
+                A::a=3;
+            定义字面值
+        constexpr计算：
+            定义函数
+                constexpr还可以作用于函数，使得函数成为一个常量表达式，在编译期就调用并计算结果
+                所以被声明为constexpr的函数调用必须能在编译期被计算为常量
+                由于函数调用成为了常量表达式，所以可以用作数组的大小
+            定义构造函数
+
     static_assert(布尔常量表达式,"消息")：在编译期进行的断言检查
         当表达式为false时，在编译期中编译期会发出错误，错误内容是消息字符串
     decltype关键字：将y声明为与表达式x的类型相同

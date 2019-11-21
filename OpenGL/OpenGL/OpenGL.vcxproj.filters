@@ -19,4 +19,8 @@
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="Shaders\VertexShader.txt" />
+    <Text Include="Shaders\FragmentShader.txt" />
+  </ItemGroup>
 </Project>
