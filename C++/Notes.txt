@@ -166,6 +166,17 @@ atoi()  将nptr所指的字符串的开头部分转化为相应的整数，长�
     函数在栈区分配bytes大小的空间并返回一个空类型的指针指向这个空间的首字节，分配的空间在当前作用域结束时被释放
     通常要做类型转换，转换成所需的类型
     可以用这个函数来模拟一个可变大小的栈区动态数组
+16. 预编译头
+    将常用且不常修改的头文件（尤其是标准头文件）放到预编译头，将极大提高编译速度
+    在VS中：
+        1. 新建pch.h，把要包含的头文件用#include 放进去
+        2. 新建pch.cpp，#include "pch.h"
+        3. 选择pch.cpp，打开属性，将预编译头属性改为“创建”
+        4. 打开项目属性，将预编译头属性改为“使用”，预编译头文件选择pch.h
+    在GCC中：
+        1. 新建pch.h，把要包含的头文件用#include 放进去
+        2. 编译pch.h: g++ pch.h -> 生成一个pch.gch文件
+        3. 正常编译其他文件
 
 C++
 1. 字符串输入
@@ -994,22 +1005,35 @@ cctype函数
             由于是友元函数，就肯定需要访问类的成员，而由于是非模板函数，所以肯定不能有任何带模板参数的类对象
             所以这样的函数只能访问全局对象，使用全局指针访问非全局对象，访问自己创建的对象，访问独立于对象的模板类的静态数据成员
         约束模板友元：友元函数中带有模板参数，而且类的每一个具体化都获得与友元匹配的具体化，即T类获得T类参数的友元，类->友元
-            先要在类模板前声明每个模板友元函数，然后再类中声明为友元，而且需要声明模板参数
-            与模板函数一样，由于约束模板友元也是模板函数，所以要在同一个文件中声明和定义
-            template<typename T>
-            void func(T& );
+            类内定义法：
+                template<typename T>
+                class HasFriend
+                {
+                    friend void func(HasFriend &);
+                };
+                由于当模板类实例化之后就获得对应的实例化的友元函数，这个实例化的友元函数不是模板函数，所以可以发生隐式类型转换（如果模板类有一个可隐式类型转换的构造函数）
+            类外定义法：
+                先要在类模板前声明每个模板友元函数，然后再类中声明为友元，而且需要声明模板参数
+                与模板函数一样，由于约束模板友元也是模板函数，所以要在同一个文件中声明和定义
+                template<typename T>
+                class HasFriend;        //先声明有这么一个模板类叫HasFriend
 
-            template<typename T>
-            class HasFriend
-            {
-                friend void func<T>(HasFriend<T>& );
-            }
+                template<typename T>
+                void func(HasFriend<T>& );//再声明有这么一个模板函数，参数的类型是一个类模板
 
-            template<typename T>
-            void func(T& hf)
-            {
-                //func的定义
-            }
+                template<typename T>
+                class HasFriend
+                {
+                    friend void func<T>(HasFriend<T>& );    //声明这个模板函数是友元
+                    //或者 friend void func<T>(HasFriend& );
+                };
+
+                template<typename T>
+                void func(HasFriend<T>& hf)
+                {
+                    //func的定义
+                }
+                由于这个友元函数是模板函数，所以不会发生隐式类型转换
         非约束模板友元：在模板类内声明的带有模板参数的友元函数，每个函数具体化都是每个类具体化的友元，即任何一个具体化之后的函数，都是所有具体化类的友元
             所以这样的友元函数可以访问任何一个具体化类
             template<typename T>
@@ -1307,7 +1331,7 @@ STL
             is_sorted_until():
         查找：
             accumulate():求从[first,last)的和
-                #include <numeric>
+#include <numeric>
                 template< class InputIt, class T >
                 T accumulate( InputIt first, InputIt last, T init );    //使用元素的operator+
 
@@ -1599,6 +1623,8 @@ string类：C++标准类
         minutes类：
         microseconds类：
         nanoseconds类：
+    所有时间段类都重载了6中比较运算符
+    所有时间段类都重载了+-*/运算符
     2.duration_cast<type>函数
         将不允许隐式类型转换的转换（损失精度的转换）用向下取整的方式转换
         只有当隐式类型转换不允许时才用duration_cast<type>函数
@@ -1623,12 +1649,30 @@ string类：C++标准类
         class duration
         {
             Type rep_;   //自定义的内部数据类型
+        public:
+            using rep = Rep;        //两个using声明的类型别名
+            using period =Period;
         }
+        由于duration模板类中用using定义了类型别名，所以可以通过提取duration模板类的实例中的数据类型
+            milliseconds::rep a; //int64_t a;
+            milliseconds::period::num //1
+            milliseconds::period::den //1000
     4.通用化时间段单位
         可以通过ratio模板参数来控制一个自定义时间段的长度
         using frame_time=duration<float, ratio<1,60>>   //将1/60秒作为一个frame_time类
     6.时钟类
-        system_clock:                
+        时钟类是联系一个时间点（表示这个时钟的绝对时间原点）和时间段长度（表示计时精度）的一个数据结构
+        一个通用的时钟类的表达：
+        struct some_clock
+        {
+            using duration = chrono::duration<...>
+            using rep = duration::rep;
+            using period = duration::period;
+            using time_point = chrono::time_point<some_clock>;
+            static constexpr bool is_steady = false;
+            static time_point now() noexcept;
+        };
+        system_clock: 表示系统时间
             静态成员函数：
                 time_point now()                            //返回一个当前时间的time_point<system_clock, nanoseconds>对象，即now是用纳秒做单位的
                 time_t to_time_t(const time_point& tp)      //将tp表示的时间点转换为time_t类型
@@ -1636,13 +1680,13 @@ string类：C++标准类
         steady_clock:
             静态成员函数：
                 time_point now()
-        以上两个时钟的区别在于system_clock可以手动更改，比如直接在系统时间设置内修改，所以可能会两次得到的时间与实际程序运行的顺序不同（时间倒流）
+        以上两个时钟的区别在于system_clock可以手动更改，比如直接在系统时间设置内修改，所以可能会两次得到的时间与实际程序运行的顺序不同（时间倒流），但是system_clock可以表示实际的日历时间
         而steady_clock一定以稳定的速率前进，一定与程序运行的顺序关联，所以要度量一段时间的话最好采用steady_clock
-        high_resolution_clock:
+        high_resolution_clock通常是system_clock或steady_clock的其中之一的类型别名
     5.时间点
         时间点与时间段的内部实现可能类似，但时间点表达的是某个具体时刻
         对于一个时间点，肯定需要一个另一个时间点做参考，然后计算从参考点开始到这个时间点之间的时间段，才能得出这个时间点
-        所以时间点需要两个模板参数，第一个模板参数是时钟的类型，第二个模板参数是时间段的类型
+        所以时间点需要两个模板参数，第一个模板参数是时钟的类型表示计时原点，第二个模板参数是时间段的类型，所以时间点的意义由Duration控制，时间点的原点由Clock控制
         template<class Clock, class Duration=typename Clock::duration>
         class time_point
         {
@@ -1650,17 +1694,21 @@ string类：C++标准类
         public:
             using clock=Clock;
             using duration=Duration;
-            ...
+            //...
         }
         成员函数：
-            duration time_since_epoch() const;  //返回从1970年1月1日到内部所记录的时间点的秒数
+            duration time_since_epoch() const;  //返回从Clock的原点到内部Duration d_所记录的时间段之间的时间段
         构造函数：
             默认构造函数：
+
         重载了各种操作符：
             两个时间点可以相减，结果是一个时间段 duration
             一个时间点可以与一个时间段相加，结果是一个新时间点 time_point
             两个时间点不能相加，因为没有意义
-
+        转换函数：
+            两个使用不同时钟（不同计时原点）的时间点不能转换，使用同一个时钟的可以转换，如果转换不损失精度，可以隐式转换，如果损失精度，需要显式转换
+            template<class ToDuration, class Clock, class Duration>
+            constexpr time_point<Clock, ToDuration> time_point_cast(const time_point<Clock, Duration>& t)   //constexpr C++14
     7.暂停程序：
         std::this_thread::sleep_for(duration<type> t)   //参数是一个时间段
         
@@ -1751,11 +1799,11 @@ C++11:
             int i3(4);      //后增加的圆括号初始化
             int i4=int();   //后增加的圆括号默认值初始化，i4=0
             注意，不能int i4() 因为这是声明一个函数
-            不要用圆括号初始化一个变量
+            不要用圆括号初始化一个变量，因为只要是圆括号内没有参数，就会被认为声明了一个函数
         这产生了一个问题，由于存在typedef类型别名，无法知道这是一个内置类型（可以用圆括号、赋值符）或是类（可以用圆括号）或是数组（可以用花括号）
         C++11后：
             用花括号列表初始化所有内置类型、用户定义类型（类、结构体），初始化列表可以加=号，也可以不加
-            用花括号初始化方法如果有赋值缩短（赋值的范围超过变量的类型所能存储的范围），将产生编译错误
+            用花括号初始化方法如果有赋值缩短（赋值的范围超过变量的类型所能存储的范围）或精度损失，将产生编译错误
             对内置类型的花括号初始化，如果没有参数，将初始化为默认0以及可能被转换为0的值，如布尔值被默认初始化为false
             bool b{};   //b==false
             对结构体初始化，将按顺序线性初始化，如：
@@ -1763,7 +1811,7 @@ C++11:
             {
                 int a;
                 char b[2];
-            }
+            };
             A a{1,2}; //a.a=1,a.b[0]=2,a.b[1]=0;
             初始化列表可以用作函数参数，要包含头文件
             #include <initializer_list>
@@ -1771,6 +1819,28 @@ C++11:
             {
                 //函数中使用类似容器和迭代器的方法
             }
+        {}初始化规则：
+            当一个结构体或类没有定义接收std::initializer_list的构造函数时，使用{}与()初始化作用相同
+            当定义了接收std::initializer_list的构造函数时，编译器会高优先级选中这个构造函数，除非这个std::initializer_list的参数类型完全无法与实参匹配
+            struct Widget
+            {
+                Widget(std::initializer_list<long double>);
+                float operator();   //Widget -> float的转换函数
+            };
+            Widget w1;
+            Widget w2(w1);  //复制构造函数
+            Widget w3{w2};  //w2转换为float，强制转换成long double再调用Widget(std::initializer_list)构造函数
+            编译器选中std::initializer_list的优先级是如此之高，以至于在发生精度损失的情况下都要选中，又由于{}初始化不能精度损失赋值，所以会发生编译器错误
+            struct Widget
+            {
+                Widget(int i, bool b);
+                Widget(std::initializer_list<bool>);
+            };
+            Widget w{10,5.0};   //调用Widget(std::initializer_list<bool>)，发生精度损失，所以错误
+        最佳选择：
+            默认构造时，不使用初始化器
+            默认使用{}初始化器直接初始化
+            当定义了std::initializer_list的时候谨慎使用，如果不是想调用这个构造函数，使用圆括号()初始化
         与auto关键字合用的特殊情况：
             auto i5{5};     //C++11: std::initializier_list<int>, C++14: int
             auto i6={6};    //std::initializer_list<int>
@@ -1946,7 +2016,21 @@ C++11:
             使用了move()函数后的左值不应该再继续使用，因为其中的动态分配的内存已经失效，例如此时不应该再输出temp字符串的值
             如果对象所属的类没有定义移动构造函数，move将使用复制构造函数，这是由于常量左值引用可以绑定右值，此时被复制的源对象没有失效，可以继续使用
         C++11中的所有容器都实现了移动构造，所以容器之间的赋值会使用移动赋值函数，从而不需要将整个容器中存储的所有对象一个个的复制 
-
+        悬空引用：
+            注意常见的悬空引用的发生情况：
+                1.引用一个临时对象的部分成员
+                    struct MyStruct
+                    {
+                        int v=0;
+                        int const &getData() const { return v; }
+                    };
+                    MyStruct getMyStruct()
+                    {
+                        return MyStruct();
+                    }
+                    auto&& data=getMyStruct().v;    //悬空引用，因为getMyStruct()返回的临时对象将被删除，返回这个临时对象的内部的数据的引用
+                    auto&& data2=getMyStruct().getData();   //也是悬空引用
+                    
     override和final管理虚方法：
         如果在继承类中包含与基类同名且特征标相同的函数，基类这个函数被声明为虚的，则可以用基类指针或引用来调用派生类的相应方法
         如果特征标不同，会导致基类的方法被隐藏，从而无法调用基类方法
@@ -2921,7 +3005,13 @@ More Effective C++
     HRESULT->long (winnt.h)初始化COM库的函数的返回值
     LPTSTR 字符串指针
     LPTCSTR 常量字符串指针
-
+2.函数参数的类型
+    T快照snapshot，每次函数被调用时都会拷贝一次当前的值    T const 
+    T&修改modify，由于引用不能是空值引用，所以这个T&要求调用时被引用的对象一定要存在      T const&观察view observe
+    T&&丢弃sink，表示调用这个函数后不再需要被引用的值
+    T*可选optional，表明可以是空指针nullptr      T* const
+    T vs T const&：值传递需要拷贝，引用需要间接读取一次内存，所以当对象的拷贝操作昂贵时，选用T const&，否则选用T，编译器可能对拷贝有优化，但是对于引用，无论如何都要多访问一次内存
+    T* vs std::optional<T>：optional<T>要求可复制，而且传指针可以在函数内修改参数T，所以T*的适用面更广
 
 #include <iostream>
 #include <array>

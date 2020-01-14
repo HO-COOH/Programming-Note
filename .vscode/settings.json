@@ -7,7 +7,8 @@
         "type_traits": "cpp",
         "*.tcc": "cpp",
         "list": "cpp",
-        "array": "cpp"
+        "array": "cpp",
+        "ratio": "cpp"
     },
     "C_Cpp.errorSquiggles": "Disabled",
     "editor.cursorSmoothCaretAnimation": true,
