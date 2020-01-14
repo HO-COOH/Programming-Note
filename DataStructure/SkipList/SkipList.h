@@ -46,7 +46,6 @@ public:
 	};
 
 	SkipListIter<ELEMENT> begin() const { return SkipListIter<ELEMENT>(head); }
-	//SkipListIter<ELEMENT> end() const {}
 	SkipList(const SkipList& list) = delete;
 	SkipList(const SkipList<ELEMENT>&& list) noexcept;
 	SkipList& operator=(const SkipList& list) = delete;
@@ -95,7 +94,7 @@ SkipNode<ELEMENT>* SkipList<ELEMENT>::find(ELEMENT element) const
 	auto last = head;
 	for(auto i=currentLevel; i>=0; --i)
 	{
-		while (last->next[i]->element < element && last->next[i]!=tail)
+		while (last->next[i]!=tail && last->next[i]->element < element )
 			last = last->next[i];
 	}
 	return (last->next[0]->element == element? (last->next[0]) : nullptr);
@@ -155,6 +154,7 @@ void SkipList<ELEMENT>::insert(ELEMENT element)
 template<typename ELEMENT>
 void SkipList<ELEMENT>::erase(ELEMENT element)
 {
+	std::cout << "Head level: " << head->next.size() << " Current Level: " << currentLevel << '\n';
 	if(auto node=find(element); node!=nullptr)
 	{
 		std::cout << "Erase " << element << '\n';
@@ -164,8 +164,11 @@ void SkipList<ELEMENT>::erase(ELEMENT element)
 			auto last = head;
 			while (last->next[i]->element < element)
 				last = last->next[i];
-			if (node->next[i] == tail)
-				last->next.pop_back();
+			if (last == head && node->next[i]==tail)
+			{
+				head->next.pop_back();
+				--currentLevel;
+			}
 			else
 				last->next[i] = node->next[i];
 		}

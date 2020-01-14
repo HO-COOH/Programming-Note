@@ -1,0 +1,7 @@
+[
+{
+  "directory": "C:/Users/Peter/Desktop/Programming-Note/DataStructure/SkipList/build",
+  "command": "C:\\PROGRA~2\\MICROS~1\\2019\\COMMUN~1\\VC\\Tools\\MSVC\\1424~1.283\\bin\\Hostx86\\x64\\cl.exe  /nologo /TP  -I..\\..\\GTest  /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1   -std:c++17 /FoCMakeFiles\\SkipList.dir\\SkipList.cpp.obj /FdTARGET_COMPILE_PDB /FS -c C:\\Users\\Peter\\Desktop\\Programming-Note\\DataStructure\\SkipList\\SkipList.cpp",
+  "file": "C:/Users/Peter/Desktop/Programming-Note/DataStructure/SkipList/SkipList.cpp"
+}
+]

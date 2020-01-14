@@ -4,9 +4,6 @@
 
 using namespace std;
 
-void func()
-{
-}
 
 TEST(EmptySkipList, EmptySkipListTest)
 {
@@ -73,6 +70,8 @@ TEST(InsertInt, InsertAndErase)
 	list.insert(9);
 	list.insert(7);
 
+	list.print_all();
+	
 	auto count = list.count;
 	list.erase(3);
 	

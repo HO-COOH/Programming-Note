@@ -39,7 +39,7 @@ include rules.ninja
 build cmake_object_order_depends_target_SkipList: phony || CMakeFiles\SkipList.dir
 
 build CMakeFiles\SkipList.dir\SkipList.cpp.obj: CXX_COMPILER__SkipList ..\..\..\SkipList.cpp || cmake_object_order_depends_target_SkipList
-  FLAGS = /DWIN32 /D_WINDOWS /W3 /GR /EHsc /std:c++17 /MDd /Zi /Ob0 /Od /RTC1
+  FLAGS = /DWIN32 /D_WINDOWS /W3 /GR /EHsc /std:c++17 /MDd /Zi /Ob0 /Od /RTC1   -std:c++17
   INCLUDES = -I..\..\..\..\GTest
   OBJECT_DIR = CMakeFiles\SkipList.dir
   OBJECT_FILE_DIR = CMakeFiles\SkipList.dir
