@@ -115,7 +115,7 @@ void func(T const& arg) { }
 
 std::string const str="Hello";
 func(str);		//T -> std::string
-func("World");	//T -> char[3]
+func("World");	//T -> char[5]
 ```
 #### Pass by non-const reference
 If the argument is a const lvalue, template parameter will be deduced as a ``const`` type. If the argument is a const rvalue, the template parameter will be deduced as a ``const&``, and ``const&`` can be bound to a rvalue, so it can accepts a const rvalue.

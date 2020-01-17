@@ -1,3 +1,36 @@
+零、包
+    1.包的声明
+        一个源代码文件可以在第一行用package关键字+包名来声明这个文件属于一个包
+            package example
+        这使得本源文件内所有的内容将归属于这个包
+        本源文件内的所有内容的全名是包名+点运算符.+标识符名
+        如果没有声明包，本文件内的所有内容将归属于一个默认的无名的包
+    2.导入
+        使用import关键字+点运算符.+包名+点.+标识符（导入一个特定标识符）/*（导入包中的全部内容）
+        如果有多个包中包含同名标识符，在导入时用附加的as关键字来区别
+            import org.test.Message as testMessage 
+    3.默认导入
+        以下的包是每一个kotlin源文件默认导入
+            kotlin.*
+            kotlin.annotation.*
+            kotlin.collections.*
+            kotlin.comparison.*
+            kotlin.io.*
+            kotlin.ranges.*
+            kotlin.sequences.*
+            kotlin.text.*
+        附加包根据目标平台导入：
+            jvm:
+                java.lang.*
+                kotlin.jvm.*
+            javascript:
+                kotlin.js.*
+    4.可见性
+        在一个源文件内，一个标识符如果用：
+            private修饰，这个标识符只在本文件内可见
+            internal修饰，这个标识符在同模块内可见
+        如果没有任何修饰，默认public，在全局可见
+
 一、基本类型
     val：值从不更改
     var：值可以更改
@@ -42,7 +75,66 @@
     也可以通过${}将表达式的值替代到字符串中
         var s="abc"
         var str="The length of s is ${s.length()}"  //str="The length of s is 3"
+二、语句
+    1.if
+        kotlin中的if语句可以作为语句，也可以作为一个表达式，有返回值
+            if(a<b)
+                max=b
+            else
+                max=a
+        如果将if语句作为表达式使用并赋值给一个变量，则if必须有配对的else语句，整个if else语句的值是满足的if 或 不满足的else语句块中最后一个语句的值
+            val max=if(a>b)
+                {
+                    print("Choose a")
+                    a
+                }
+                else
+                {
+                    print("Choose b")
+                    b
+                }
+    2.when
+        when语句可以作为语句，也可以作为一个表达式，有返回值
+        带参数的when语句：
+            when语句执行时，将参数与分支条件比较，匹配的分支将被执行，不匹配的被跳过，如果没有匹配的，执行else语句（如果存在的话）
+                when(x)
+                {
+                    1 -> print("x==1")
+                    2 -> print("x==2")
+                    else -> print("x is neither 1 nor 2")
+                }
+            如果需要对不同的分支执行相同的操作，可以将多个分支的条件用逗号,分隔，合并成一个分支
+                when(x)
+                {
+                    0,1 -> print("x==0 or x==1")
+                    else -> print("otherwise")
+                }
+        不带参数的when语句：
+            不带参数的when语句相当于if-else语句，
+                when
+                {
+                    x.isOdd() -> print("x is odd")
+                    x.isEven() -> print("x is even")
+                    else -> print("What")
+                }
+        作为表达式时，必须要有else语句，整个when语句的返回值是匹配分支语句块的最后一个语句的值
+    3.for循环
+        for循环可用于任何定义了迭代器的数据集合，包括：
+        定义了一个iterator()的方法，这个函数返回的对象需要：定义了方法next()和hasNext()
+            for(item in collection)
+            {
+                //...
+            }
+    4.while循环
+    5.do while循环
+    6.跳转语句，也均可以作为表达式
+        return
+        break
+        continue
+    
+
 二、数组 Array
+
 三、函数
     1. 声明
         fun functionName(arg1: ArgType, arg2: ArgType):returnType
@@ -92,12 +184,51 @@
         当一个类定义了主要构造函数时，必须通过在constructor()之后加冒号通过this()调用主要构造函数并提供主要构造函数所需的参数完成构造
             constructor(arg: argType):this(args) { }
         所以一个类的构造函数的执行顺序是：主要构造函数->所有init代码块->次要构造函数
+    继承：
+        一个类要被继承，显示指明它允许被继承，在基类前加open关键字
+            open class Base{ }
+        类似的，要继承基类的成员、方法，在相应的成员方法前加open关键字
+        指定派生类从基类继承而来，需要在派生类的声明头部后用冒号:加基类名，并调用基类的一个构造函数(如果基类没有定义构造函数，编译器会隐式产生一个，所以依然需要用一对圆括号调用它)
+            class Derived: Base() {}
+    3.可见性
+        private：类内可见
+        protected：类内和派生类内可见
+        public：默认
+        internal：同样被声明成internal的同模块的类内可见
+    4.接口类
+        接口类使用关键字interface声明，接口类可以定义具体方法或抽象方法，与抽象类不同的是，接口类不能存储非抽象的数据成员，或者需要用get()方法来赋初值
+        接口类的方法如果没有定义，默认为abstract修饰的抽象方法
+        一个普通类或接口类可以同时继承多个接口类
+        如果一个普通类继承了包含同名方法的多个接口类，需要显式override重名的方法
+            interface A
+            {
+                fun foo() {print("A")}
+                fun bar()
+            }
+            interface B
+            {
+                fun foo() {print("B")}
+                fun bar() {print("B.bar")}
+            }
+            class MyClass: A, B
+            {
+                override fun foo()
+                {
+                    super<A>.foo()
+                    super<B>.foo()
+                    //...
+                }
+
+                override fun bar()
+                {
+                    super<B>.bar()
+                    //...
+                }
+            }
+    5.数据类
+        数据类是主要用来存储数据的类，用data class关键字声明
 五、继承
-    一个类要被继承，显示指明它允许被继承，在基类前加open关键字
-        open class Base{ }
-    类似的，要继承基类的成员、方法，在相应的成员方法前加open关键字
-    指定派生类从基类继承而来，需要在派生类的声明头部后用冒号:加基类名，并调用基类的一个构造函数(如果基类没有定义构造函数，编译器会隐式产生一个，所以依然需要用一对圆括号调用它)
-        class Derived: Base() {}
+
 六、Set
     判重过程：
         1.比较hash code，如果没有找到相同hash code的引用，则没有重复

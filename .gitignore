@@ -6,3 +6,12 @@
 .vscode/settings.json
 *.exe
 *.exe
+.vscode
+build
+images
+out
+.idea
+.vs
+images
+out
+.vs
