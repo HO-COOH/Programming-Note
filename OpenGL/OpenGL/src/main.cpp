@@ -55,7 +55,7 @@ int main(void)
 		va.Push<float>(2);
 		va.AddBuffer(vb);
 
-		Shader shader("./Shaders/VertexShader.txt", "./Shaders/FragmentShader.txt");
+		Shader shader("./Shaders/VertexShader.vert", "./Shaders/FragmentShader.frag");
 		shader.Bind();
 		
 		glEnable(GL_BLEND);

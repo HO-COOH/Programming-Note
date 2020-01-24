@@ -125,6 +125,11 @@ glBlendFunc(src,	//how the src RGBA factor is computed, default: GL_ONE
 glBlendEquation(mode);	//how to combine the src and dest colors, defaul: GL_FUNC_ADD
 ```
 
+### ImGUI
+API **independent** library to draw UI on the screen, eg. buttons, textfields, windows...  
+[imgui github links](https://github.com/ocornut/imgui)
+
+
 
 ## Draw
 - Loop until the user closes the window
@@ -139,4 +144,10 @@ The bottom left of the window is (0,0)
 ### Error Handling
 Note: ``glfwTerminate()`` will destory the OpenGL context, so any operation including deleteing program, deleting buffer, will result in an OpenGL error code. So these operations should be run before calling ``glfwTerminate()``. After abstracting ``VertexBuffer`` ,``VertexArray`` and ``IndexBuffer`` into classes, we should make these stack allocated object inside a scope. So their destructor will be called before terminate.
 ### Math
+#### Projection matrix
+Transform a space location to the device coordinates.
+#### View projection matrix
+Transform position, rotation, angle of the camera.
+#### Model matrix
+Transform position, rotation, angle of the object.
 
