@@ -501,6 +501,7 @@ public:
 Some_class x;
 Some_class y{x};	//call template copy constructor!
 ```
+And member function templates cannot be declared as ``virtual``. Because virtual function is implemented as one entry per virtual function in a fixed-size vtable, but the number of instantiated member function is not fixed until the entire program has been translated. 
 
 ## Variable Template 
 Since C++14, variables can also be parameterized by a specific type. Such a thing is called a variable template.

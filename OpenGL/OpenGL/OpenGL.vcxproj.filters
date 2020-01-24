@@ -30,10 +30,17 @@
     <ClCompile Include="src\VertexArray.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="src\Shader.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Texture.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Text Include="Shaders\VertexShader.txt" />
     <Text Include="Shaders\FragmentShader.txt" />
+    <Text Include="notes\Note.md" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Renderer.h">
@@ -46,6 +53,15 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\VertexArray.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Shader.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Texture.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Dependency\stb_image.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

@@ -540,8 +540,7 @@ cctype函数
     局部变量将隐藏（与之同名的）全局变量
 
     函数默认都具有外部链接性
-    可以将函数声明为static returnType func()
-    使得函数只在本文件内可用
+    可以将函数声明为static returnType func()使得函数只在本文件内可用
     mutable关键字：若结构和类声明为const，可以将某个成员声明为mutable，使得可以修改这种结构和类的实体中被声明为mutable的成员
         也可以在const成员函数中修改mutable的类成员
     定位new：

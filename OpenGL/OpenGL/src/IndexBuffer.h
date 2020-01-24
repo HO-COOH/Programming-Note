@@ -6,7 +6,8 @@ class IndexBuffer
 public:
 	IndexBuffer(const unsigned int data[], const unsigned int count);
 	~IndexBuffer();
-	void Bind();
+	void Bind() const;
 	void UnBind();
+	auto GetCount() const { return count; }
 };
 
