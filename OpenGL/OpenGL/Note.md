@@ -142,6 +142,12 @@ while(!glfwWindowShouldClose(GLFWwindow*))
 The bottom left of the window is (0,0)
 
 ### Error Handling
+[youtube link](https://www.youtube.com/watch?v=FBbPWSOQ0-w&list=PLlrATfBNZ98foTJPJ_Ev03o2oq3-GGOS2&index=11&t=0s)
+```cpp
+#define ASSERT(x) if(!(x)) __debugbreak();	//MSVC specific
+#define GLCall(x) x;\
+	ASSERT(glCheckError());\
+```
 Note: ``glfwTerminate()`` will destory the OpenGL context, so any operation including deleteing program, deleting buffer, will result in an OpenGL error code. So these operations should be run before calling ``glfwTerminate()``. After abstracting ``VertexBuffer`` ,``VertexArray`` and ``IndexBuffer`` into classes, we should make these stack allocated object inside a scope. So their destructor will be called before terminate.
 ### Math
 #### Projection matrix

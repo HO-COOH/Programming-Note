@@ -1789,6 +1789,90 @@ C++11:
             char32_t const*, size_t
 
     统一的初始化：
+        初始化的类型：
+            默认初始化 default initialize：不给定初始化的值，对于内置类型，其值是未定义的，访问这样的变量造成未定义行为，对于类，将调用默认构造函数
+                int a;
+            复制初始化 copy initialize: 由赋值符=开始的初始化，按值传递的函数参数，返回值的函数
+                int i=2;
+                int square(int i);  //形参i和返回值都是复制初始化
+                当复制初始化的类型不符时，会发生可能的类型转换
+            聚合初始化 aggregate initialize: 发生在(聚合)结构体、数组的初始化赋值时
+                int i[4]={0,1,2,3};
+                struct Foo
+                {
+                    int i,j;
+                };
+                Foo foo={1,2};
+                当初始化器的个数少于成员个数时，结构体或数组剩余的成员将用0值初始化
+                    Foo foo2={1};   //foo.j==0
+                当聚合体嵌套聚合体时，初始化器将按顺序初始化聚合体中的元素，嵌套的大括号可以省略
+                    struct Bar
+                    {
+                        Foo f;
+                        int k
+                    };
+                    Bar b={1,2};    //Equivalent to Bar b={{1,2},0};
+            直接初始化 direct initialize: 使用圆括号()的初始化器
+                Foo foo(1,2);
+                int i(3);
+                auto* foo_ptr = new Foo(2,3);
+                直接初始化与复制初始化的区别：
+                    1.对于内置类型，没区别
+                    2.对于类，直接初始化能接受多于一个的参数，将使用重载函数的语法来调用合适的构造函数
+                由于使用圆括号，直接初始化会造成解析问题，最常见的问题是声明了一个函数而不是进行初始化
+                    struct Foo{};
+                    struct Bar
+                    {
+                        Bar(Foo);   //使用一个Foo对象来初始化Bar
+                    }；
+                    Bar bar(Foo()); //本意是使用一个临时的Foo对象来初始化一个bar，但是C++将解析成声明了一个返回Bar的函数bar()，这个函数接受一个返回Foo的函数作为参数
+            值初始化 value initialize: 使用空的圆括号()的初始化器
+                int i()=int();    //int i=0;
+                如果有用户定义的默认构造函数，调用默认构造函数，如果没有，将用0值初始化
+                所以C++11后一个类如果使用=default编译器生成的默认构造函数，由于它不是用户定义的，所以将使用0值初始化类内成员
+                    struct A
+                    {
+                        A()=default;
+                        int i;
+                    };  //调用A()将使得i=0
+                注意，如果在类外使用default定义默认构造函数，这个函数将属于用户定义的，尽管定义是编译器生成的，所以不会使用0值初始化类内成员
+                    struct A
+                    {
+                        A();
+                        int i
+                    };
+                    A::A()=default; //调用A()将使得i的值不确定
+            列表初始化 list initialize: 使用用花括号{}的初始化器
+                直接列表初始化 direct list initialize: 不使用赋值符=
+                复制列表初始化 copy list initialize: 使用赋值符=，形式上与聚合初始化相同，但聚合初始化不调用构造函数
+                   {}初始化规则：
+                    当一个结构体或类没有定义接收std::initializer_list的构造函数时，使用{}与()初始化作用相同
+                    当定义了默认构造函数和std::initializer_list构造函数，但实参是空的花括号初始化器时，调用默认构造函数
+                    当定义了接收std::initializer_list的构造函数时，编译器会高优先级选中这个构造函数，除非这个std::initializer_list的参数类型完全无法与实参匹配
+                    struct Widget
+                    {
+                        Widget(std::initializer_list<long double>);
+                        float operator();   //Widget -> float的转换函数
+                    };
+                    Widget w1;
+                    Widget w2(w1);  //复制构造函数
+                    Widget w3{w2};  //w2转换为float，强制转换成long double再调用Widget(std::initializer_list)构造函数
+                    编译器选中std::initializer_list的优先级是如此之高，以至于在发生精度损失的情况下都要选中，又由于{}初始化不能精度损失赋值，所以会发生编译器错误
+                    struct Widget
+                    {
+                        Widget(int i, bool b);
+                        Widget(std::initializer_list<bool>);
+                    };
+                    Widget w{10,5.0};   //调用Widget(std::initializer_list<bool>)，发生精度损失，所以错误
+            委托初始化 C++20 designated initialize: 是聚合体初始化的变种，可以在花括号内用句点.加成员名的方式初始化成员
+                与C相似，但不同的是成员顺序必须一致（可以跳过某些成员，跳过的使用0值初始化），不能混合其他初始化方法（所有成员都要用委托初始化），不能对数组使用
+                    struct Foo
+                    {
+                        int a,b,c
+                    };
+                    Foo foo{.a=1, .c=3};    //.b=0
+                    Foo foo{.a=3, 2};       //混合其他初始化方法，Error
+
         C++11前（C++98 C++03）：
             int i1;     //未定义的值
             int i2=0;   //内置类型的C风格初始化，注意不是赋值运算符
@@ -1818,24 +1902,6 @@ C++11:
             {
                 //函数中使用类似容器和迭代器的方法
             }
-        {}初始化规则：
-            当一个结构体或类没有定义接收std::initializer_list的构造函数时，使用{}与()初始化作用相同
-            当定义了接收std::initializer_list的构造函数时，编译器会高优先级选中这个构造函数，除非这个std::initializer_list的参数类型完全无法与实参匹配
-            struct Widget
-            {
-                Widget(std::initializer_list<long double>);
-                float operator();   //Widget -> float的转换函数
-            };
-            Widget w1;
-            Widget w2(w1);  //复制构造函数
-            Widget w3{w2};  //w2转换为float，强制转换成long double再调用Widget(std::initializer_list)构造函数
-            编译器选中std::initializer_list的优先级是如此之高，以至于在发生精度损失的情况下都要选中，又由于{}初始化不能精度损失赋值，所以会发生编译器错误
-            struct Widget
-            {
-                Widget(int i, bool b);
-                Widget(std::initializer_list<bool>);
-            };
-            Widget w{10,5.0};   //调用Widget(std::initializer_list<bool>)，发生精度损失，所以错误
         最佳选择：
             默认构造时，不使用初始化器
             默认使用{}初始化器直接初始化
