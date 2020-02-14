@@ -2541,8 +2541,6 @@ Effective C++
             return *result;
         }
         Rational a=b*c; //a是*result，result指针无法再被释放，除非delete &a，不过客户对这个实现方式应该是一无所知的
-
-        //不过有了右值引用？
     24.若所有参数都需要类型转换，定义一个非成员函数
         还是以Rational有理数类作为例子，我们希望不仅能两个有理数对象之间可以相乘，我们还希望一个有理数对象和一个整数之间也可以相乘，如果将operator*作为成员函数则只能是有理数*整数的形式，反之错误
         假设Rational类的*号运算符是作为成员函数
@@ -3077,58 +3075,3 @@ More Effective C++
     T*可选optional，表明可以是空指针nullptr      T* const
     T vs T const&：值传递需要拷贝，引用需要间接读取一次内存，所以当对象的拷贝操作昂贵时，选用T const&，否则选用T，编译器可能对拷贝有优化，但是对于引用，无论如何都要多访问一次内存
     T* vs std::optional<T>：optional<T>要求可复制，而且传指针可以在函数内修改参数T，所以T*的适用面更广
-
-#include <iostream>
-#include <array>
-#include <vector>
-
-using namespace std;
-
-struct A_value
-{
-	int v;
-	A_value(int _v) :v(_v) { cout << "value struct!\n"; }
-};
-
-class A
-{
-	int value;
-public:
-	A() { cout << "default constructor! value=" << value<<endl; }
-	A(A_value b) :value(b.v) { cout << "Value constructor! value=" << value<<endl; }
-	//A(int v) :value(v) { cout<<"Explicit constructor! value="<<value<<endl; }
-	A(const A& a) :value(a.value) { cout << "Copy constructor! value=" << value << endl; }
-	A(A&& a) { cout << "Move constructor! value=" << value << endl; }
-	~A()
-	{
-		cout << "Destructor!\n";
-	}
-};
-
-A Return_temp_A()
-{
-	return A();
-}
-
-A Return_local_A()
-{
-	A a(3);
-	return a;
-}
-
-int main()
-{
-	
-	cout << "/*std::array*/\n";
-	array<A, 5> A_array;
-	
-	cout << "\n/*std::vector without anything.*/\n";
-	vector<A> A_vector;
-	A_vector.reserve(3);
-	cout << "/*std::vector push_back A()*/\n";
-	//A_vector.push_back(3);
-	cout << "\n/*std::vector emplace_back A()*/\n";
-	A_vector.emplace_back(4);
-	
-	cout << "\n/*Out of scope*/\n";
-}
