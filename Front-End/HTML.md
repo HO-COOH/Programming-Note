@@ -72,9 +72,20 @@ To specify how the new page is opened, use ``target`` attribute:
 ## Images
 Defined with ``<img>`` tag. Attributes:
 - source file: ``src``
-- alternative text: ``alt``
+- alternative text: ``alt``(if error / screen reader is used)
 - ``width``
 - ``height``
+- ``style``: can be used to specify ``width`` and ``height``
+  ```html
+  <img src="someImage.img" style="width:128px; height:128px">
+  ```
+  use ``float`` attribute to inline a image to the left or right to the text
+  ```html
+  <p>
+      <img src="someImage.img" style="float:left; width:...">
+      someText in this paragraph
+  </p>
+  ```
 Images can be used as a link.
 ```html
 <a href="someLink">
