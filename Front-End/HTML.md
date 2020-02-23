@@ -97,6 +97,19 @@ Images can be used as a link.
 Defined with ``<botton>`` tag.
 Button can be used as a link. Need Javascript.
 
+## Tables
+Defined with ``<table>`` tag.
+- Add a caption to a table, use ``<caption>`` tag.
+- Header row is defined with the ``<th>`` tag.
+- Each row is defined with ``<tr>`` tag.
+- Each cell in the row is defined with ``<td>`` tag.
+Tables are displayed without borders by default. To add border, use ``border`` property.  
+- To make a cell span >1 column, use ``colspan`` attribute.
+- To make a cell span >1 row, use ``rowspan`` attribute.
+```html
+<th colspan="2">someHeading</th>
+```
+
 ## Lists
 - Unordered/bullet lists are defined with ``<ul>`` tag
 - Ordered/numbered list are defined with ``<ol>`` tag
@@ -108,6 +121,18 @@ followed by items defined by ``<li>`` tag
     <li>Milk</li>
 </ul>
 ```
+
+## Iframe
+An iframe is used to display a web page within a web page, defined by ``<iframe>`` tag.
+- ``src`` - specify the URL of the inline frame page
+- ``height``
+- ``width``
+- ``name`` - specify a name for the iframe, and then act as a target of a link
+
+## Script
+The ``<scirpt>`` tag is used to define a client-side Javascript. It either contains the code or points to an external code through ``src`` attribute.  
+If the browser does not support Javascript or user disabled the feature, ``<noscript>`` tag can be used to provide alternative content.
+
 ## Special formating element
 - ``<b>`` - Bold text
 - ``<strong>`` - Important text
@@ -148,7 +173,6 @@ Specify the styling of an element, like color, background-color, font-family, fo
 ```
 where ``property`` is a CSS property, and ``value`` is a CSS value.
 
-
 ### Color
 - Using predefined color names:
 ```html
@@ -171,3 +195,25 @@ A programming language for Real Men. Most languages try to provide a simplified 
 ```html
 <b style="color:hsl(0, 100%, 50%)">Don't try this at home!</b>
 ```
+## class
+``class`` attribute is used to define same style for the elements with the same class name.  
+Elements can have more than one class name, seperated by a **space**
+```html
+<h2 class="city main">London</h2>
+```
+## id
+``id`` attribute specifies a unique id for an element, which **must** be unique within the HTML document.  
+Combining ``id`` and ``href`` to make a bookmark, which on click will jump to the location to the element with the referenced id.
+```html
+<p id="paragraph1">someContent</p>
+<!-- ... -->
+<a href="#paragraph1">Jump to paragraph1</a>
+```
+``href`` can even jump to another HTML document with the specified id.
+```html
+<a href="anotherPage.html#paragraph1">Jump to paragraph1</a>
+```
+
+
+class name can be used by Javascript. Accessing the elements by using ``document.getElementsByClassName()``
+id can be used by Javascript. Accessing the element by using ``document.getElementById()``

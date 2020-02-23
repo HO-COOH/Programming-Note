@@ -781,6 +781,16 @@ cctype函数
             className::className() : mem1(value), mem2(&object) {...}  
     定位new运算符生成的对象：需要显式地为用定位new运算符生成的对象调用其析构函数，然后再释放存储有那个对象的内存空间
         直接delete掉new的对象再释放内存会发生异常
+    位域：
+        在类中可以使用位域显式指定数据成员占用多少个位（是bit，不是字节）,所以相邻位域的成员可以挤到一个字节内
+        位域声明语法：
+            变量名:位数; //声明一个具名的位域
+            变量类型:位数;    //声明一个匿名的位域
+        位域的类型只能是整数或枚举类型
+        将匿名的位域声明为0位大小将使得下一个位域从整数字节起始，而不是从相邻的位起始
+        如果声明的位域的位数大于变量的类型所需的位数，这个变量所能存储的值的范围不会扩大，但是占用的空间等于位域所声明的空间，未使用的位成为空缺（padding）
+        由于位域并不一定从整数字节起始，所以位域不能使用指针和非常量的引用，位域也不能是静态成员
+        在C++20前，位域不能使用默认成员初始化器（类内初始化）来初始化，C++20后可以使用类内复制初始化或列表初始化
 继承：
     公有继承：从base基类公有继承得到derived派生类，声名：
         class derived:public base {...} 
@@ -1950,7 +1960,25 @@ C++11:
                 所以被声明为constexpr的函数调用必须能在编译期被计算为常量
                 由于函数调用成为了常量表达式，所以可以用作数组的大小
             定义构造函数
-
+    std::reference_wrapper
+        #include <functional>
+        是一个用法类似于引用的可复制对象，定义了一个转换成指向所引用对象的引用的转换函数
+        当一个reference_wrapper给另一个reference_wrapper赋值时，发生reference_wrapper的赋值拷贝，而不是所指向对象的拷贝，所以是一个可重新绑定的引用
+        当需要一个指向对象的引用时，会调用转换函数
+        当转换函数不被自动调用（比如作为模板的参数，或者auto，会被推断为reference_wrapper类型而不是所指向的对象的引用类型），但需要所指向对象的引用时，调用.get()成员函数
+        可能的实现：
+            template<typename T>
+            class reference_wrapper
+            {
+                T* ptr;
+            public:
+                reference_wrapper &operator=(const reference_wrapper &x) noexcept = default;
+                constexpr operator T&() const noexcept {}
+                constexpr operator T& get() const noexcept {}
+            }
+            template<typename T>
+            reference_wrapper<T&> -> reference_wrapper<T>;.
+        reference_wrapper还可以绑定可调用对象，此时.operator()成员函数可用
     static_assert(布尔常量表达式,"消息")：在编译期进行的断言检查
         当表达式为false时，在编译期中编译期会发出错误，错误内容是消息字符串
     decltype关键字：将y声明为与表达式x的类型相同
@@ -2281,10 +2309,131 @@ C++17：
             }   //VS2019输出"default constructor!"
         所以无论如何也不应该定义一个函数返回右值引用
 C++20：
-    1.模块
+    1.模块 Modules
         模块名：[模块名]
+    2.范围 Ranges
+    3.概念 Concepts
+    4.协程 Coroutines
+
 
 多线程C++11 std::thread：
+    -1.内存模型和执行顺序
+        https://en.cppreference.com/w/cpp/language/eval_order
+        同一语句中表达式的执行顺序是未定义的，这包括函数调用时各实参之间的评估的顺序，编译器可能选择任何顺序，实际运行时的顺序也会改变，如：
+            int a() { return std::puts("a"); }
+            int b() { return std::puts("b"); }
+            int c() { return std::puts("c"); }
+            void z(int, int, int) {}
+            int main() 
+            {
+                z(a(), b(), c());       // 有可能按任何顺序输出abc，每次程序运行时的输出也可能改变
+                return a() + b() + c(); // 同上
+            }
+        但注意不要与表达式之间结合的顺序混淆，结合的顺序是根据运算符的规则固定的，比如a+b+c的顺序总是(a+b)+c
+        前序原则（C++11）：
+            对表达式的评估包括以下2种情形：
+                1.值的计算：计算一个表达式返回的值，这包括读取泛左值glvalue和读取一个刚被赋值过的对象的值
+                2.副作用的评估：读取一个声明为volatile对象的值，
+
+
+        执行顺序：
+            源代码顺序：源代码中的语句的顺序
+            程序顺序：源代码经过编译生成的机器指令的顺序
+            执行顺序：现代处理器使用乱序执行策略，机器指令读进cpu时，cpu会对机器指令重新排序，成为执行顺序
+            实际（观察到的）顺序：由于多线程和缓存的存在，内存中的变量的值的改变顺序又会与执行顺序不同，成为实际顺序
+        C++标准所规定的C++抽象机器只规定了在同一线程中，实际顺序与源代码顺序在产生任何副作用的前提下要相同，但对于多线程程序没有任何顺序的保证
+        当一个线程从内存中读取时，它可能读取到原始值、在同一线程中写入的值、在另一个线程中写入的值
+        在#include <atomic>中定义的函数和操作默认都是确保以原程序的顺序执行，同时提供了6种执行顺序供选择
+        namespace std {
+            enum memory_order {
+                memory_order_relaxed,   //只确保当前指令的原子性，不保证任何顺序
+                memory_order_consume,
+                memory_order_acquire,   //确保当前原子操作之后的源代码不能移到当前原子操作之前（保证后面代码读取的可见性），但当前原子操作之前的源代码可以移到当前原子操作之后执行
+                memory_order_release,   //确保当前原子操作之前的源代码不能移到当前原子操作之后（保证前面代码写入的可见性），但当前原子操作之后的源代码可以移到当前原子操作之前执行
+                memory_order_acq_rel,
+                memory_order_seq_cst    //默认值
+            };
+        }
+
+    0.volatile关键字
+        volatile关键字本来是用于在声明变量时，表明它可能在没有程序修改它时发生了改变，所以编译器不能在没有程序修改这个变量的情况下优化掉或者缓存到cpu寄存器中，所以可以确保读写操作实际上的执行
+        volatile常用于存取IO寄存器、内存映射硬件
+        对于线程安全的数据，我们需要确保以下两点：
+            1.读写操作是实际上按程序的需要执行了的，而不是被编译器优化了，或者是写入CPU缓存，从而使得对数据的操作在另一个线程读取时可见
+            2.程序中的机器指令没有被重新排序，编译器可能对程序的某些步骤重新排序，导致即使读写操作是真实执行了，但是由于顺序的问题导致这个线程本身的逻辑错误或者另一个线程发生错误
+        volatile关键字能确保第一点，但不能确保第二点
+        所以在多线程编程时使用volatile的结果是未定义的UB
+        应使用#include <atomic>替代
+    atomic
+        原子操作是一个确保单指令性的操作（可能是多个机器指令组成，也可能是一个）
+            - 其他线程要么看到这个操作已经完成，要么看到这个操作没有开始，但是不会看到任何中间状态
+            - 在底层，原子操作是由特殊机器指令实现的
+            - 原子性是一个通用术语，不限于描述机器指令，也可以描述其他操作具有单指令性（例如数据库的交易，其他访问数据库的操作不应该看到处理交易的中间状态）
+        在单核cpu的情况下，单机器指令的操作不会被切换，因为中断只会发生在指令之间，所以切换只可能发生在操作前或操作后
+        在多核cpu的情况下，单机器指令的操作就不一定是原子的，因为一个核在执行一个指令时其他核可能在执行操作同一块内存的指令，造成资源竞争问题
+        多核系统的原子操作通常使用内存栅障（memory barrier）来实现，即一个CPU核在执行原子操作时，其他CPU核必须停止对内存操作或者不对指定的内存进行操作
+        std::atomic<>是一个模板类，支持所有trivially copyable类型
+                1.必须占用连续的内存空间
+                2.可以使用memcpy来复制
+                3.没有虚函数，构造函数不能抛出异常
+            然而满足上述要求的自定义类型虽然可以作为原子类型，但不一定是无锁的
+            C++17可以使用std::is_always_lock_free()来检查
+            std::atomic<>是实现大多数无锁算法的基础
+            std::atomic<int> x{0};
+            ++x;x++;x+=1;   //atomic increment, OK
+            x|=2;   //atomic bit set, OK
+            x*=2;   //Error, not compile
+            int y=x*2;  //atomic read of x, OK
+            x=y+1;      //atomic write of x, OK
+            x=x+1;  //!Not atomic statement，因为先是一个atomic读，然后一个atomic写
+            x=x*2;  //!Not atomic statement，同上
+            支持的操作总结：
+                复制和赋值（包括内置类型和用户定义的类型）
+                原始指针的自加和自减
+                整数类型的加减、位运算
+                bool类型的所有操作
+            成员函数：
+                T z=x.exchange(y);  //z=x;x=y合成为一个原子操作
+                bool success=x.compare_exchange_strong(y,z);    //if x==y => x=z, success=true
+                                                                //else    => y=x, success=false
+                    可能的实现：
+                        bool compare_exchange_strong(T& y, T z)
+                        {
+                            Lock lock;          //任意一种可提供独占访问的机制
+                            T tmp=*this;        //读一次
+                            if(tmp!=y)
+                            {
+                                y=tmp;
+                                return false;   //如果this的值与y不同，读一次
+                            }
+                            *this=z;            //写一次
+                            return true;        //如果this的值与y相同，读一次写一次
+                        }
+                    由于lock可能很慢，所以可以优化成：
+                        bool compare_exchange_strong(T& y, T z)
+                        {
+                            T tmp=*this;        //读一次
+                            if(tmp!=y)
+                            {
+                                y=tmp;
+                                return false;   //如果this的值与y不同，读一次
+                            }
+                            Lock lock;          //提高了当tmp!=y时的执行速度
+                            tmp=*this;          //*this可能在中间发生了改变，所以要重新读取
+                            if(tmp!=y)
+                            {
+                                y=tmp;
+                                return false;
+                            }
+                            *this=z;            //如果this的值与y相同，读两次写一次
+                            return true;
+                        }
+                x.fetch_add(y); //same as x+=y
+                fetch_sub()
+                fetch_and()
+                fetch_or()
+                fetch_xor()
+
     1.一个最简单的多线程（用第二个线程打印hello world）
         #include<iostream>
         #include<thread>
@@ -2322,9 +2471,10 @@ C++20：
         当创建的线程数多于CPU核心数时，会带来多余的上下文切换降低性能
         使用unsigned int std::thread::hardware_concurrency()函数获取CPU线程数，返回一个无符号整形值
     4.资源竞争
-        当同一个对象被多个线程共有，就会造成资源竞争问题，最简单的解决方法是对共享资源采取某种保护机制，确保只有修改资源的线程才能看到不变量被破坏的中间状态，其余线程要访问时，要么修改已经完成了，要么还没开始修改（用互斥量延迟访问）
+        当同一个对象被多个线程共有，且有一个或一个以上的线程需要修改这个对象，同时还有其他线程需要读取时，就会造成资源竞争问题
+        而多个线程只读这个对象，不会造成资源竞争
+        最简单的解决方法是对共享资源采取某种保护机制，确保只有修改资源的线程才能看到不变量被破坏的中间状态，其余线程要访问时，要么修改已经完成了，要么还没开始修改（用互斥量延迟访问）
         保护数据的最基本方式，是C++标准库中的互斥量，std::mutex
-        
     5.死锁
         有锁情况：
             当两个线程A、B以相反的顺序锁两个mutex M1、M2时，可能发生如下清醒：
@@ -2376,7 +2526,6 @@ C++20：
                     默认值为std::launch::async|std::launch::deferred，表示新线程的创建与否取决于实现，也可能不创建新线程
                     如果确实要创建新线程，用std::launch::async
                     std::launch::deferred 表示不创建新线程，而且延迟执行，直到调用了所返回的future对象的get()方法，才执行函数Fn
-                
                 template <class T> future
                 template <class R&> future<R&>
                 template <> future<void>
@@ -2400,7 +2549,28 @@ C++20：
                     auto result_value=result.get(); //主线程获取子线程的结果
                 }
         std::packaged_task<>
-        st
+        std::shared_mutex
+            #include <shared_mutex>
+            不同于std::mutex提供的单独访问的权限，shared_mutex提供两种性质的访问的保护：
+                共享性：多个线程可以同时获取这一个互斥量（常用于一个共享资源用于多个只读线程）
+                    .lock_shared()
+                    .try_lock_shared()
+                    .unlock_shared()
+                占有性：只有一个线程可以获取这一个互斥量（常用于一个共享资源需要被一个线程写入）
+                    .lock()
+                    .try_lock()
+                    .unlock()
+            当一个线程使用.lock()或.try_lock()占有性取得互斥量后，其他任何线程将不能取得这个互斥量
+            当一个线程使用.lock_shared()或.try_lock_shared()共享性取得互斥量后，其他线程同样可以共享性取得这个互斥量
+        std::shared_lock<Mutex>
+            #include <shared_mutex>
+            类似于std::lock_guard和std::unique_lock相对于std::mutex的关系
+            shared_lock在构造时，可以指定是否上锁以及是否try
+                explicit shared_lock(mutex_type& m);     //构造时上锁
+                shared_lock(mutex_type& m, std::defer_lock_t ); //构造时不上锁
+                shared_lock(mutex_type& m, std::try_to_lock_t); //构造时尝试上锁，不成功也立即返回
+                shared_lock(mutex_type& m, std::adopt_lock_t);  //构造时假设已经上锁，退出作用域解锁
+
 
 Effective C++
     1.C++的四个子语言
