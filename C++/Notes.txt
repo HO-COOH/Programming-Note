@@ -229,6 +229,7 @@ C++
                         ios_base::cur      文件当前位置
                         ios_base::end      文件尾
         seekg(streampos);   //定位到文件第streampos个字节的位置（从0开始）
+        注意：当使用迭代器使得fstream对象到达文件末尾，因为此时文件流在超尾位置所以会产生eof和bad，如果希望使用同一对象重新定位并读取内容时应该先调用.clear()成员函数
         tellg()：返回输入文件指针的当前位置
         read(char *s, size_t count);    //读取count个字节，存储到s所指的内存区域
     ofstream：
@@ -338,6 +339,54 @@ cctype函数
 使用临时文件：
     char *tmpnam(char *s);  //生成一个包含L_tmpnam个字符的字符串并存储到s所指的字符数组中
     这个函数可以在同一目录下生成最多不超过TMP_MAX个不同的文件名
+流迭代器：
+    std::basic_streambuf
+        #include <streambuf>
+        template<class charT, class Traits=std::char_traits<charT>> class basic_streambuf;
+        表示一个控制输入输出到一个字符流的缓冲对象。这个对象包含了一个缓冲空间buffer和缓冲空间中的字符序列character sequence
+        所有的IO流对象如：std::basic_istream和std::basic_ostream以及他们的派生类std::ofstream和std::stringstream等对象在底层都是用std::basic_streambuf来实现的
+        字符序列是一个charT类型的数组，它的状态由三个指针控制：
+            起始指针：指向缓冲空间中最低的元素
+            next指针：指向下一个待读取或写入的元素
+            末尾指针：指向缓冲的超尾元素
+            [******.........] buffer
+            |     |         |
+           begin  next      end
+        一个std::basic_streambuf对象可能同时支持写入和读取，这时它的状态由六个指针控制
+        对于char和wchar_t有两个预定义的类型别名：
+        using streambuf=basic_streambuf<char>;
+        using wstreambuf=basic_streambuf<wchar_t>;
+    std::ostream_iterator
+        #include <iterator>
+        template<class T, class charT=char, class Traits=std::char_traits<charT>> class ostream_iterator;
+        是一个单次single-pass的输出迭代器（只有++和写入操作），它调用operator<<()与关联的std::basic_ostream对象中写入连续的对象
+        每次写入操作完毕后，可写入可选的分隔符字符串
+        可能的实现只需要使用两个指针，一个指向所关联的std::basic_ostream对象，一个指向分隔符字符串
+        成员函数：
+            构造：需要一个流对象和一个可选的分隔符字符串
+                ostream_iterator(ostream_type& stream, const charT* delim)
+                ostream_iterator(ostream_type& stream)
+            重载的赋值运算符=：由于是个迭代器，所以使用=就相当于对所指对象的写入操作，这里所指对象就是构造时的stream类对象
+                ostream_iterator& operator=(const T& value)
+                可能的实现：
+                    *stream<<value;
+                    if(delim)
+                        *stream<<delim;
+                    return *this;
+            对这个迭代器进行++没有效果
+    std::ostreambuf_iterator
+        #include <iterator>
+        template<class charT, class Traits=std::char_traits<charT>> class ostreambuf_iterator;
+        与ostream_iterator类似，也是一个单次single-pass的输出迭代器，它将连续的字符写入与之关联的std::basic_streambuf对象
+        可能的实现只需一个指针指向所关联的std::basic_streambuf对象，和一个布尔值表示到达文件尾
+        成员函数：
+            构造：
+                用一个指向streambuf_type字符流缓冲类型的指针构造：
+                    ostreambuf_iterator(streambuf_type* buffer);
+                用一个ostream_type输出流类型构造，等效于先从这个流对象获取内部的字符流缓冲的指针：
+                    ostreambuf_iterator(ostream_type& stream);
+            重载的赋值运算符=：向关联的字符流缓冲对象写入一个字符
+                ostreambuf_iterator& operator=(charT c)
 
 
 2.String类 string头文件
@@ -367,10 +416,6 @@ cctype函数
         }
     试验得知，超过16字节后，会在堆区重新分配内存空间进行拷贝
     C++用R"(Some string)"表示原始字符串
-3.高级数据类型
-    char16_t;
-    char32_t;
-    wchar_t;
 4.vector类
     vector<typeName>vt(n_elem);//创建一个名为vt的vector对象，存储n_elem个类型为typeName的元素，n_elem可以是变量
 5.array类
@@ -1171,6 +1216,36 @@ STL
                 vector类的性能优化方法：
                     当预先知道大概会在vector容器中存储几个对象时，可以先定义一个vector对象，然后用成员函数reserve(size_t numberOfElements)方法，避免过多的自动重新分配resize()
                     由于push_back()函数首先调用类构造函数来构造一个临时对象，再用复制构造函数复制这个临时对象到容器中，然后释放这个临时对象，造成浪费，所以使用emplace_back()函数直接就在容器内空间构造来优化性能 
+                特化：std::vector<bool>
+                    类内嵌套：std::vector<bool>::reference
+                        成员函数：
+                            .operator=(bool x); //用x赋值给对应的布尔值
+                            bool .operator bool() const; //返回一个对应的布尔值
+                    成员函数：
+                        .begin()
+                        .end()
+                        以上成员函数返回一个vector<bool>::iterator
+                        与通用模板不同，对这个迭代器进行.operator*将返回一个临时对象std::vector<bool>::reference（通用模板返回所指向对象的左值引用）
+                        注意于范围for循环的用法，由于
+                            std::vector<bool> vb;
+                            for(auto& value:vb)
+                            { /*...*/  }
+                        与下面的普通for循环完全等价
+                            std::vector<bool> vb;
+                            {
+                                auto &&range = vb;
+                                for (auto b = vb.begin(), e=vb.end(); b!=e; ++b)
+                                {
+                                    auto &value = *b;
+                                    /*...*/
+                                }
+                            }
+                        而*b返回一个临时的std::vector<bool>::reference对象，这个临时对象本身是个纯右值，所以不能赋值给用auto&（左值引用）声明的对象，正确方法是将value声明为右值引用
+                            auto&& value=*b;
+                        此时对value的操作即可有以下两种情形：
+                            value=true; value=false; value=!value;  调用std::vector<bool>::reference::operator=(bool x)进行写操作来对对应的布尔变量赋值
+                            bool v=value;   调用std::vector<bool>::reference::operator bool() const 进行读操作
+
             deque：template < class T, class Alloc = allocator<T> > class deque;
                 是双端队列，内部实现可能不同，但是要求在队头和队尾插入和删除元素效率高，通常不能使用一个随机访问迭代器，因为内存分配可能不是连续的空间
                 功能上与vector类似，但当队列很大时，vector重新分配整块内存开销很大，而deque开销较小
@@ -1266,6 +1341,13 @@ STL
                 typedef typename Iter::reference reference;
                 typedef typename Iter::iterator_category iterator_category;
             };
+        其中iterator_category是以下的任何一种：
+            struct input_iterator_tag{};
+            struct output_iterator_tag{};
+            struct forward_iterator_tag:public input_iterator_tag{};
+            struct bidirectional_iterator_tag:public forward_iterator_tag{};
+            struct random_access_iterator_tag:public bidirectional_iterator_tag{};
+            C++20 struct contiguous_iterator_tag:public random_access_iterator_tag{};
             /*下面针对原始指针也提供iterator_traits的偏特化*/
             template<typename T>
             struct iterator_traits<T*>  //T*指针的偏特化iterator_traits
@@ -1289,6 +1371,7 @@ STL
     自定义迭代器类：
         为了能让自定义的迭代器类兼容既有STL的算法，就应该在其中定义五种typedef
         在<iterator>头文件中定义了一个迭代器模板，包含了这五种typedef的定义，只需在自定义迭代器类中public继承这个类模板，并赋值给相应的模板参数，就可以省去全部重写typedef和名称的麻烦
+        !deprecated in C++17!
         template <class Category, class T, class Distance = ptrdiff_t, class Pointer = T*, class Reference = T&>
         struct iterator 
         {
@@ -1298,8 +1381,26 @@ STL
             typedef Reference reference;
             typedef Category  iterator_category;
         };
+        或使用C++11后的using语句
+        template <class Category, class T, class Distance = ptrdiff_t, class Pointer = T*, class Reference = T&>
+        struct iterator
+        {
+            using value_type        =T;
+            using difference_type   =Distance;
+            using pointer           =Pointer;
+            using reference         =Reference;
+            using iterator_category =Category;
+        };
         class my_int_iterator: public std::iterator<std::random_access_iterator_tag, int>
         {...}   //此时my_int_iterator中的value_type为int，pointer为int*, reference为T&, iterator_category为random_access_iterator_tag
+        C++17标准反对使用std::iterator<>模板的原因：
+            继承std::iterator<>时，每个类型实参所对应的类型形参不明确，而且由于形参多而难以辨认，如上面的my_int_iterator可以写成：
+                class my_int_iterator: public std::iterator<std::random_access_iterator_tag, int, int, int*, int&>;  //难以辨认后面的四个类型实参是对应于哪几个形参
+            //而且由于这些类型声明是定义在std::iterator<>中的，所以无法直接在自定义迭代器的定义中使用它，必须用typename std::iterator<>作为类型前缀
+            //    class MyIterator:public std::iterator<std::forward_iterator_tag, int>
+            //    {
+            //        value_type data;    //ERROR
+            //    }
     方法：
         #include <algorithm>
         排序：
@@ -1603,7 +1704,7 @@ string类：C++标准类
         成员方法：
             string str() const;         //返回一个字符串，是当前stringstream内容的拷贝
             void str(const string& s);  //丢弃当前stringstream的内容，并将s的值拷贝进stringstream内，常用于调用str("")的方法来释放内存
-    string_view
+    string_view C++17
         由于string的构造在大多数情况下需要分配堆区内存，而且在使用string的大多数情况下只是需要获取其中的内容，所以大多数情况下可以避免新创建一个string，C++17以前可以通过char数组来解决，但是损失了string的灵活接口
         string_view是这样的一个类，他只包括一个指向所需string部分内容的起始的指针，和一个大小，所以他无需构造新string
         string_view有所有的string只读的常用方法
@@ -1633,6 +1734,7 @@ string类：C++标准类
         microseconds类：
         nanoseconds类：
     所有时间段类都重载了6中比较运算符
+        C++20后定义了一个三向比较运算符
     所有时间段类都重载了+-*/运算符
     2.duration_cast<type>函数
         将不允许隐式类型转换的转换（损失精度的转换）用向下取整的方式转换
@@ -1718,6 +1820,15 @@ string类：C++标准类
             两个使用不同时钟（不同计时原点）的时间点不能转换，使用同一个时钟的可以转换，如果转换不损失精度，可以隐式转换，如果损失精度，需要显式转换
             template<class ToDuration, class Clock, class Duration>
             constexpr time_point<Clock, ToDuration> time_point_cast(const time_point<Clock, Duration>& t)   //constexpr C++14
+    6.时间段字面值C++14
+        使用时间段字面值需要using namespace std::chrono_literals;
+        以秒钟为例，可能的实现：
+            std::chrono::hours operator ""s(unsigned long long s)
+            {
+                return std::chrono::seconds(s);
+            }
+        还有h,min,ms,us,ns
+        C++20后增加了d,y分别表示天，年
     7.暂停程序：
         std::this_thread::sleep_for(duration<type> t)   //参数是一个时间段
         
@@ -1774,10 +1885,29 @@ string类：C++标准类
             所以可以在一个range_expression类中不定义begin和end方法，而在类外定义一个函数或函数模板叫begin end，接受一个这个类的对象
 C++11:
     新类型：
-        longlong, unsigned longlong 64位整形
+        long long, unsigned long long 64位整形
         wchar_t的字面值用L做前缀：wchar_t title[]=L"something"; 一个wchar_t占用2字节
-        char16_t的字面值用u做前缀，表示UTF-16
-        char32_t的字面值用U做前缀，表示UTF-32
+        char16_t的字符字面值用u做前缀，表示UTF-16
+        char32_t的字符字面值用U做前缀，表示UTF-32
+    UTF支持：
+        首先区分几个概念：
+            实现单元：指编码unicode字符所用的数据结构，UTF-8：char UTF-16：char16_t UTF-32：char32_t
+            编码单位：一个unicode字符所使用的数据结构的个数，由于只有UTF-8使用变长编码，所以一个unicode字符的编码单位取决于具体字符，而UTF-16和UTF-32的编码单位都是1
+            占用空间（以字节为单位）：对于UTF-8=编码单位*1，UTF-16=2，UTF-32=4
+        字符：只有utf-16和UTF-32字母可以直接赋值给对应的char16_t和char32_t，char不支持除了ASCII字符外的其他unicode字符直接赋值
+            char a{'\u0078'};       //ERROR
+            char16_t b{u'\u0078'};  //OK
+            char32_t c{U'\u0078'};
+        字符串字面值：utf8 16 32的字符串字面值以u8 u U 做前缀
+            utf-16和utf-32对应的字符串是std::u16string和std::u32string，utf-8对应的字符串依然是std::string
+            std::string a{u8"Hello, \u2603!"};
+            std::u16string b{u"Hello, \u2603!"};
+            std::u32string c{U"Hello, \u2603!"};
+            由于UTF-8的实现单元是char，所以直接对utf-8字符串修改其中的unicode字符都是不正确的
+            std::string a{"Hello, "};
+            a.push_back(u'\u2603'); //ERROR
+            正确的方法是构造一个UTF-8字符串然后使用.insert或+=的方法
+
     用户定义字面值：
         字面值是一种常量
         C++自带的四种字面值：整数、浮点数、字符、字符串
@@ -2208,14 +2338,17 @@ C++14:
         {
             return ...
         }
-    2.二进制字面值
-        二进制字面值用0b或0B开头 int a=0b110;   //a=6
+        2.decltype(auto) 推导初始化表达式的类型
+            decltype(auto)的推导规则与decltype() 一致，与auto不一致（auto的推导规则与模板的推导规则一致，除了auto会推导std::initializer_list）
+            在C++14前，如果需要用一个表达式的类型来声明一个对象，需要把整个表达式放到decltype() 内：decltype(longAndComplexExpression) var = longAndComplexExpression;
+            C++ 14后可以简写成：decltype(auto)var = longAndComplexExpression;
+        3.二进制字面值 二进制字面值用0b或0B开头 int a = 0b110; //a=6
         八进制字面值用0开头 int b=011;  //b=9
         十六进制字面值用0x或0X开头 int c=0x11;  //c=17
-    3.字面值分隔符
+    4.字面值分隔符
         可以在数字字面值上用一个单引号'来分割一个长数   int a=100'000;
         注意，分隔符前面必须要有除了二进制字面值标志的其他数位，不能在标志符后紧跟一个分隔符
-    4.变量模板
+    5.变量模板
         可以对单个变量定义成模板，变量的取值在编译器根据模板参数生成
         template<typename T>
         T pi=T(3.1415926535897L);
@@ -2308,6 +2441,8 @@ C++17：
                 return A();
             }   //VS2019输出"default constructor!"
         所以无论如何也不应该定义一个函数返回右值引用
+    6.if constexpr
+    
 C++20：
     1.模块 Modules
         模块名：[模块名]
@@ -2509,7 +2644,28 @@ C++20：
             std::once_flag是一个多线程环境中只能被改变一次的对象，作为call_once()函数模板的第一参数，第二参数是一个函数对象，确保在多线程环境中function函数对象只被调用一次
         std::condition_variable
             #include <condition_variable>
-            当一个线程在做
+            condition_variable 是一个线程同步原语，用来阻塞一个或多个需要访问共享资源的线程，直到另一个线程调用.notify_one()或.notify_all()方法
+            通常，需要独占资源的线程需要：
+                1.获取一个互斥量std::mutex（通常使用std::lock_guard)
+                2.占用共享资源
+                3.释放互斥量并执行.notify_one()或.notify_all()
+            其他等待的线程需要：
+                1.使用std::unique_lock<std::mutex>获取同一互斥量
+                2.对同一std::condition_variable执行wait()方法，这个方法会自动释放unique_lock获取的互斥量并暂停线程的执行，避免忙等
+                3.当被唤醒后，将自动重新获取互斥量并恢复执行
+            注意，等待线程有可能被“假唤醒”，应该在调用wait()方法时增加一个lambda表达式，判断唤醒条件是否真的达到了
+            成员函数：
+                .notify_one()
+                .notify_all()
+
+                template<class Predicate>
+                .wait(std::unique_lock<std::mutex>& lock, Predicate pred);//当pred为假时，一直等待，当pred为真时退出等待，相当于：
+                    while(!pred())
+                        wait(lock);
+
+                .wait_for()
+                .wait_until()
+
         std::promise+std::future+std::async
             子线程->主线程传递信息
                 假设想要在子线程中接收来自主线程的一个引用参数来传递信息，比如子线程将处理结果返回给主线程，一个可能的做法是给子线程函数增加一个引用参数，然后主线程创建thread对象时用ref传递这个参数
@@ -2549,6 +2705,10 @@ C++20：
                     auto result_value=result.get(); //主线程获取子线程的结果
                 }
         std::packaged_task<>
+            #include <future>
+            可以封装任何可调用对象（包括函数、lambda、绑定、重载了()运算符的对象），并使用async调用
+            成员函数：
+                .get_future()
         std::shared_mutex
             #include <shared_mutex>
             不同于std::mutex提供的单独访问的权限，shared_mutex提供两种性质的访问的保护：
