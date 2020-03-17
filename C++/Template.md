@@ -102,6 +102,15 @@ Templates are compiled in **2 phases**:
 ## Pass by value vs. Pass by reference
 ### Pass by value
 Since C++11, template can be defined to pass by value, but caller can use ``std::ref`` or ``std::cref`` to pass argument by refernece.
+```cpp
+template<typename T>
+void func(T a)	//template is pass by value
+{
+	//...
+}
+MyClass obj;
+func<decltype(obj)&>(std::ref(obj));	//actually passing by reference
+```
 ### Pass by reference
 - In all cases, there is no copy by passing by reference.
 - Arguments never decays.

@@ -2054,6 +2054,28 @@ C++11:
     auto关键字：根据显式初始化所赋值的类型自动判断变量的类型
         auto x{initializer};
         当需要显式指明一个类型时 auto x=type{initializer};
+    std::tuple
+        #include <tuple>
+        tuple是一个固定大小、可容纳不同元素类型（但是元素的类型必须在编译器确定）的容器，std::pair是std::tuple的一个偏特化（部分具体化）
+        成员函数：
+            .operator<=>() C++20
+            各种比较运算符
+
+        静态成员函数:
+            ::get()
+                C++11定义了按下标索引获取内容的版本，这里省略const版本和右值引用的版本（当tuple是一个临时对象时使用get将返回右值引用），这个版本从C++14后变成constexpr
+                template<size_t I, class... Types>      //tuple类模板
+                constexpr typename std::tuple_element<I, tuple<Types...>>::type& get(tuple<Types...>& t) noexcept;    //返回tuple t中的索引为I（从0开始）的元素的引用
+                C++14定义了按类型获取元素的版本，如果这个tuple不是有且只有一个所需获取的类型将产生编译器错误，同样省略const和右值引用版本
+                template<class T, class... Types>   //T是所要获取的元素的类型
+                constexpr T& get(tuple<Types...>& t) noexcept;
+            ::tie()
+                template<class... Type>
+                constexpr tuple<Types&...> tie(Types&... args) noexcept;
+                生成一个元素全是左值引用的tuple
+                常用于多个变量一次性赋值，如：
+                    int a; double c; std::string c;
+                    std::tie(a,b,c)=std::tuple{1,2.0,"helloworld"};
     std::enable_if：
         C++11引入一个概念SFINAE (substituion failure is not an error)匹配失败不是错误，意思是当编译器根据函数调用来实例化模板函数时，可能会有几个函数模板在推导模板参数时无法编译通过，但只要有一个可以正确推导出来，就不会产生编译错误
         enable_if与函数模板和type_traits配合，可以实现这个目的，让只满足特定要求的模板函数的调用才能让模板函数实例化，不满足要求的调用就阻止函数模板实例化
@@ -2213,7 +2235,7 @@ C++11:
         完美转发：所谓转发，就是通过一个函数将参数继续转交给另一个函数进行处理，原参数可能是右值，可能是左值，如果还能继续保持参数的原有特征，那么它就是完美的
             不完美转发：在一个接收右值引用参数的函数func1内将这个参数直接传给另一个函数func2，就是不完美转发，这是由于func1的右值引用参数有名字，所以在func1函数体他是一个左值，传递给另一个函数是作为左值或左值引用来传递的，改变了原有特性
             std::forward()模板函数：将具名的右值引用（左值）仍然作为右值引用传递给另一个接受右值引用参数的函数，而不改变左值引用的性质
-                然而只有forward并不能完美转发，因为在非模板函数中引用参数只能是左值引用或右值引用中的一种，要实现两种都接受，必须借助模板实现通用引用参数
+                然而只有forward并不能完美转发，因为在非模板函数中引用参数只能是左值引用或右值引用中的一种，要实现两种都接受，必须借助函数模板，并定义通用引用参数，使用std::forward来转发参数并调用其他函数
             将std::forward()与函数模板结合，使得函数既能接受左值引用，又能接收右值引用
             void somefunc(int&& a);
             void somefunc(int& a);  //假设有一个重载函数，既能处理右值引用也能处理左值引用
@@ -2266,14 +2288,37 @@ C++11:
             ...
         }
         class anotherClass: someClass {...} //错误
+    成员函数的引用修饰
+        可以在类内的成员函数的函数头后加引用修饰符&和&&，限定当这个类的对象是左值和右值时的不同调用
+        一个典型应用是std::optional
+        template<typename T>
+        class optional
+        {
+            T& value();
+            T const &value() const;
+        };
+        optional<SomeClass> returnOptional();   //一个返回optional的函数
+        optional<SomeClass> o_obj{SomeClass()}; //构造一个包含值的optional
+        SomeClass obj=o_obj.value();    //调用复制构造函数
+        SomeClass obj2=returnOptional().value(); //由于调用函数returnOptional()产生了一个临时的optional<SomeClass>，所以我们希望不要使用复制构造来将这个临时的optional内的SomeClass复制到obj2中，而是使用移动构造
+        所以对value()成员函数使用引用修饰，当optional是右值时使用std::move()来返回一个右值引用，当optional是左值时直接返回SomeClass的左值引用
+        template<typename T>
+        class optional
+        {
+            T& value() &;
+            T const &value() const &;
+            T&& value() &&;
+        };
     lambda表达式：在需要函数指针、函数符的地方可以用lambda函数，有点类似于内联函数，在用lambda函数的地方需要完整定义整个函数
         lambda函数的一般形式的定义：中括号 [] (参数列表) {函数体}
-            [](int a) {return a%3==0;}  //一个用于判断参数是否可以被3整除的lambda函数，将返回一个布尔值
+            [](int a) {return a % 3 == 0;}  //一个用于判断参数是否可以被3整除的lambda函数，将返回一个布尔值
+        当lambda表达式没有参数时，可以省略圆括号()
+            []{std::cout<<"Print in lambda\n";}
         可以用auto关键字自动判断其类型并赋值给一个标识符作为别名
         lambda函数的真正类型是：[](paraType)->returnType
         例如可以将上面的lambda函数赋值给mod_3，使之成为函数的别名
-            auto mod_3=[](int a ){return a%3==0;};
-        或：[](int)->bool mod_3=[](int a){return a%3==0;};
+            auto mod_3=[](int a ){return a % 3 == 0;};
+        或：[](int)->bool mod_3=[](int a){return a % 3 == 0;};
         调用时就像正常函数调用的形式那样调用lambda函数：mod_3(6);
         lambda函数可以捕获定义它的作用域内的变量，在中括号内指定变量名可以按按值传递，在中括号内指定变量名+引用可以按引用访问，只填一个&符号可以按引用访问所有变量，只填一个=号可以按值传递所有变量
         还可以混合使用&指定变量和按值传递的方式
@@ -2442,7 +2487,11 @@ C++17：
             }   //VS2019输出"default constructor!"
         所以无论如何也不应该定义一个函数返回右值引用
     6.if constexpr
-    
+    7.std::boyer_moore_searcher
+        #include <functional>
+    8.std::filesystem
+        
+        
 C++20：
     1.模块 Modules
         模块名：[模块名]
@@ -2843,10 +2892,6 @@ Effective C++
             }
             Date d(Year(2019),Month::Feb(),Day(20));
         case 2:工厂函数（返回新对象的指针或引用的函数）直接返回智能指针来防止客户忘记delete造成的内存泄漏
-    20.以const引用传递代替值传递
-        对于类、结构体，以const引用作为函数形参显然能减少构造和拷贝的次数，提高效率
-        对于类中禁用了复制构造函数，则以const引用传递是唯一作为函数形参的方法，比如std::unique_ptr
-        如果派生类对象以值传递的方式传递给一个基类类型形参，则失去多态性质，成为切割
     21.必须返回对象时不要返回引用
         注意不要犯返回一个指向临时对象的引用的错误
         假如有个有理数类Rational，我们会希望两个有理数可以相乘，相乘的结果是一个新的有理数对象
