@@ -1300,13 +1300,32 @@ STL
             如果希望不能通过迭代器修改容器的值，可以声明只读迭代器：vector<int>::const_iterator a;  //类比const T*
             如果希望不能修改迭代器本身，可以声明常量迭代器：const vector<int>::iterator a;         //类比T* const
     迭代器适配器：
-        ostream_iterator:
-            #include <iterator>
-            声明：ostream_iterator <dataType, outType> out_iter(cout,char c);    //声明了一个输出流迭代器out_iter，参数dataType指定输出的数据类型，outType表示输出流使用的字符类型，一般为char或wchar_t
-                参数c表示每个数据后的分隔符
-            这个输出流迭代器可以用作copy()的第三个参数，使得可以输出一个容器的指定范围
         reverse_iterator：反向迭代器，对反向迭代器执行递增会使其递减
-            vector类定义了rbegin() 返回指向超尾的反向迭代器和rend() 返回指向第一个元素的反向迭代器
+            通常对容器调用.rbegin()返回指向最后一个元素的反向迭代器 .rend()返回指向第一个元素的反向迭代器
+            反向迭代器也定义了数组下标的运算符[]重载
+                /*unspecified*/ std::reverse_iterator<Iter>::operator[](difference_type n) const;
+            相当于返回当前位置base的base[-n]元素
+                1   2   3   4   5   6   7   8   9
+                            |   |
+                            |   r_iter(base[0])
+                            r_iter[1](base[-1])
+        insert_iterator: 容器插入迭代器
+            插入迭代器是一个输出迭代器，构造时需要一个要插入的容器的引用 和 插入的位置的迭代器
+            可能的实现只包含构造时的容器的指针和一个容器的迭代器
+            用来将元素插入到内部的迭代器指向的容器的位置，并对这个内部迭代器正向++
+            所以对这个迭代器本身进行++和解除引用*操作都是不执行任何动作，只有解除引用写入operator=()才执行实际的动作
+            辅助函数：是为了解决C++17没有模板类的类型推断，导致程序累赘的问题
+                template<class Container> 
+                std::insert_iterator<Container> std::inserter(Container& c, typename Container::iterator i);    返回一个指向容器迭代器i所指向的位置的插入迭代器
+        back_insert_iterator: 容器尾部插入迭代器，继承自insert_iterator，构造时只需要一个容器的引用
+            与容器插入迭代器相同，对这个迭代器本身进行++和解除引用*操作都是不执行任何动作，只有解除引用写入operator=()才执行实际的动作
+            调用operator=()写入时等同于调用容器的push_back()方法，并返回这个迭代器本身
+            辅助函数：
+                template<class Container>
+                std::back_insert_iterator<Container> back_inserter(Container& c);
+        front_insert_iterator: 容器头部插入迭代器
+
+
     迭代器特性：#include <iterator> http://c.biancheng.net/view/471.html
         对于使用迭代器作为参数的函数模板，存在一个问题，就是我们不知道在调用函数（实例化后）传给形参的迭代器所指的数据的类型
         template<typename Iter>
@@ -1817,7 +1836,7 @@ string类：C++标准类
             一个时间点可以与一个时间段相加，结果是一个新时间点 time_point
             两个时间点不能相加，因为没有意义
         转换函数：
-            两个使用不同时钟（不同计时原点）的时间点不能转换，使用同一个时钟的可以转换，如果转换不损失精度，可以隐式转换，如果损失精度，需要显式转换
+            两个使用不同时钟（不同计时原点）的时间点不能转换，使用同一个时钟的可以转换，如果转换不损失精度，可以隐式转换，如果损失精度，需要实例化转换
             template<class ToDuration, class Clock, class Duration>
             constexpr time_point<Clock, ToDuration> time_point_cast(const time_point<Clock, Duration>& t)   //constexpr C++14
     6.时间段字面值C++14
@@ -1927,7 +1946,10 @@ C++11:
             wchar_t const*, size_t
             char16_t const*, size_t
             char32_t const*, size_t
-
+    #include <limits>
+        注意std::numeric_limits<T>::min(), max(), lowest()
+        min()返回T类型所能表示的最小值，对于整数类型，返回最小的负数（绝对值最大的负数）；对于浮点类型，返回能表示的最接近0的数
+        min()返回T类型所能表示的最低值，对于所有类型，都返回0或绝对值最大的负数
     统一的初始化：
         初始化的类型：
             默认初始化 default initialize：不给定初始化的值，对于内置类型，其值是未定义的，访问这样的变量造成未定义行为，对于类，将调用默认构造函数
