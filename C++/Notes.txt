@@ -1151,11 +1151,11 @@ cctype函数
     智能指针就是在声明时分配堆内存，并在指针变量退出所在作用域后自动释放分配的内存
     1.unique_ptr
         声明方法：unique_ptr<Type> pt(new Type);  //创建了一个Type类型的智能指针pt
-            unique_ptr<Type[]> pt(size_t size); //创建了一个大小为size个Type类型的智能指针pt
+            unique_ptr<Type[]> pt(size_t size); //创建了一个大小为size个Type类型数组的智能指针pt
             unique_ptr<Type>pt=std::make_unique<T>();
             unique_ptr<Type>pt=std::make_unique<T[]>();
         unique_ptr对象重点在于所有权的概念，即不允许复制（避免了auto_ptr在复制时导致两个指针指向同一块内存，然后超出作用域后释放同一块内存两次的问题）
-        例外是可以将一个临时指针变量赋值给另一个，如：
+        例外是可以将一个临时指针变量赋值给另一个，此时调用移动构造函数或移动赋值运算符：
         unique_ptr<Type> Create()
         {
             return unique_ptr<Type> (new Type);
@@ -1174,13 +1174,24 @@ cctype函数
         {
             unique_ptr<Type> pt=Create();
         }
-        作为函数实参时，如果形参是同样的智能指针，由于会发生复制，所以产生错误，正确的方法是将形参声明为引用
+        作为函数实参时，如果形参是同样的智能指针，由于会发生复制，所以产生错误，正确的方法是将形参声明为引用或者move()
         方法：
             get()返回unique_ptr所管理的对象的指针
             reset(*ptr=nullptr)释放当前所管理的对象，如果参数ptr是一个nullptr（同时也是缺省参数），则调用reset后当前的unique_ptr不拥有任何对象，如果ptr非空，则拥有ptr所指的对象（常用与重新分配一块新内存给当前的unique_ptr)
-        3.unique_ptr<T> make_unique<Type>(para)
+        unique_ptr<T> make_unique<Type>(para)
         make_unique模板函数将para传递给Type类型的构造函数来构造一个堆区对象，然后返回一个unique_ptr
         这个函数的效果与return unique_ptr<T>(new T(para));  一致
+        
+        实际上unique_ptr的完整形式是unique_ptr<Type, Deleter>，第二个模板参数接受一个自定义的删除器，可以指定如何将所分配的内存空间释放
+            struct FileCloser
+            {
+                void operator()(FILE* fp) const
+                {
+                    assert(fp!=nullptr);
+                    fclose(fp);
+                }
+            }
+            std::unique_ptr<FILE, FileCloser> fp{fopen("somefile", "r")};
     2.shared_ptr
         当程序会使用多个指向同一个对象的指针，就用shared_ptr
         允许复制和赋值，在复制时会增加引用计数，退出作用域后将指向同一内存的shared_ptr的引用计数减少1，当引用计数减少到0时释放这一块内存
@@ -1787,6 +1798,7 @@ string类：C++标准类
             milliseconds::rep a; //int64_t a;
             milliseconds::period::num //1
             milliseconds::period::den //1000
+    注意：所有时间段类默认构造时的值不确定，因为其默认构造函数是编译器生成的版本，而Type类型是原始类型时其值不确定
     4.通用化时间段单位
         可以通过ratio模板参数来控制一个自定义时间段的长度
         using frame_time=duration<float, ratio<1,60>>   //将1/60秒作为一个frame_time类
