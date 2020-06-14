@@ -122,6 +122,25 @@ followed by items defined by ``<li>`` tag
 </ul>
 ```
 
+## Nav
+```html
+<nav class="menu">
+  <ul>
+    <li><a href="#">Home</a></li>
+    <li><a href="#">About</a></li>
+    <li><a href="#">Contact</a></li>
+  </ul>
+</nav>
+```
+
+## Input
+3种输入框
+```html
+<input type="text">
+<input type="password">
+<input type="number">
+```
+
 ## Iframe
 An iframe is used to display a web page within a web page, defined by ``<iframe>`` tag.
 - ``src`` - specify the URL of the inline frame page

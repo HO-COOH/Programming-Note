@@ -177,7 +177,32 @@ atoi()  将nptr所指的字符串的开头部分转化为相应的整数，长�
         1. 新建pch.h，把要包含的头文件用#include 放进去
         2. 编译pch.h: g++ pch.h -> 生成一个pch.gch文件
         3. 正常编译其他文件
-
+    在CMake中：
+        使用target_precompiled_headers(target "pch.h")
+17. C的时间库
+    #include <time.h>
+    tm 是一个存储日历时间的类型，并按单位存储
+    struct tm 
+    {
+        int tm_sec;
+        int tm_min;
+        int tm_hour;
+        int tm_mday;
+        int tm_mon;
+        int tm_year;    //years since 1900
+        int tm_wday;    //weekday(0-6)
+        int tm_yday;    //days since Jan.1 (0-365)
+        int tm_isdst;   //1: daylight saving time, 0: otherwise
+    };
+    time_t 是一个时间点类型，内部使用一个整数类型（标准未规定实际使用的类型），这个类型能够存储从1970.1.1到某个时间点之间的秒数
+    有下面两个函数将time_t时间点转换为日历时间
+        struct tm* gmtime(const time_t* timer);     //将timer给定的时间点转换为UTC的时间
+        struct tm* localtime(const time_t* timer);  //将timer给定的时间点转换为当地日历表示法的时间
+    注意这两个函数会覆盖写入到一个共同的静态变量中，所以后调用的那个会将之前的那个静态变量覆盖掉，所以正确的方法是使用memcpy将数据复制到tm结构体变量中
+        time_t current = time(NULL);
+        struct tm local, utc;
+        memcpy(&local, localtime(&current), sizeof(local));
+        memcpy(&utc, gmtime(&current), sizeof(utc));
 C++
 1. 字符串输入
     cin.getline(char *s, int n);//读取一行，最多读取n-1个字符拷贝给s所指的字符串，并添加'\0'，丢弃用户输入的换行符
@@ -745,9 +770,9 @@ cctype函数
             后置++、后置--，需要返回一个加和减之前的临时对象，再对自身操作，定义
                 someClass operator++(int) 
                 {
-                    someClass temp(...) //构造一个临时对象，通常是使用复制构造函数直接将*this复制给temp
+                    someClass temp(*this); //构造一个临时对象，通常是使用复制构造函数直接将*this复制给temp
                     ...//一些操作
-                    return this;
+                    return temp;
                 }
         只能通过成员函数重载的运算符：
             = 赋值运算符 () 函数调用运算符  [] 下标运算符  -> 指针访问类成员运算符
@@ -1105,6 +1130,7 @@ cctype函数
     模板别名：可以为模板具体化（指定了类型参数的模板类的类名）指定别名
         旧方法使用typedef：typedef className<type> alias;   //将alias作为className的type类型的具体化的别名
         C++11新方法：using alias=className<type>;   //将alias作为className的type类型的具体化的别名
+    
 
 友元：
     单向友元：如果A类对象要控制（发送信息给B类）应考虑在B类定义中用friend关键字将A类声明为友元类，友元类声明的位置无关紧要，可以在public private protected中声明，不改变友元类的访问权限
@@ -2110,24 +2136,46 @@ C++11:
                 常用于多个变量一次性赋值，如：
                     int a; double c; std::string c;
                     std::tie(a,b,c)=std::tuple{1,2.0,"helloworld"};
-    std::enable_if：
-        C++11引入一个概念SFINAE (substituion failure is not an error)匹配失败不是错误，意思是当编译器根据函数调用来实例化模板函数时，可能会有几个函数模板在推导模板参数时无法编译通过，但只要有一个可以正确推导出来，就不会产生编译错误
-        enable_if与函数模板和type_traits配合，可以实现这个目的，让只满足特定要求的模板函数的调用才能让模板函数实例化，不满足要求的调用就阻止函数模板实例化
-        enable_if是一个模板结构体，一个可能的实现：
-            template<bool b, typename T=void>
-            struct enable_if{};
+    #include <type_traits>
+        std::enable_if：
+            C++11引入一个概念SFINAE (substituion failure is not an error)匹配失败不是错误，意思是当编译器根据函数调用来实例化模板函数时，可能会有几个函数模板在推导模板参数时无法编译通过，但只要有一个可以正确推导出来，就不会产生编译错误
+            enable_if与函数模板和type_traits配合，可以实现这个目的，让只满足特定要求的模板函数的调用才能让模板函数实例化，不满足要求的调用就阻止函数模板实例化
+            enable_if是一个结构体模板，一个可能的实现：
+                template<bool b, typename T=void>
+                struct enable_if{};
 
-            template<typename T=void>
-            struct enable_if<true, T=void>
-            {
-                typedef T type;
-            }
-        第一个是通用模板，第二个是部分具体化后的模板，所以当模板参数b为false时将匹配通用模板，此时这个结构体为空，当模板参数b为true时，按优先原则将匹配第二个部分具体化后的模板，这个模板内将类型type作为模板参数T的别名
-        例如想要一个模板函数在形参为整数时才实例化，而且返回TYPE类型，可以
-        template<typename T>
-        typename std::enable_if<std::is_integral<T>::value, TYPE>::type func(T a) {...}
-        根据enable_if的模板定义，当形参T的类型是整数时，is_integral<T>的value为true，所以type的值就是TYPE，如果不指定TYPE，则根据定义，type的值是void
-        当形参T的类型不是整数时，is_integral<T>的value为false，所以与enable_if的第一个通用模板匹配，此时这个结构体中没有定义type，所以编译出错，函数不会实例化
+                template<typename T=void>
+                struct enable_if<true, T=void>
+                {
+                    typedef T type;
+                }
+            第一个是通用模板，第二个是部分具体化后的模板，所以当模板参数b为false时将匹配通用模板，此时这个结构体为空，当模板参数b为true时，按优先原则将匹配第二个部分具体化后的模板，这个模板内将类型type作为模板参数T的别名
+            例如想要一个模板函数在形参为整数时才实例化，而且返回TYPE类型，可以
+            template<typename T>
+            typename std::enable_if<std::is_integral<T>::value, TYPE>::type func(T a) {...}
+            根据enable_if的模板定义，当形参T的类型是整数时，is_integral<T>的value为true，所以type的值就是TYPE，如果不指定TYPE，则根据定义，type的值是void
+            当形参T的类型不是整数时，is_integral<T>的value为false，所以与enable_if的第一个通用模板匹配，此时这个结构体中没有定义type，所以编译出错，函数不会实例化
+        std::integral_constant：
+            是一个结构体，定义了一对编译期静态常量，同时也是整个<type_traits>库的基础
+            可能的实现：
+                template<class T, T v>
+                struct integral_constant
+                {
+                    static constexpr T value = v;
+                    using value_type = T;
+                    using type = integral_constant; // using injected-class-name
+                    constexpr operator value_type() const noexcept { return value; }
+                    constexpr value_type operator()() const noexcept { return value; } //since c++14
+                };
+            同时定义了两个辅助的类型别名：
+            using true_type = std::integral_constant<bool, true>
+            using false_type = std::integral_constant<bool, false>
+            所以可以通过继承这两个类，结合std::enable_if实现SFINAE
+            C++17新增了一个辅助类
+                template<bool B>
+                using bool_constant = integral_constant<bool, B>;
+            
+                
     constexpr关键字：
         constexpr值：
             定义对象（包括内置类型）
@@ -2503,7 +2551,7 @@ C++17：
         public:
             A() { cout << "default constructor! value=" << value<<endl; }
             A(const A& a) :value(a.value) { cout << "Copy constructor! value=" << value << endl; }
-            A(A&& a) { cout << "Move constructor! value=" << value << endl; }
+            A(A &&a) { cout << "Move constructor! value=" << value << endl; }
             ~A() { cout << "Destructor!\n"; }
         };
         当调用返回具名局部变量的函数时，有可能有优化从而就地构造（在函数被调用的地方直接构造），也可能没有优化，从而先调用构造函数构造函数内的局部变量，再在被调用的地方调用移动构造函数
@@ -2524,7 +2572,9 @@ C++17：
     7.std::boyer_moore_searcher
         #include <functional>
     8.std::filesystem
-        
+    9.<type_traits>中新增的 
+        template<bool B>
+        using std::bool_constant = std::integral_constant<bool, B>;   
         
 C++20：
     1.模块 Modules
@@ -2668,7 +2718,7 @@ C++20：
         而对线程对象调用detach(void)方法表明这个函数不等待线程的完成，函数返回时线程可能还在运行
         detach()打破了thread对象与线程的联系，确保thread对象被销毁时terminate()不会被调用
         如果对thread对象既不适用join()又不使用detach()，则在线程对象因为主线程main退出作用域被销毁时，新线程会terminate
-        可以用joinable()方法检查这个线程是否可以与thread对象结合或分离，已经分离的线程不能再与任何thread对象结合，称为守护进程，joinable()函数返回一个布尔值
+        可以用joinable()方法检查这个线程是否可以与thread对象结合或分离，已经分离的线程不能再与任�����thread对象结合，称为守护进程，joinable()函数返回一个布尔值
         每个线程都有一个独特的id，获取当前线程的id，使用std::this_thread::get_id()函数
         获取线程对象的id，使用get_id()成员方法
     2.获取资源即初始化
@@ -2681,7 +2731,7 @@ C++20：
             std::thread t(add,std::ref(x));  //x->1
         }
         当然，也可以用指针的方式来实现
-        void add(int* a){++(*a);}
+        void add(int *a) { ++(*a); }
         int x=0;
         std::thread t(add,&x);
         对于可调用对象而言，thread的构造函数的传递一个成员函数指针作为线程函数，第二参数是一个合适的对象的指针，后面的参数是线程函数的参数
