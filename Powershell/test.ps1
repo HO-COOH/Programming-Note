@@ -1,12 +1,6 @@
-using namespace System.Globalization
-using namespace System.Collections
-enum Color
+$fileName="test.txt"
+for($i=0; $i -le 4000; ++$i)
 {
-    RED
-    GREEN=2
-    BLUE
+    # Write-Host($i)
+    Out-File $fileName -Append -InputObject $i
 }
-
-$str='hello 123 world'
-$num = [System.IFormatProvider]::
-

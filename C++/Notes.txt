@@ -204,6 +204,35 @@ atoi()  将nptr所指的字符串的开头部分转化为相应的整数，长�
         memcpy(&local, localtime(&current), sizeof(local));
         memcpy(&utc, gmtime(&current), sizeof(utc));
 C++
+0.编译器相关
+    宏
+        每一个#if宏都必须以一个#endif结束
+            #if
+            #ifdef
+            #ifndef
+            #else
+            #elif
+            #endif
+        与#ifdef不同的是#if defined宏可以与逻辑与&& 和逻辑或||串起来多个条件
+        例如判断posix操作系统环境的宏，可以写成
+            #if defined(__linux__) || defined(__unix__) || defined(__APPLE__)
+                #include <unistd.h>
+            #endif
+        预处理期打印消息提示的宏
+            #pragma message("Message")
+            #pragma message "Message"
+            #warning "Warning Message"
+        C++17检查是否有某个头文件的宏
+            #if __has_include(<unistd.h>)
+                #include <unistd.h>
+            #endif
+    编译选项
+        优化
+            向量化指令
+                GCC/Clang: -march=native，还有一堆CPU架构选项可选
+                MSVC: /arch:AVX2
+
+
 1. 字符串输入
     cin.getline(char *s, int n);//读取一行，最多读取n-1个字符拷贝给s所指的字符串，并添加'\0'，丢弃用户输入的换行符
     cin.get(char *s, int n);//读取一行，最多读取n-1个字符拷贝给s所指的字符串，并添加'\0'，不丢弃用户输入的换行符，保留在输入队列中
@@ -921,7 +950,7 @@ cctype函数
                 重载赋值与复制相似
             若基类使用了new，派生类也使用了new，则需要显式定义派生类的构造、析构、复制、重载赋值运算符
                 因为派生类的构造需要new，所以显然需要在构造函数中定义，还要注意一般继承的构造函数调用基类构造函数的方法
-                因为派生类的析构需要delete，所以也显然需要在析构函数中定义，派生类的析构函数将自动调用基类的构造函数delete基类new的部分
+                因为派生类的析构需要delete，所以也显然需�����在析构函数中定义，派生类的析构函数将自动调用基类的构造函数delete基类new的部分
                 派生类的复制构造函数需要调用基类的复制构造函数来处理基类的复制，所以需要在成员初始化列表部分将引用参数传给基类的复制构造函数来构造基类部分，同时再处理派生类自己new的部分
                     格式：derived::derived(const derived& d):base(d) {...}
                 派生类的重载赋值运算符也需要将引用参数传给基类的重载赋值运算符，与复制构造函数不同的是可以在重载复制运算符函数体中进行（注意作用域解析运算符，因为如果不加，会递归调用派生类的函数）
@@ -1181,7 +1210,7 @@ cctype函数
             unique_ptr<Type>pt=std::make_unique<T>();
             unique_ptr<Type>pt=std::make_unique<T[]>();
         unique_ptr对象重点在于所有权的概念，即不允许复制（避免了auto_ptr在复制时导致两个指针指向同一块内存，然后超出作用域后释放同一块内存两次的问题）
-        例外是可以将一个临时指针变量赋值给另一个，此时调用移动构造函数或移动赋值运算符：
+        例外是可以将一个临时指针变量赋值给另一个，此时调用移动构造函数或移动赋值运算符，这是由于返回值优化RVO，使得智能指针直接构造在返回地址上：
         unique_ptr<Type> Create()
         {
             return unique_ptr<Type> (new Type);
@@ -1218,6 +1247,21 @@ cctype函数
                 }
             }
             std::unique_ptr<FILE, FileCloser> fp{fopen("somefile", "r")};
+        使用std::unique_ptr来正确实现链表的方法：
+            template<typenamme T>
+            class LinkedList
+            {
+                struct Node
+                {
+                    T data;
+                    std::unique_ptr<Node> next;
+                    Node(T data):data(std::move(data)){}
+                };
+                std::unique_ptr<Node> head; //所有权链从头结点开始，头结点管理整个链表所有结点的所有权
+                Node *tail;                 //尾节点的所有权由尾节点的前一个结点开始
+            public:
+                /*...插入删除算法*/
+            };
     2.shared_ptr
         当程序会使用多个指向同一个对象的指针，就用shared_ptr
         允许复制和赋值，在复制时会增加引用计数，退出作用域后将指向同一内存的shared_ptr的引用计数减少1，当引用计数减少到0时释放这一块内存
@@ -1484,7 +1528,6 @@ STL
 
                 可选参数comp是一个自定义的比较函数
             stable_sort():
-
             nth_element():将第n个元素（索引n-1）放到正确的位置，并且保证从[first,n-1)的元素都不比[n,last)大
                 template< class RandomIt >
                 void nth_element(RandomIt first, RandomIt nth, RandomIt last );
@@ -1495,8 +1538,79 @@ STL
             inplace_merge():
             is_sorted():
             is_sorted_until():
-        查找：
-            accumulate():求从[first,last)的和
+        <numeric>算法：
+            accumulate():求从[first,last)的和，这个算法按定义是顺序执行的，所以没有带执行顺序参数的重载版本
+            reduce():将一个序列中的元素两两简化，最后生成1个元素
+                主模板：
+                    template<class InputIt, class T, class BinaryOp>
+                    constexpr T reduce(InputIt first, InputIt last, T init, BinaryOp binary_op);
+                简化模板，等同于用accumulate来求所有元素求和并加上初始值init：
+                    template<class InputIt, class T>
+                    constexpr T reduce(InputIt first, InputIt last, T init);
+                    等同于reduce(first, last, init, std::plus<>{});
+                更加简化的模板
+                    template<class InputIt>
+                    constexpr typename std::iterator_traits<InputIt>::value_type reduce(InputIt first, InputIt last);
+                    等同于reduce(first, last, typename std::iterator_traits<InputIt>::value_type{});
+                    也等同于reduce(first, last, typenamme std::iterator_traits<InputIt>::value_type{}, std::plus<>{});
+                类似于accumulate()，但是可以被并行化，执行顺序是不确定的，所以只能用于满足交换律的算法
+                比如将一个字符串数组合并成一个长字符串，由于合并的结果与顺序有关，所以reduce()会产生任何顺序，而accumulate()的顺序是确定的
+                    std::array strs{"Mickey"s, "Minnie"s, "Jerry"s};
+                    auto combined=std::accumulate(strs.begin(), strs.end(), {});    //"MickeyMinnieJerry"
+                    auto combined2=std::reduce(strs.begin(), strs.end(), {});       //任何可能的顺序组合
+                注意
+            inner_product():求两个向量的内积，即两个向量对应元素相乘的和，可能的实现
+                template<class InputIt1, class InputIt2, class T>
+                constexpr // since C++20
+                T inner_product(InputIt1 first1, InputIt1 last1,
+                                InputIt2 first2, T init)
+                {
+                    while (first1 != last1)
+                    {
+                        init = std::move(init) + *first1 * *first2; // std::move since C++20
+                        ++first1;
+                        ++first2;
+                    }
+                    return init;
+                }
+            C++17 transform_reduce():先transform然后reduce
+                操作一个序列的重载版本
+                    template<class InputIt, class T, class BinaryOp, class UnaryOp>
+                    constexpr T transform_reduce(InputIt first, InputIt last, T init, BinaryOp binop, UnaryOp unary_op);
+                    先对[first, last)的元素使用unary_op生成transform后的新序列，然后再对这个新序列从init开始使用binop
+                    比如要计算一个一个字符串数组的字符数：
+                        std::array arr{ "Mickey","Minnie","Jerry" };
+                        std::cout<< std::transform_reduce(arr.cbegin(), arr.cend(), 0u, [](auto a, auto b) {return a + b; }, [](auto str) {return strlen(str); });//输出17
+                操作两个序列的重载版本：
+                    template <class InputIt1, class InputIt2, class T, class BinaryOp1, class BinaryOp2>
+                    constexpr T transform_reduce(InputIt1 first1, InputIt1 last1, InputIt2 first2, T init, BinaryOp1 binary_op1, BinaryOp2 binary_op2);
+                    先对[first1, last1)和[first2, ...)两两对应元素对使用binary_op2生成一个类型为T的新序列，然后再对这个新序列从init开始使用binary_op1
+                还有一个并行的简化求两个向量内积（并行化的std::inner_product）的重载版本
+                    template<class InputIt1, class InputIt2, class T>
+                    constexpr T transform_reduce(InputIt1 first1, InputIt1 last1, InputIt2 first2, T init);
+                    等同于transform_reduce(first1, last1, first2, init, std::plus<>{}, std::multiples<>{});
+                
+    C++17并行算法：
+        C++17后大部分STL的算法都新增了一个以执行顺序的参数作为第一参数的函数的重载，比如
+            template< class ExecutionPolicy, class RandomIt, class Compare >
+            void sort( ExecutionPolicy&& policy, RandomIt first, RandomIt last, Compare comp );
+        这个执行顺序的参数可选，这些执行顺序实际上是对应类的一个全局对象
+            object <------------------------------> class
+            std::execution::seq             std::execution::sequenced_policy
+            std::execution::par             std::execution::parallel_policy
+                提供了基本的并行能力，执行顺序是确定的，“确定”的意思是顺序是由实现定义的，但具体的执行顺序是用户不能预知的
+                要求所提供的迭代器、可调用对象必须不能造成资源竞争，但是可以提供同步机制，比如访问一个全局对象（当然要有互斥量保护或者使用原子量）
+            std::execution::par_unseq       std::execution::parallel_unsequenced_policy
+                提供了最大化的并行能力，执行顺序是不确定的
+                对一个元素的操作可能在一个线程执行一半，再在另一个线程执行一半，或者穿插执行
+                所以这就要求所提供的迭代器、可调用对象必须不具有任何同步机制，而且只对当前元素进行操作
+            std::execution::unseq           std::execution::unsequenced_policy
+        注意，使用带执行参数的重载下，实际编译后的程序是否是并行的，由实现决定
+        注意，带执行顺序的重载算法可能要求更高级别的迭代器
+        使用了执行顺序参数后，任何没有catch的异常会直接导致std::terminate()来结束程序的运行，即使执行顺序是std::execution::seq（即默认值）
+            std::for_each(v.begin(), v.end(), [](auto x){ throw my_exception();});   //异常向外传播
+            std::for_each(std::execution::seq, v.begin(), v.end(), [](auto x){ throw my_exception();});  //std::terminate()
+
 #include <numeric>
                 template< class InputIt, class T >
                 T accumulate( InputIt first, InputIt last, T init );    //使用元素的operator+
@@ -1523,6 +1637,43 @@ STL
             advance(InputIterator& it, Distance n)
                 将迭代器it向前推进n个元素的位置
                 如果it是随机存取迭代器，函数直接用迭代器运算+或-，否则用++或--移动n次
+            clamp：
+                template<class T>
+                constexpr const T& clamp(const T& v, const T& lo, const T& hi);
+                当lo<=v<=hi时，返回v，当v<lo时，返回lo，当hi<v时，返回hi
+            midpoint() C++20
+                返回两个数的中点
+                可能的实现：
+                    template<typename T>
+                    constexpr T midpoint(T const a, T const b)
+                    {
+                        if constexpr(std::is_integral_v(T))
+                        {
+                            using Unsigned = std::make_unsigned_t<T>;
+                            const auto a_unsigned=static_cast<Unsigned>(a);
+                            const auto b_unsigned = static_cast<Unsigned>(b);
+                            return a > b ? a - (a_unsigned - b_unsigned) / 2
+                                         : a + (b_unsigned - a_unsigned) / 2;
+                        }
+                        //floating point
+                        /*The easiest case, if a and b can be added safely*/
+                        constexpr T high_limit=std::numeric_limits<T>::max()/2;
+                        const auto a_abs=abs(a);
+                        const auto b_abs=abs(b);
+                        if(a_abs <= high_limit && b_abs <= high_limit)
+                            return (a+b)/2;
+                        
+                        /*One of |a| or |b| >= high_limit*/
+                        constexpr T low_limit=std::numeric_limits<T>::min()*2;
+                        /*if |a| is lower than 2*(the smallest representable value), meaning a->0, then it can't be halfed */
+                        if(a_abs < low_limit)
+                            return a + b / 2;
+                        /*Same with b*/
+                        if(b_abs < low_limit)
+                            return a / 2 + b;
+                        /*Both a and b can be safely halfed*/
+                        return a/2+b/2;
+                    }
         复制：        
             copy()方法需要三个迭代器参数，第一和第二个迭代器参数指向源的范围（包括第一参数，而不包括第二参数），第三个迭代器参数指向目的地
             copy_backward()
@@ -1669,7 +1820,7 @@ string类：C++标准类
             size_t find_last_not_of (const char* s, size_t pos = npos) const;
             size_t find_last_not_of (const char* s, size_t pos, size_t n) const;
             size_t find_last_not_of (char c, size_t pos = npos) const noexcept;
-        compare()：	比较调用字符串和参数字符串，如果调用字符串的第一个比参数字符串的不同字符的ascii值大，返回1，否则返回-1
+        compare()：	比较���用���符串和参数字符串，如果调用字符串的第一个比参数字符串的不同字符的ascii值大，返回1，否则返回-1
             如果调用字符串或参数字符串其中一个比完了，调用字符串短，返回-1，否则返回1
             如果都相同，返回0
             string s1="apple", s2="ban", 则s1.compare(s2)返回-1
@@ -1763,7 +1914,7 @@ string类：C++标准类
     string_view C++17
         由于string的构造在大多数情况下需要分配堆区内存，而且在使用string的大多数情况下只是需要获取其中的内容，所以大多数情况下可以避免新创建一个string，C++17以前可以通过char数组来解决，但是损失了string的灵活接口
         string_view是这样的一个类，他只包括一个指向所需string部分内容的起始的指针，和一个大小，所以他无需构造新string
-        string_view有所有的string只读的常用方法
+        string_view���所有的string只读的常用方法
 
 <chrono> C++11:
     所有的chrono函数都在std::chrono名称空间内
@@ -1973,7 +2124,8 @@ C++11:
         对应的字面值变量的声明：
             returnType 变量名=para_标识符;
         标识符一定是以下划线开头的名称，字面值是以数值+相应标识符后缀组成，实际的值由字面值函数（将值代入形参para）计算的返回值确定
-        假如有字面值函数：long double operator"" _cm(long double x){return x*10;} 
+        假如有字面值函数：long double operator"" _cm(long double x){
+    return x * 10;} 
         则有：long double height=3.4_cm;  //long double height=34;
         也有接收两个参数的字面值函数，第二个参数一定是size_t类型，此时的字面值都是常量字符指针类型，所以第二参数的值是这个字面值字符串的长度
         字面值的形参只能是以下的类型：
@@ -2207,8 +2359,8 @@ C++11:
                 T* ptr;
             public:
                 reference_wrapper &operator=(const reference_wrapper &x) noexcept = default;
-                constexpr operator T&() const noexcept {}
-                constexpr operator T& get() const noexcept {}
+                constexpr operator T &() const noexcept {}
+                constexpr operator T &get() const noexcept {}
             }
             template<typename T>
             reference_wrapper<T&> -> reference_wrapper<T>;.
@@ -2221,7 +2373,9 @@ C++11:
             用decltype(auto)声明变量的类型时，变量需要被立即初始化（就是必须定义赋值），此时所声明的变量的类型是用初始化的值替换auto关键字所得的decltype
                 即：decltype(auto) 变量名=初始化值; 相当于 decltype(初始化值) 变量名=初始化值;
             用decltype(auto)声明函数的返回值类型时，与声明变量的情况类似，相当于将返回语句替换掉auto关键字
-                即：decltype(auto) func() {return 表达式;} 相当于 decltype(表达式) func() {return 表达式;}
+                即：decltype(auto) func() {
+    return 表达式;} 相当于 decltype(表达式) func() {
+    return 表达式;}
     返回类型后置：可以在函数名前加auto关键字，将返回值类型用一个指针运算符放到函数头后面
         auto func() ->  returnType
         多与decltype合用在模板里
@@ -2230,7 +2384,8 @@ C++11:
         用于模板部分具体化：using arr12=std::array<T,12>;
     空指针：nullptr，更安全
         如果有个重载函数，一个重载版本接受指针，另一个重载版本接受整数，如果将一个NULL指针作为实参调用函数，将会引起多义错误，而新的nullptr则不会
-        void foo(int i) {...}
+        void foo(int i) {
+    ...}
         void foo(char* pt) {...}
         foo(NULL);      //多义错误
         foo(nullptr);   //调用void foo(char*)
@@ -2400,10 +2555,29 @@ C++11:
         lambda函数的真正类型是：[](paraType)->returnType
         例如可以将上面的lambda函数赋值给mod_3，使之成为函数的别名
             auto mod_3=[](int a ){return a % 3 == 0;};
-        或：[](int)->bool mod_3=[](int a){return a % 3 == 0;};
+            或：[](int)->bool mod_3=[](int a){return a % 3 == 0;};
         调用时就像正常函数调用的形式那样调用lambda函数：mod_3(6);
-        lambda函数可以捕获定义它的作用域内的变量，在中括号内指定变量名可以按按值传递，在中括号内指定变量名+引用可以按引用访问，只填一个&符号可以按引用访问所有变量，只填一个=号可以按值传递所有变量
-        还可以混合使用&指定变量和按值传递的方式
+        lambda函数可以捕获定义它的作用域内的变量，在中括号内指定变量名可以按按值传递，在中括号内指定变量名+引用可以按引用访问，只填一个&符号可以按引用访问所有变量，只填一个=号可以按值传递所有变量，还可以混合使用&指定变量和按值传递的方式
+        lambda表达式对象本身的类型是一个由编译器生成的特定id为类型的一个重载了()运算符的结构体，所以可以将其视为一个类，既然是类，就可以使用类的特性，比如继承
+        lambda表达式的继承：
+            继承lambda表达式，就是继承它的operator()成员方法，所以多继承，就相当于重载了多个lambda的结构体中的operator()，而且这些lambda的函数签名可以不同，这就提供了一种合并多个函数的方法
+            使用C++17引入的类模板参数自动推导，可以写成
+            auto l1 = []() {return 5; };
+            auto l2 = [](int i) {return i * 10; };
+            
+            template<typename ...Functions>
+            struct Combined : Functions...  //继承任意数量的lambda表达式
+            {
+                Combined(Functions... functions) :Functions(std::move(functions))...{}
+                using Functions::operator()...;
+            };
+
+            int main()
+            {
+                auto combined = Combined{ l1,l2 };
+                std::cout << combined() << '\n';    //5
+                std::cout << combined(2) << '\n';   //20
+            }
 
     函数包装器：
         #include <funtional>
@@ -2457,19 +2631,458 @@ C++11:
         public:
             someClass():a(0) {...}
             someClass(int v):someClass() {//do other things}
-        }
+            }
 
+多线程C++11 std::thread：
+    -1.内存模型和执行顺序
+        https://en.cppreference.com/w/cpp/language/eval_order
+        同一语句中表达式的执行顺序是未定义的，这包括函数调用时各实参之间的评估的顺序，编译器可能选择任何顺序，实际运行时的顺序也会改变，如：
+            int a() { return std::puts("a"); }
+            int b() { return std::puts("b"); }
+            int c() { return std::puts("c"); }
+            void z(int, int, int) {}
+            int main() 
+            {
+                z(a(), b(), c());       // 有可能按任何顺序输出abc，每次程序运行时的输出也可能改变
+                return a() + b() + c(); // 同上
+            }
+        但注意不要与表达式之间结合的顺序混淆，结合的顺序是根据运算符的规则固定的，比如a+b+c的顺序总是(a+b)+c
+        前序原则（C++11）：
+            对表达式的评估包括以下2种情形：
+                1.值的计算：计算一个表达式返回的值，这包括读取泛左值glvalue和读取一个刚被赋值过的对象的值
+                2.副作用的评估：读取一个声明为volatile对象的值，
+
+
+        执行顺序：
+            源代码顺序：源代码中的语句的顺序
+            程序顺序：源代码经过编译生成的机器指令的顺序
+            执行顺序：现代处理器使用乱序执行策略，机器指令读进cpu时，cpu会对机器指令重新排序，成为执行顺序
+            实际（观察到的）顺序：由于多线程和缓存的存在，内存中的变量的值的改变顺序又会与执行顺序不同，成为实际顺序
+        C++标准所规定的C++抽象机器只规定了在同一线程中，实际顺序与源代码顺序在产生任何副作用的前提下要相同，但对于多线程程序没有任何顺序的保证
+        当一个线程从内存中读取时，它可能读取到原始值、在同一线程中写入的值、在另一个线程中写入的值
+        在#include <atomic>中定义的函数和操作默认都是确保以原程序的顺序执行，同时提供了6种执行顺序供选择
+        namespace std {
+            enum memory_order {
+                memory_order_relaxed,   //只确保当前指令的原子性，不保证任何顺序
+                memory_order_consume,
+                memory_order_acquire,   //确保当前原子操作之后的源代码不能移到当前原子操作之前（保证后面代码读取的可见性），但当前原子操作之前的源代码可以移到当前原子操作之后执行
+                memory_order_release,   //确保当前原子操作之前的源代码不能移到当前原子操作之后（保证前面代码写入的可见性），但当前原子操作之后的源代码可以移到当前原子操作之前执行
+                    //release就是acquire的相反
+                    /*
+                        acquire和release内存序常在一起使用：
+                        线程1对一个原子量进行写入，使用release内存序
+                        线程2对同一原子量进行读取，使用acquire内存序
+                        所以所有线程1的内存障碍之前的操作在线程2内存障碍后都可见
+                        总结为：线程1准备数据，然后release（publish）对原子量的修改
+                        线程2读取数据acquire，要求线程1所准备的数据都可见
+
+                    */
+                memory_order_acq_rel,   //确保原子操作前后的代码不能跨越这个原子操作，即之前的不能移到之后，之后的也不能移到之前
+                memory_order_seq_cst    //默认值，最强的顺序约束
+            };
+        }
+        对于x86平台，所有原子量的load()操作都是acquire，所以使用这个内存序是没有代价的，同样的，所有原子量的store()都是release
+    0.volatile关键字
+        volatile关键字本来是用于在声明变量时，表明它可能在没有程序修改它时发生了改变，所以编译器不能在没有程序修改这个变量的情况下优化掉或者缓存到cpu寄存器中，所以可以确保读写操作实际上的执行
+        volatile常用于存取IO寄存器、内存映射硬件
+        对于线程安全的数据，我们需要确保以下两点：
+            1.读写操作是实际上按程序的需要执行了的，而不是被编译器优化了，或者是写入CPU缓存，从而使得对数据的操作在另一个线程读取时可见
+            2.程序中的机器指令没有被重新排序，编译器可能对程序的某些步骤重新排序，导致即使读写操作是真实执行了，但是由于顺序的问题导致这个线程本身的逻辑错误或者另一个线程发生错误
+        volatile关键字能确保第一点，但不能确保第二点
+        所以在多线程编程时使用volatile的结果是未定义的UB
+        应使用#include <atomic>替代
+    atomic
+        原子操作是一个确保单指令性的操作（可能是多个机器指令组成，也可能是一个）
+            - 其他线程要么看到这个操作已经完成，要么看到这个操作没有开始，但是不会看到任何中间状态
+            - 在底层，原子操作是由特殊机器指令实现的
+            - 原子性是一个通用术语，不限于描述机器指令，也可以描述其他操作具有单指令性（例如数据库的交易，其他访问数据库的操作不应该看到处理交易的中间状态）
+        在单核cpu的情况下，单机器指令的操作不会被切换，因为中断只会发生在指令之间，所以切换只可能发生在操作前或操作后
+        在多核cpu的情况下，单机器指令的操作就不一定是原子的，因为一个核在执行一个指令时其他核可能在执行操作同一块内存的指令，造成资源竞争问题
+        多核系统的原子操作通常使用内存栅障（memory barrier）来实现，即一个CPU核在执行原子操作时，其他CPU核必须停止对内存操作或者不对指定的内存进行操作
+        原子对象是否保证了真的原子性会对实际性能产生很大影响，比如不是原子性的结构可能是有锁的
+            long                //lock_free
+            struct A {long x;}; //lock_free
+            struct B {long x; long y;}; //可能lock_free，在x86平台上是lock_free
+            struct C {long x; long y; long z;
+            };                                  //肯定不是lock_free
+            struct D {long x; int y;};          //x86平台是lock_free因为它对其到16字节，所以与B一样
+            struct E {int x; int y; int z; };   //肯定不是lock_free因为12字节
+            所以对于原子性来说，字节对其很重要
+        std::atomic<>对象（除了std::atomic_flag）包含一个.is_lock_free()的成员函数来检查对这个原子量的操作是否是真的原子的
+        C++17新增了一个静态成员函数.is_always_lock_free()，当这个原子对象在所有当前代码可能被编译到的硬件环境中都是原子操作时返回true
+            比如std::atomic<int>::is_always_lock_free()返回true，而std::atomic<uintmax_t>::is_always_lock_free()由于只在特定的硬件平台会有特殊的机器指令来确保原子性，所以返回false
+        std::atomic<>是一个模板类，支持所有trivially copyable类型
+            1.必须占用连续的内存空间
+            2.可以使用memcpy来复制
+            3.没有虚函数，构造函数不能抛出异常
+            然而满足上述要求的自定义类型虽然可以作为原子类型，但不一定是无锁的
+            C++17可以使用std::is_always_lock_free()来检查
+            std::atomic<>是实现大多数无锁算法的基础
+            std::atomic<int> x{0};
+            ++x;x++;x+=1;   //atomic increment, OK
+            x|=2;   //atomic bit set, OK
+            x*=2;   //Error, not compile
+            int y=x*2;  //atomic read of x, OK
+            x=y+1;      //atomic write of x, OK
+            x=x+1;  //!Not atomic statement，因为先是一个atomic读，然后一个atomic写
+            x=x*2;  //!Not atomic statement，同上
+            支持的操作总结：
+                复制和赋值（包括内置类型和用户定义的类型）
+                    store 执行顺序支持: relaxed, released, seq_cst
+                    load              relaxed, consume, acquire, seq_cst
+                    read_modify_write relaxed, consume, acquire, release, acq_rel, seq_cst   
+                原始指针的自加和自减
+                整数类型的加减、位运算
+                bool类型的所有操作
+            但是atomic模板都不支持复制构造和赋值运算符，因为这牵扯到两个原子量，所以不可能是原子操作
+        std::atomic_flag
+            是最简单的一种原子类型，代表一个布尔信号量，而且总是的原子的（is_lock_free()和is_always_lock_free()永远返回true）
+            在C++20前必须使用std::atomic_flag f=ATOMIC_FLAG_INIT;来初始化成未置位状态，否则状态是未定义的
+            C++20后可以被默认构造
+            成员函数：
+                .clear()，是一个store操作，所以不可以用memory_order_acquire或者memory_order_acq_rel
+                .test_and_set()，返回之前的值并置位，是一个read_modify_write操作，所以支持任何内存顺序
+                C++20后定义了更多成员函数
+        std::atomic_bool
+            可以直接由一个布尔值来构造
+        成员函数：
+            .load()返回之前的值，等同于赋值操作
+                T y=x.load();   //T y=x;
+            .store()与std::atomic_flag用.clear()来写入不同，atomic模板用.store()来写入新值
+                x.store(y); //x=y
+            .exchange()
+                T z=x.exchange(y);  //z=x;x=y合成为一个原子操作
+            .compare_exchange_???() 由于有了.exchange()，所以引进了一种新的read_mofify_write操作：compare_change，这个操作先比较原子量当前的值，如果不同，就更新到期望的值
+                .compare_exchange_weak()
+                .compare_exchange_strong()
+                weak和strong的主要区别是，weak可能返回false即使是当前值与期望值相等(spuriously fail)，这主要是硬件平台决定的，x86平台总是strong的
+                    bool success=x.compare_exchange_strong(expected,desired);    
+                        //if x==expected    => x=desired, success=true
+                        //else              => expected=x, success=false
+                可能的实现：
+                    bool compare_exchange_strong(T& y, T z)
+                    {
+                        Lock lock;          //任意一种可提供独占访问的机制
+                        T tmp=*this;        //读一次
+                        if(tmp!=y)
+                        {
+                            y=tmp;
+                            return false;   //如果this的值与y不同，读一次
+                        }
+                        *this=z;            //写一次
+                        return true;        //如果this的值与y相同，读一次写一次
+                    }
+                由于lock可能很慢，所以可以优化成：
+                    bool compare_exchange_strong(T& y, T z)
+                    {
+                        T tmp=*this;        //读一次
+                        if(tmp!=y)
+                        {
+                            y=tmp;
+                            return false;   //如果this的值与y不同，读一次
+                        }//提高了当tmp!=y时的执行速度
+                        Lock lock;          
+                        tmp=*this;          //*this可能在中间发生了改变，所以要重新读取
+                        if(tmp!=y)
+                        {
+                            y=tmp;
+                            return false;
+                        }
+                        *this=z;            //如果this的值与y相同，读两次写一次
+                        return true;
+                    }
+                类似的
+                    bool compare_exchange_weak(T& y, T z)
+                    {
+                        T tmp = *this;
+                        if(tmp!=y)
+                        {
+                            y = tmp;
+                            return false;
+                        }
+                        TimedLock L{mutex}; //如果互斥量被占用，就阻塞一定时间，如果一定时间到还没有获取到互斥量就返回false，即使当前的值等于期望值
+                        if(!L.locked())
+                            return false;
+                        tmp = *this;
+                        if(tmp!=y)
+                        {
+                            y = tmp;
+                            return false;
+                        }
+                        *this = z;
+                        return true;
+                    }
+                一个简单的例子：
+                    std::atomic<int> x{0};  //一个全局量
+                    void func() //某个线程
+                    {
+                        do{
+                            int xLocal = x;
+                        } while(!x.compare_exchange_strong(xLocal, xLocal+1)){}
+                    }
+                这个成员函数是多数无锁算法的核心
+
+            .fetch_add()
+                x.fetch_add(y);// x+=y
+                int z=x.fetch_add(y);// z=(x+=y)-y，也就是返回旧的值
+            .fetch_sub()
+            .fetch_and()
+            .fetch_or()
+            .fetch_xor()
+            各种重载的算术运算符（除了乘法）
+            atomic模板中重载的算术运算符都是保证原子性的
+            但是一个表达式中如果包含了原子量，这个表达式的执行肯定不是原子的
+                比如++x是原子的，而x=x+1不是
+            
+    1.一个最简单的多线程（用第二个线程打印hello world）
+        #include<iostream>
+        #include<thread>
+        void hello()
+        {
+            std::cout<<"Helloworld!"<<std::endl;
+        }
+        int main()
+        {
+            std::thread t(hello);   //创建一个线程对象t，并赋值给hello函数（这里可以用任何可调用的函数对象赋值）
+            t.join();               //显式地表明要等待线程执行完毕，可以确保在函数退出前该线程执行完毕
+        }
+        std::thread 的构造函数可以接收可调用对象（函数、lambda、可调用对象（重载了()操作符的类、结构体））
+        而对线程对象调用detach(void)方法表明这个函数不等待线程的完成，函数返回时线程可能还在运行
+        detach()打破了thread对象与线程的联系，确保thread对象被销毁时terminate()不会被调用
+        只需在std::thread对象被析构前决定是否join和detach，与线程是否已经执行完毕返回无关
+        如果对thread对象既不适用join()又不使用detach()，则在线程对象因为主线程main退出作用域被销毁时，新线程会调用std::terminate
+        如果主线程还没结束，也会被std::terminate()强行终止
+        可以用joinable()方法检查这个线程是否可以与thread对象结合或分离，已经分离的线程不能再与任�����thread对象结合，称为守护进程，joinable()函数返回一个布尔值
+        每个线程都有一个独特的id，获取当前线程的id，使用std::this_thread::get_id()函数
+        获取线程对象的id，使用get_id()成员方法
+    2.获取资源即初始化RAII
+        当thread对象绑定的函数有参数时，需要在thread对象的构造函数内传值调用，这是由于默认情况下创建新线程时，参数是拷贝到新线程的独立内存中
+        如果函数参数是引用，需要将构造函数内的参数用std::ref()显式转换
+        void add(int & a) {++a;}
+        int main() 
+        {
+            int x=0;
+            std::thread t(add,std::ref(x));  //x->1
+        }
+        当然，也可以用指针的方式来实现
+        void add(int *a) { ++(*a); }
+        int x=0;
+        std::thread t(add,&x);
+        对于可调用对象而言，thread的构造函数的传递一个成员函数指针作为线程函数，第二参数是一个合适的对象的指针，后面的参数是线程函数的参数
+    3.线程数的理想上限
+        当创建的线程数多于CPU核心数时，会带来多余的上下文切换降低性能
+        使用unsigned int std::thread::hardware_concurrency()函数获取CPU线程数，返回一个无符号整形值
+    4.资源竞争
+        当同一个对象被多个线程共有，且有一个或一个以上的线程需要修改这个对象，同时还有其他线程需要读取时，就会造成资源竞争问题
+        而多个线程只读这个对象，不会造成资源竞争
+        最简单的解决方法是对共享资源采取某种保护机制，确保只有修改资源的线程才能看到不变量被破坏的中间状态，其余线程要访问时，要么修改已经完成了，要么还没开始修改（用互斥量延迟访问）
+        保护数据的最基本方式，是C++标准库中的互斥量，std::mutex
+    5.死锁
+        有锁情况：
+            当两个线程A、B以相反的顺序锁两个mutex M1、M2时，可能发生如下清醒：
+            A               B
+            lock(M1)        
+                            lock(M2)
+            lock(M2)
+                            lock(M1)
+            //...           //...
+            这时便发生了死锁，由于A线程先lock了M1，然后尝试lock M2，此时B线程又lock了M2，所以A线程无法继续，由于A线程先lock了M1，所以B线程尝试lock M1也不成功，所以B线程也无法继续
+        无锁情况：
+            当两个线程A、B互相调用join()
+            A                   B
+            ...                 ...
+            thread(B).join()    thread(A).join()
+            这时也发生了死锁，由于A线程等待B线��执行完毕才能执行完，B线程等待A线程执行完毕才能执行完，所以A、B线程都在互相等待对方执行完毕
+    6.避免死锁的方法
+        1）永远让线程使用相同的顺序来锁多个mutex
+        2）尽量只同时锁一个mutex，锁住之后做一些操作，释放这个mutex，再锁另一个mutex
+        3）使用std::lock()来锁mutex对象，std::lock()包含避免死锁的算法
+    7.设计无锁的数据结构
+        几个概念：
+            阻塞性：使用互斥量、条件变量(condition variable)、future来同步数据
+            非阻塞性：不使用上面的工具来同步数据，比如spin_lock使用原子量，在原子量被置位时进入忙等，是非阻塞的，但是消耗大量CPU资源
+            无障碍性：当所有其他线程暂停执行时，当前线程可以继续执行
+            无锁：如果有几个线程正在对一个数据结构操作，其中一个线程会在有限的步骤内完成它的操作
+            无等待：所有对一个数据结构操作的线程都能在有限的步骤内完成它们的操作。注意：无等待性与实际运行时间无关，无等待性只说明了有限步骤内可以完成，因此实际性能并不一定比有锁的程序高，算法是最重要的
+                一个无锁程序：
+                    std::atomic<unsigned long> sum;
+                    void calculateSum(size_t N, unsigned long* a)
+                    {
+                        for(size_t i=0; i < N; ++i)
+                            sum += a[i];
+                    }
+                一个有锁程序：
+                    unsigned long sum{};
+                    std::mutex mut;
+                    void calculateSum(size_t N, unsigned long* a)
+                    {
+                        unsigned long local = 0;
+                        for(size_t i=0; i < N; ++i)
+                            local += a;
+                        std::lock_guard lock{mut};
+                        sum += local;
+                    }
+                这个有锁的程序比无锁的版本性能高非常多，说明无锁并不意味着性能，算法是关键
+            
+    7.各种C++ mutex包装器
+        std::mutex
+            C++标准库中的互斥量的类型
+        std::lock_guard<Mutex>(mutex& m)模板
+            代表对一个互斥量占有一段时间
+            在定义时自动锁上mutex m，在超出作用域后自动解锁mutex m，但是没有lock()和unlock()函数，锁和解锁的过程完全由所在的作用域决定
+        C++17 std::scoped_lock
+            与lock_guard相似，也是在定义时上锁，退出作用于解锁
+            不同的是scoped_lock的构造函数是一个可变模板，所以可以一次性上锁多个互斥量，并且包含了防死锁算法
+        std::unique_lock<Mutex>(mutex& m)模板
+            可以人为调用lock()和unlock()任意次
+            可选的第二参数：unique_lock<Mutex>(mutex& m, std::defer_lock)表示在定义时不自动加锁
+            unique_lock比lock_guard更灵活，但成本更高
+            unique_lock和lock_guard都不可复制，只可移动
+
+        std::once_flag+std::call_once(once_flag& flag, Fn&& function) 
+            std::once_flag是一个多线程环境中只能被改变一次的对象，作为call_once()函数模板的第一参数，第二参数是一个函数对象，确保在多线程环境中function函数对象只被调用一次
+        std::condition_variable
+            #include <condition_variable>
+            condition_variable 是一个线程同步原语，用来阻塞一个或多个需要访问共享资源的线程，直到另一个线程调用.notify_one()或.notify_all()方法
+            通常，需要独占资源的线程需要：
+                1.获取一个互斥量std::mutex（通常使用std::lock_guard)
+                2.占用共享资源
+                3.释放互斥量并执行.notify_one()或.notify_all()
+            其他等待的线程需要：
+                1.使用std::unique_lock<std::mutex>获取同一互斥量
+                2.对同一std::condition_variable执行wait()方法，这个方法会自动释放unique_lock获取的互斥量并暂停线程的执行，避免忙等
+                3.当被唤醒后，将自动重新获取互斥量并恢复执行
+            注意，等待线程有可能被“假唤醒”，应该在调用wait()方法时增加一个lambda表达式，判断唤醒条件是否真的达到了
+            成员函数：
+                .notify_one()
+                .notify_all()
+
+                template<class Predicate>
+                .wait(std::unique_lock<std::mutex>& lock, Predicate pred);//当pred为假时，一直等待，当pred为真时退出等待，相当于：
+                    while(!pred())
+                        wait(lock);
+
+                .wait_for(std::chrono的时间段)
+                .wait_until(std::chrono的时间点)
+        std::condition_variable_any
+            可以使用这个模板来wait和
+        std::promise+std::future+std::async
+            子线程->主线程传递信息
+                假设想要在子线程中接收来自主线程的一个引用参数来传递信息，比如子线程将处理结果返回给主线程，一个可能的做法是给子线程函数增加一个引用参数，然后主线程创建thread对象时用ref传递这个参数
+                然而此处需要保证在子线程写入这个引用参数时，主线程没有同时访问他，所以需要在两个线程分别写入和访问时上锁
+                然而还需要保证主线程访问这个参数前，子线程已经完成写入操作了，所以不会读取到无用数据，所以还可能需要一个condition_variable来使得子线程写入后唤醒主线程来访问
+                这使得代码变得复杂
+                template <class Fn, class... Args>
+                std::future<typename result_of<Fn(Args...)>::type> std::async(Fn&& fn, Args&&... args)
+                template <class Fn, class... Args>
+                std::future<typename result_of<Fn(Args...)>::type> std::async(launch policy, Fn&& fn, Args&&... args)
+                async函数接收一个函数对象Fn，并将args传递给函数Fn，返回一个std::future对象，这个future对象的模板参数类型是函数Fn的返回值类型
+                此时可以通过async函数返回的future对象来获取函数的返回值
+                async函数的第一参数控制新线程的创建方式
+                    默认值为std::launch::async|std::launch::deferred，表示新线程的创建与否取决于实现，也可能不创建新线程
+                    如果确实要创建新线程，用std::launch::async
+                    std::launch::deferred 表示不创建新线程，而且延迟执行，直到调用了所返回的future对象的get()方法，才执行函数Fn
+                template <class T> future
+                template <class R&> future<R&>
+                template <> future<void>
+                future表示一个可以在未来获取其内容的对象
+            主线程->子线程传递信息
+                假设需要在主线程中传递信息给子线程，除了通过在创建新线程时直接将参数传递给函数，还可以在创建新线程之后先让新线程做别的事情，然后主线程继续执行，准备新线程所需的数据，完成后子线程从需要这个数据的地方开始继续执行
+                将子线程函数定义为接收std::future参数
+                returnType func(std::future<paraType>&& para)  //注意这里应该是右值引用，因为promise的get_future函数返回临时变量，或者就直接值传递
+                {
+                    //做一些其他事情
+                    paraType value=para.get();  //如果主线程此时没准备好信息，就暂停在此处，直到主线程传来信息
+                    ...//继续做另一些事情
+                }
+                int main()
+                {
+                    std::promise<paraType> p;   //表示当前数据还未准备好，但是将来某时刻会准备好，然后让子线程继续执行
+                    auto result=std::async(std::launch::async, func, p.get_future());   //async函数返回一个std::future<returnType>对象
+                    ...//主线程做别的事，准备数据给p
+                    p.set_value(...);    //数据准备好了，子线程此时继续执行
+                    ...//主线程可以继续做别的事，或者等待子线程返回
+                    auto result_value=result.get(); //主线程获取子线程的结果
+                }
+            std::future表示一种独占性的预期结果，所以只能move不能copy
+            std::future可以用std::move转换为std::shared_future
+                std::shared_future<Type> sf{std::move(f)};
+            也可以用.share()成员函数构造一个shared_future
+            std::shared_future表示多个线程共有的预期性结果，可以copy
+            std::shared_future可以直接由std::promise.get_future()构造
+
+        std::packaged_task<>
+            #include <future>
+            这个类也是应用了所有权的概念，只能移动，不能复制
+            可以封装任何可调用对象（包括函数、lambda、绑定、重载了()运算符的对象），并使用async调用
+            成员函数：
+                .get_future()
+            用法：
+                void thread(std::packaged_task<int()> t)
+                {
+
+                }
+        std::shared_mutex
+            #include <shared_mutex>
+            不同于std::mutex提供的单独访问的权限，shared_mutex提供两种性质的访问的保护：
+                共享性：多个线程可以同时获取这一个互斥量（常用于一个共享资源用于多个只读线程）
+                    .lock_shared()
+                    .try_lock_shared()
+                    .unlock_shared()
+                占有性：只有一个线程可以获取这一个互斥量（常用于一个共享资源需要被一个线程写入）
+                    .lock()
+                    .try_lock()
+                    .unlock()
+            当一个线程使用.lock()或.try_lock()占有性取得互斥量后，其他任何线程将不能取得这个互斥量
+            当一个线程使用.lock_shared()或.try_lock_shared()共享性取得互斥量后，其他线程同样可以共享性取得这个互斥量
+            std::lock_guard作用于shared_mutex使用的是占有性lock()
+        std::shared_lock<Mutex>
+            #include <shared_mutex>
+            类似于std::lock_guard和std::unique_lock相对于std::mutex的关系
+            shared_lock在构造时，可以指定是否上锁以及是否try
+                explicit shared_lock(mutex_type& m);     //构造时上锁
+                shared_lock(mutex_type& m, std::defer_lock_t ); //构造时不上锁
+                shared_lock(mutex_type& m, std::try_to_lock_t); //构造时尝试上锁，不成功也立即返回
+                shared_lock(mutex_type& m, std::adopt_lock_t);  //构造时假设已经上锁，退出作用域解锁
+        std::recursive_mutex
+            同一个线程能锁住多次，常用于需要获取互斥量的递归函数，或者互斥量的获取在一个循环中但是解锁在另一个循环中
+            如果一个线程锁住了一个递归互斥量，它可以继续锁住任意次，其他线程会被阻塞，直到这个互斥量被解锁相同的次数（即递归返回）
+                std::recursive_mutex mut;
+                void recursion(int loopTime)
+                {
+                    if(loopTime<=0)
+                        return;
+                    std::lock_guard{mut};
+                    //critical section
+                    recursion(--loopTime);
+                }
+            或者
+                std::recursive_mutex mut;
+                void loop()
+                {
+                    for(auto i=0; i < 5; ++i)
+                    {
+                        mut.lock();
+                        //critical section
+                    }
+                    for(auto i=0; i<5; ++i)
+                    {
+                        mut.unlock();
+                        //clean up
+                    }
+                }
+            
 C++14:
     1.函数返回值类型auto
         auto func(paraType para)
         {
             return ...
         }
-        2.decltype(auto) 推导初始化表达式的类型
-            decltype(auto)的推导规则与decltype() 一致，与auto不一致（auto的推导规则与模板的推导规则一致，除了auto会推导std::initializer_list）
-            在C++14前，如果需要用一个表达式的类型来声明一个对象，需要把整个表达式放到decltype() 内：decltype(longAndComplexExpression) var = longAndComplexExpression;
-            C++ 14后可以简写成：decltype(auto)var = longAndComplexExpression;
-        3.二进制字面值 二进制字面值用0b或0B开头 int a = 0b110; //a=6
+    2.decltype(auto) 推导初始化表达式的类型
+        decltype(auto)的推导规则与decltype() 一致，与auto不一致（auto的推导规则与模板的推导规则一致，除了auto会推导std::initializer_list）
+        在C++14前，如果需要用一个表达式的类型来声明一个对象，需要把整个表达式放到decltype() 内：decltype(longAndComplexExpression) var = longAndComplexExpression;
+        C++ 14后可以简写成：decltype(auto)var = longAndComplexExpression;
+    3.二进制字面值 二进制字面值用0b或0B开头 int a = 0b110; //a=6
         八进制字面值用0开头 int b=011;  //b=9
         十六进制字面值用0x或0X开头 int c=0x11;  //c=17
     4.字面值分隔符
@@ -2531,9 +3144,15 @@ C++17：
             auto* pt=std::get_if<T>(&var)   //这样当var中实际存储的确实是T类型时，返回一个指向这个数据的指针，如果类型不符，或者没有数据，返回一个nullptr
             auto& rf=std::get<T>(var)       //这样当var中实际存储的确实是T类型时，返回一个这个数据的引用，如果类型不符，抛出std::bad_variant_access异常
             bool std::holds_aternative<T>(var)  //查询var是否实际存储了T类型的数据，如果是，返回true，否则返回false
+        对于没有默认构造函数的类，<variant>库中定义了一个空类std::monostate，使得包含了这个空类的variant可以被默认构造，比如：
+            struct S{
+                int i;
+                S(int i):i(i){}
+            };
+            std::variant<std::monostate, S> v;    //此时可以被默认构造
         template<class callable, class... variants>
         std::visit(callable f, variants var1...)
-            相当于将variant var1...中的数据传递给可调用对象f（函数、函数对象（重载了()操作符的结构体、类）），然后调用这个可调用对象f
+            相当于将variant var1...传递给可调用对象f（函数、函数对象（重载了()操作符的结构体、类）），然后调用这个可调用对象f
             visit的返回值就是可调用对象f的返回值
     4.std::any
         #include <any> 
@@ -2561,7 +3180,7 @@ C++17：
             {
                 A a;
                 return a;
-            }   //VS2019输出"default constructor!" "Move constructor!"
+            } //VS2019输出"default constructor!" "Move constructor!"
         当调用直接返回临时变量的函数时，一定会发生返回值优化
             A Return_temp()
             {
@@ -2574,7 +3193,9 @@ C++17：
     8.std::filesystem
     9.<type_traits>中新增的 
         template<bool B>
-        using std::bool_constant = std::integral_constant<bool, B>;   
+        using std::bool_constant = std::integral_constant<bool, B>;
+    10.__has_include 宏
+
         
 C++20：
     1.模块 Modules
@@ -2582,287 +3203,11 @@ C++20：
     2.范围 Ranges
     3.概念 Concepts
     4.协程 Coroutines
-
-
-多线程C++11 std::thread：
-    -1.内存模型和执行顺序
-        https://en.cppreference.com/w/cpp/language/eval_order
-        同一语句中表达式的执行顺序是未定义的，这包括函数调用时各实参之间的评估的顺序，编译器可能选择任何顺序，实际运行时的顺序也会改变，如：
-            int a() { return std::puts("a"); }
-            int b() { return std::puts("b"); }
-            int c() { return std::puts("c"); }
-            void z(int, int, int) {}
-            int main() 
-            {
-                z(a(), b(), c());       // 有可能按任何顺序输出abc，每次程序运行时的输出也可能改变
-                return a() + b() + c(); // 同上
-            }
-        但注意不要与表达式之间结合的顺序混淆，结合的顺序是根据运算符的规则固定的，比如a+b+c的顺序总是(a+b)+c
-        前序原则（C++11）：
-            对表达式的评估包括以下2种情形：
-                1.值的计算：计算一个表达式返回的值，这包括读取泛左值glvalue和读取一个刚被赋值过的对象的值
-                2.副作用的评估：读取一个声明为volatile对象的值，
-
-
-        执行顺序：
-            源代码顺序：源代码中的语句的顺序
-            程序顺序：源代码经过编译生成的机器指令的顺序
-            执行顺序：现代处理器使用乱序执行策略，机器指令读进cpu时，cpu会对机器指令重新排序，成为执行顺序
-            实际（观察到的）顺序：由于多线程和缓存的存在，内存中的变量的值的改变顺序又会与执行顺序不同，成为实际顺序
-        C++标准所规定的C++抽象机器只规定了在同一线程中，实际顺序与源代码顺序在产生任何副作用的前提下要相同，但对于多线程程序没有任何顺序的保证
-        当一个线程从内存中读取时，它可能读取到原始值、在同一线程中写入的值、在另一个线程中写入的值
-        在#include <atomic>中定义的函数和操作默认都是确保以原程序的顺序执行，同时提供了6种执行顺序供选择
-        namespace std {
-            enum memory_order {
-                memory_order_relaxed,   //只确保当前指令的原子性，不保证任何顺序
-                memory_order_consume,
-                memory_order_acquire,   //确保当前原子操作之后的源代码不能移到当前原子操作之前（保证后面代码读取的可见性），但当前原子操作之前的源代码可以移到当前原子操作之后执行
-                memory_order_release,   //确保当前原子操作之前的源代码不能移到当前原子操作之后（保证前面代码写入的可见性），但当前原子操作之后的源代码可以移到当前原子操作之前执行
-                memory_order_acq_rel,
-                memory_order_seq_cst    //默认值
-            };
-        }
-
-    0.volatile关键字
-        volatile关键字本来是用于在声明变量时，表明它可能在没有程序修改它时发生了改变，所以编译器不能在没有程序修改这个变量的情况下优化掉或者缓存到cpu寄存器中，所以可以确保读写操作实际上的执行
-        volatile常用于存取IO寄存器、内存映射硬件
-        对于线程安全的数据，我们需要确保以下两点：
-            1.读写操作是实际上按程序的需要执行了的，而不是被编译器优化了，或者是写入CPU缓存，从而使得对数据的操作在另一个线程读取时可见
-            2.程序中的机器指令没有被重新排序，编译器可能对程序的某些步骤重新排序，导致即使读写操作是真实执行了，但是由于顺序的问题导致这个线程本身的逻辑错误或者另一个线程发生错误
-        volatile关键字能确保第一点，但不能确保第二点
-        所以在多线程编程时使用volatile的结果是未定义的UB
-        应使用#include <atomic>替代
-    atomic
-        原子操作是一个确保单指令性的操作（可能是多个机器指令组成，也可能是一个）
-            - 其他线程要么看到这个操作已经完成，要么看到这个操作没有开始，但是不会看到任何中间状态
-            - 在底层，原子操作是由特殊机器指令实现的
-            - 原子性是一个通用术语，不限于描述机器指令，也可以描述其他操作具有单指令性（例如数据库的交易，其他访问数据库的操作不应该看到处理交易的中间状态）
-        在单核cpu的情况下，单机器指令的操作不会被切换，因为中断只会发生在指令之间，所以切换只可能发生在操作前或操作后
-        在多核cpu的情况下，单机器指令的操作就不一定是原子的，因为一个核在执行一个指令时其他核可能在执行操作同一块内存的指令，造成资源竞争问题
-        多核系统的原子操作通常使用内存栅障（memory barrier）来实现，即一个CPU核在执行原子操作时，其他CPU核必须停止对内存操作或者不对指定的内存进行操作
-        std::atomic<>是一个模板类，支持所有trivially copyable类型
-                1.必须占用连续的内存空间
-                2.可以使用memcpy来复制
-                3.没有虚函数，构造函数不能抛出异常
-            然而满足上述要求的自定义类型虽然可以作为原子类型，但不一定是无锁的
-            C++17可以使用std::is_always_lock_free()来检查
-            std::atomic<>是实现大多数无锁算法的基础
-            std::atomic<int> x{0};
-            ++x;x++;x+=1;   //atomic increment, OK
-            x|=2;   //atomic bit set, OK
-            x*=2;   //Error, not compile
-            int y=x*2;  //atomic read of x, OK
-            x=y+1;      //atomic write of x, OK
-            x=x+1;  //!Not atomic statement，因为先是一个atomic读，然后一个atomic写
-            x=x*2;  //!Not atomic statement，同上
-            支持的操作总结：
-                复制和赋值（包括内置类型和用户定义的类型）
-                原始指针的自加和自减
-                整数类型的加减、位运算
-                bool类型的所有操作
-            成员函数：
-                T z=x.exchange(y);  //z=x;x=y合成为一个原子操作
-                bool success=x.compare_exchange_strong(y,z);    //if x==y => x=z, success=true
-                                                                //else    => y=x, success=false
-                    可能的实现：
-                        bool compare_exchange_strong(T& y, T z)
-                        {
-                            Lock lock;          //任意一种可提供独占访问的机制
-                            T tmp=*this;        //读一次
-                            if(tmp!=y)
-                            {
-                                y=tmp;
-                                return false;   //如果this的值与y不同，读一次
-                            }
-                            *this=z;            //写一次
-                            return true;        //如果this的值与y相同，读一次写一次
-                        }
-                    由于lock可能很慢，所以可以优化成：
-                        bool compare_exchange_strong(T& y, T z)
-                        {
-                            T tmp=*this;        //读一次
-                            if(tmp!=y)
-                            {
-                                y=tmp;
-                                return false;   //如果this的值与y不同，读一次
-                            }
-                            Lock lock;          //提高了当tmp!=y时的执行速度
-                            tmp=*this;          //*this可能在中间发生了改变，所以要重新读取
-                            if(tmp!=y)
-                            {
-                                y=tmp;
-                                return false;
-                            }
-                            *this=z;            //如果this的值与y相同，读两次写一次
-                            return true;
-                        }
-                x.fetch_add(y); //same as x+=y
-                fetch_sub()
-                fetch_and()
-                fetch_or()
-                fetch_xor()
-
-    1.一个最简单的多线程（用第二个线程打印hello world）
-        #include<iostream>
-        #include<thread>
-        void hello()
-        {
-            std::cout<<"Helloworld!"<<std::endl;
-        }
-        int main()
-        {
-            std::thread t(hello);   //创建一个线程对象t，并赋值给hello函数（这里可以用任何可调用的函数对象赋值）
-            t.join();               //显式地表明要等待线程执行完毕，可以确保在函数退出前该线程执行完毕
-        }
-        std::thread 的构造函数可以接收可调用对象（函数、lambda、可调用对象（重载了()操作符的类、结构体））
-        而对线程对象调用detach(void)方法表明这个函数不等待线程的完成，函数返回时线程可能还在运行
-        detach()打破了thread对象与线程的联系，确保thread对象被销毁时terminate()不会被调用
-        如果对thread对象既不适用join()又不使用detach()，则在线程对象因为主线程main退出作用域被销毁时，新线程会terminate
-        可以用joinable()方法检查这个线程是否可以与thread对象结合或分离，已经分离的线程不能再与任�����thread对象结合，称为守护进程，joinable()函数返回一个布尔值
-        每个线程都有一个独特的id，获取当前线程的id，使用std::this_thread::get_id()函数
-        获取线程对象的id，使用get_id()成员方法
-    2.获取资源即初始化
-        当thread对象绑定的函数有参数时，需要在thread对象的构造函数内传值调用，这是由于默认情况下创建新线程时，参数是拷贝到新线程的独立内存中
-        如果函数参数是引用，需要将构造函数内的参数用std::ref()显式转换
-        void add(int & a) {++a;}
-        int main() 
-        {
-            int x=0;
-            std::thread t(add,std::ref(x));  //x->1
-        }
-        当然，也可以用指针的方式来实现
-        void add(int *a) { ++(*a); }
-        int x=0;
-        std::thread t(add,&x);
-        对于可调用对象而言，thread的构造函数的传递一个成员函数指针作为线程函数，第二参数是一个合适的对象的指针，后面的参数是线程函数的参数
-    3.线程数的理想上限
-        当创建的线程数多于CPU核心数时，会带来多余的上下文切换降低性能
-        使用unsigned int std::thread::hardware_concurrency()函数获取CPU线程数，返回一个无符号整形值
-    4.资源竞争
-        当同一个对象被多个线程共有，且有一个或一个以上的线程需要修改这个对象，同时还有其他线程需要读取时，就会造成资源竞争问题
-        而多个线程只读这个对象，不会造成资源竞争
-        最简单的解决方法是对共享资源采取某种保护机制，确保只有修改资源的线程才能看到不变量被破坏的中间状态，其余线程要访问时，要么修改已经完成了，要么还没开始修改（用互斥量延迟访问）
-        保护数据的最基本方式，是C++标准库中的互斥量，std::mutex
-    5.死锁
-        有锁情况：
-            当两个线程A、B以相反的顺序锁两个mutex M1、M2时，可能发生如下清醒：
-            A               B
-            lock(M1)        
-                            lock(M2)
-            lock(M2)
-                            lock(M1)
-            //...           //...
-            这时便发生了死锁，由于A线程先lock了M1，然后尝试lock M2，此时B线程又lock了M2，所以A线程无法继续，由于A线程先lock了M1，所以B线程尝试lock M1也不成功，所以B线程也无法继续
-        无锁情况：
-            当两个线程A、B互相调用join()
-            A                   B
-            ...                 ...
-            thread(B).join()    thread(A).join()
-            这时也发生了死锁，由于A线程等待B线程执行完毕才能执行完，B线程等待A线程执行完毕才能执行完，所以A、B线程都在互相等待对方执行完毕
-    6.避免死锁的方法
-        1）永远让线程使用相同的顺序来锁多个mutex
-        2）尽量只同时锁一个mutex，锁住之后做一些操作，释放这个mutex，再锁另一个mutex
-        3）使用std::lock()来锁mutex对象，std::lock()包含避免死锁的算法
-    7.各种C++ mutex包装器
-        std::mutex
-            C++标准库中的互斥量的类型
-        std::lock_guard<Mutex>(mutex& m)模板
-            在定义时自动锁上mutex m，在超出作用域后自动解锁mutex m，但是没有lock()和unlock()函数，锁和解锁的过程完全由所在的作用域决定
-        std::unique_lock<Mutex>(mutex& m)模板
-            可以人为调用lock()和unlock()任意次
-            可选的第二参数：unique_lock<Mutex>(mutex& m, std::defer_lock)表示在定义时不自动加锁
-            unique_lock比lock_guard更灵活，但成本更高
-            unique_lock和lock_guard都不可复制，只可移动
-        std::once_flag+std::call_once(once_flag& flag, Fn&& function) 
-            std::once_flag是一个多线程环境中只能被改变一次的对象，作为call_once()函数模板的第一参数，第二参数是一个函数对象，确保在多线程环境中function函数对象只被调用一次
-        std::condition_variable
-            #include <condition_variable>
-            condition_variable 是一个线程同步原语，用来阻塞一个或多个需要访问共享资源的线程，直到另一个线程调用.notify_one()或.notify_all()方法
-            通常，需要独占资源的线程需要：
-                1.获取一个互斥量std::mutex（通常使用std::lock_guard)
-                2.占用共享资源
-                3.释放互斥量并执行.notify_one()或.notify_all()
-            其他等待的线程需要：
-                1.使用std::unique_lock<std::mutex>获取同一互斥量
-                2.对同一std::condition_variable执行wait()方法，这个方法会自动释放unique_lock获取的互斥量并暂停线程的执行，避免忙等
-                3.当被唤醒后，将自动重新获取互斥量并恢复执行
-            注意，等待线程有可能被“假唤醒”，应该在调用wait()方法时增加一个lambda表达式，判断唤醒条件是否真的达到了
-            成员函数：
-                .notify_one()
-                .notify_all()
-
-                template<class Predicate>
-                .wait(std::unique_lock<std::mutex>& lock, Predicate pred);//当pred为假时，一直等待，当pred为真时退出等待，相当于：
-                    while(!pred())
-                        wait(lock);
-
-                .wait_for()
-                .wait_until()
-
-        std::promise+std::future+std::async
-            子线程->主线程传递信息
-                假设想要在子线程中接收来自主线程的一个引用参数来传递信息，比如子线程将处理结果返回给主线程，一个可能的做法是给子线程函数增加一个引用参数，然后主线程创建thread对象时用ref传递这个参数
-                然而此处需要保证在子线程写入这个引用参数时，主线程没有同时访问他，所以需要在两个线程分别写入和访问时上锁
-                然而还需要保证主线程访问这个参数前，子线程已经完成写入操作了，所以不会读取到无用数据，所以还可能需要一个condition_variable来使得子线程写入后唤醒主线程来访问
-                这使得代码变得复杂
-                template <class Fn, class... Args>
-                std::future<typename result_of<Fn(Args...)>::type> std::async(Fn&& fn, Args&&... args)
-                template <class Fn, class... Args>
-                std::future<typename result_of<Fn(Args...)>::type> std::async(launch policy, Fn&& fn, Args&&... args)
-                async函数接收一个函数对象Fn，并将args传递给函数Fn，返回一个std::future对象，这个future对象的模板参数类型是函数Fn的返回值类型
-                此时可以通过async函数返回的future对象来获取函数的返回值
-                async函数的第一参数控制新线程的创建方式
-                    默认值为std::launch::async|std::launch::deferred，表示新线程的创建与否取决于实现，也可能不创建新线程
-                    如果确实要创建新线程，用std::launch::async
-                    std::launch::deferred 表示不创建新线程，而且延迟执行，直到调用了所返回的future对象的get()方法，才执行函数Fn
-                template <class T> future
-                template <class R&> future<R&>
-                template <> future<void>
-                future表示一个可以在未来获取其内容的对象
-            主线程->子线程传递信息
-                假设需要在主线程中传递信息给子线程，除了通过在创建新线程时直接将参数传递给函数，还可以在创建新线程之后先让新线程做别的事情，然后主线程继续执行，准备新线程所需的数据，完成后子线程从需要这个数据的地方开始继续执行
-                将子线程函数定义为接收std::future参数
-                returnType func(std::future<paraType>&& para)  //注意这里应该是右值引用，因为promise的get_future函数返回临时变量，或者就直接值传递
-                {
-                    //做一些其他事情
-                    paraType value=para.get();  //如果主线程此时没准备好信息，就暂停在此处，直到主线程传来信息
-                    ...//继续做另一些事情
-                }
-                int main()
-                {
-                    std::promise<paraType> p;   //表示当前数据还未准备好，但是将来某时刻会准备好，然后让子线程继续执行
-                    auto result=std::async(std::launch::async, func, p.get_future());   //async函数返回一个std::future<returnType>对象
-                    ...//主线程做别的事，准备数据给p
-                    p.set_value(...);    //数据准备好了，子线程此时继续执行
-                    ...//主线程可以继续做别的事，或者等待子线程返回
-                    auto result_value=result.get(); //主线程获取子线程的结果
-                }
-        std::packaged_task<>
-            #include <future>
-            可以封装任何可调用对象（包括函数、lambda、绑定、重载了()运算符的对象），并使用async调用
-            成员函数：
-                .get_future()
-        std::shared_mutex
-            #include <shared_mutex>
-            不同于std::mutex提供的单独访问的权限，shared_mutex提供两种性质的访问的保护：
-                共享性：多个线程可以同时获取这一个互斥量（常用于一个共享资源用于多个只读线程）
-                    .lock_shared()
-                    .try_lock_shared()
-                    .unlock_shared()
-                占有性：只有一个线程可以获取这一个互斥量（常用于一个共享资源需要被一个线程写入）
-                    .lock()
-                    .try_lock()
-                    .unlock()
-            当一个线程使用.lock()或.try_lock()占有性取得互斥量后，其他任何线程将不能取得这个互斥量
-            当一个线程使用.lock_shared()或.try_lock_shared()共享性取得互斥量后，其他线程同样可以共享性取得这个互斥量
-        std::shared_lock<Mutex>
-            #include <shared_mutex>
-            类似于std::lock_guard和std::unique_lock相对于std::mutex的关系
-            shared_lock在构造时，可以指定是否上锁以及是否try
-                explicit shared_lock(mutex_type& m);     //构造时上锁
-                shared_lock(mutex_type& m, std::defer_lock_t ); //构造时不上锁
-                shared_lock(mutex_type& m, std::try_to_lock_t); //构造时尝试上锁，不成功也立即返回
-                shared_lock(mutex_type& m, std::adopt_lock_t);  //构造时假设已经上锁，退出作用域解锁
+    5.is_constant_evaluated
+    6.<version>
+        C++20加入了标准的编译器功能测试宏，来测试编译器是否支持标准的某些功能
+        https://en.cppreference.com/w/cpp/feature_test#Library_features
+        可以结合#ifdef来为不同的C++标准编译不同的代码
 
 
 Effective C++
@@ -2898,7 +3243,7 @@ Effective C++
             }
 
             /*someClass.cpp*/
-            const int someClass::a=5;
+            const int someClass::a = 5;
         然而这种方法声明的类专属常量无法作为数组长度，可以使用下面的enum hack代替
             class someClass
             {
@@ -2973,8 +3318,7 @@ Effective C++
             private:
                 explicit Month(int m): month(m){}  //设计三
                 int month;
-            }
-            Date d(Year(2019),Month::Feb(),Day(20));
+            } Date d(Year(2019), Month::Feb(), Day(20));
         case 2:工厂函数（返回新对象的指针或引用的函数）直接返回智能指针来防止客户忘记delete造成的内存泄漏
     21.必须返回对象时不要返回引用
         注意不要犯返回一个指向临时对象的引用的错误
@@ -3210,7 +3554,7 @@ Effective C++
            
             /*RealPerson.cpp*/
             #include "Person.h"
-            #include "RealPerson.h"
+#include "RealPerson.h"
             Person* Person::CreatePerson(const std::string& name, const Date& birthday, const Address& addr) //在RealPerson.cpp中实现CreatePerson函数
             {
                 return new RealPerson(name, birthday, addr);
@@ -3407,7 +3751,7 @@ More Effective C++
         void func(const Base array[], int numberOfElements)
         {
             for(int i=0; i<numberOfElements; ++i)
-            {dosomething(array[i]);}   //如果在循环中遍历这个被切割后的Derived对象数组，则由于循环时array[i]指针每次移动的距离是根据Base类对象的大小计算的，对于Derived类对象数组，移动的距离就会不正确，造成错误
+            {dosomething(array[i]);}   //如果在循环中遍历这个被切割后的Derived对象数组，则由于循���时array[i]指针每次移动的距离是根据Base类对象的大小计算的，对于Derived类对象数组，移动的距离就会不正确，造成错误
         }
         应该用指向对象的指针数组的方法处理派生结构中的对象数组
     4.是否需要默认构造函数
@@ -3534,3 +3878,28 @@ More Effective C++
     T*可选optional，表明可以是空指针nullptr      T* const
     T vs T const&：值传递需要拷贝，引用需要间接读取一次内存，所以当对象的拷贝操作昂贵时，选用T const&，否则选用T，编译器可能对拷贝有优化，但是对于引用，无论如何都要多访问一次内存
     T* vs std::optional<T>：optional<T>要求可复制，而且传指针可以在函数内修改参数T，所以T*的适用面更广
+2.5 位运算技巧
+    相反数
+        一个带符号整数x的相反数是: -x = ~x+1
+    按位取反
+        一个带符号整数x按位取反是： ~x = x^-1 = x^(1111...111)  //-1的二进制是32个1
+    取一个数x的绝对值
+        先把这个数的符号位取出 char flag=x>>(sizeof(x)*8-1)
+        然后再用恒等式 (x^flag)-flag
+            这是因为当x是正数时，x^flag -> x^0 -> x，x-0是x
+            当x是负数时，x^flag -> x^-1 -> ~x, ~x-(-1) -> ~x+1 -> x
+
+3.if分支消除技巧
+    要取一个带符号的整数的符号位，只需将这个数右移(位数-1)位，也就是sizeof(T)*8-1位
+        bool is_positive= num >> (sizeof(num) * 8 - 1);
+
+    先看这样一个三目运算符表达式
+        C ? X : Y;
+    它等价于
+        Y - (C ? (Y - X) : 0);
+    因为当C==true时，Y-(Y-X)=X, 而当C==false时，Y-0=Y
+    如果用-1来表示true，用0表示false，又可以写成
+        Y - (C & (Y - X))
+    因为当C==true==-1时，-1 & 任何整数都等于这个整数本身，所以Y-(Y-X)=X，而当C==false==0时，Y-0=Y
+
+    
