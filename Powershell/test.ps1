@@ -1,6 +1,12 @@
-$fileName="test.txt"
-for($i=0; $i -le 4000; ++$i)
+class Base 
 {
-    # Write-Host($i)
-    Out-File $fileName -Append -InputObject $i
+    [int]$a
+    Base([int]$num)
+    {
+        $this.a = $num
+    }
+}
+class Derived 
+{
+    Derived():Base(100) {} 
 }

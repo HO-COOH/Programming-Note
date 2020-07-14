@@ -230,8 +230,11 @@ C++
         优化
             向量化指令
                 GCC/Clang: -march=native，还有一堆CPU架构选项可选
-                MSVC: /arch:AVX2
-
+                MSVC: /arch:AVX2 (Visual studio Project -> Properties -> Configurations -> C/C++ -> Code generation -> Enabel Enhanced Instruction set)
+                使用CMake：
+                    if(MSVC)
+                        add_definitions(/arch:AVX)
+                    endif()
 
 1. 字符串输入
     cin.getline(char *s, int n);//读取一行，最多读取n-1个字符拷贝给s所指的字符串，并添加'\0'，丢弃用户输入的换行符
@@ -1622,18 +1625,18 @@ STL
                 比较从[first1,last1)的元素是否与[first2, first2+(last1-first1-1) )的相同
                 如果first2迭代器所指向的容器的元素比first1的多，则只比较与first1到last1相等个数的元素
                 如果first1迭代器所指向的容器元素比first2的多，一定返回false
-                template <class InputIterator1, class InputIterator2>
-                bool equal (InputIterator1 first1, InputIterator1 last1, InputIterator2 first2);
-                相当于：
-                {
-                    while(first1 != last1)
+                可能的实现
+                    template <class InputIterator1, class InputIterator2>
+                    bool equal (InputIterator1 first1, InputIterator1 last1, InputIterator2 first2);
                     {
-                        if(*first1 != *first2)
-                            return false;
-                        ++first1;
-                        ++first2;
+                        while(first1 != last1)
+                        {
+                            if(*first1 != *first2)
+                                return false;
+                            ++first1;
+                            ++first2;
+                        }
                     }
-                }
             advance(InputIterator& it, Distance n)
                 将迭代器it向前推进n个元素的位置
                 如果it是随机存取迭代器，函数直接用迭代器运算+或-，否则用++或--移动n次
@@ -1641,6 +1644,20 @@ STL
                 template<class T>
                 constexpr const T& clamp(const T& v, const T& lo, const T& hi);
                 当lo<=v<=hi时，返回v，当v<lo时，返回lo，当hi<v时，返回hi
+            gcd() C++17
+                template<class M, class N>
+                constexpr std::common_type_t<M, N> gcd(M m, N n)
+                如果m，n都为0， 返回0，否则返回两个数（绝对值）的最大公约数
+                m，n应该都是除了布尔类型之外的整数类型
+            lcm() C++17
+                template<class M, class N>
+                constexpr std::common_type_t<M, N> lcm(M m, N n)
+                返回两个数（绝对值）的最小公约数，如果m或n为0，返回0
+                m，n应该都是除了布尔类型之外的整数类型
+            iota() C++11
+                template<class ForwardIt, class T>
+                constexpr void iota(ForwardIt first, ForwardIt last, T value)
+                从value递增（调用++操作符），将值填入[first, last)的区间中
             midpoint() C++20
                 返回两个数的中点
                 可能的实现：
