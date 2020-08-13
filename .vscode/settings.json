@@ -83,10 +83,12 @@
         "xstring": "cpp",
         "xtr1common": "cpp",
         "xtree": "cpp",
-        "xutility": "cpp"
+        "xutility": "cpp",
+        "regex": "cpp"
     },
     "C_Cpp.errorSquiggles": "Disabled",
     "editor.cursorSmoothCaretAnimation": true,
     "editor.smoothScrolling": true,
-    "python.pythonPath": "C:\\Users\\Peter\\anaconda3\\python.exe"
+    "python.pythonPath": "C:\\Users\\Peter\\anaconda3\\python.exe",
+    "cmake.configureOnOpen": false
 }

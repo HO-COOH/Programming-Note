@@ -64,3 +64,25 @@ ___
 
 # 图片
 ![提示字符串](图片地址)
+
+# Code block
+
+<details>
+<summary>Click for some code.</summary>
+here it is
+```cpp
+puts("Hello world");
+```
+
+## Nested 
+here it is
+Something more
+
+<summary>more code</summary>
+Here it is
+```cpp
+puts("I am dumb.");
+```
+
+
+</details>

@@ -1,3 +1,17 @@
+-1.运行栈
+                        应用
+                支持库 | OpenCL编译器前端 | SPIR-V
+                OpenCL运行时 | OpenCL IR编译器（IR: intermediate representation）
+                        GPU内核驱动
+                        硬件层
+            
+    对比CUDA运行栈：
+                        应用
+                    CUDA编译器前端
+            Host端编译器    | Device端编译器
+            原生目标代码文件 | Nvidia PTX
+                        可执行文件
+
 0.体系结构
     context：捆绑到一个device
     platform
@@ -6,9 +20,11 @@
     command queue：操作一个device的通道，可能是一个FIFO（先进先出）的队列结构
     buffer：device上的全局内存，与context和device相捆绑
 
-    一个platform代表一个OpenCL的实现，由结构体cl_platform_id表示
+    一个platform代表一个OpenCL的实现，一个platform通常包含相同的芯片厂商，比如AMD的cpu和gpu，由结构体cl_platform_id表示
+        定义platform的目的是，相同的芯片厂商之间的设备交互可能会提供更优化的性能，比如amd的gpu和cpu之间传输数据，可能有优化的方法
     一个device代表一个platform上的设备，由结构体cl_device_id表示
-    一个context可以包含几个device，但是只能是同一个platform上的不同device，不能包含不同platform上的device，比如几个A卡可以运行在同一个context下，但是AN卡不能在同一个context
+    一个context可以包含几个device，但是只能是同一个platform上的不同device，不能包含不同platform上的device，比如几个A卡可以运行在同一个context下（因为是同一个platform），但是A卡和N卡不能在同一个context
+        一个context决定了什么设备之间可以传输数据，同一个context的设备才能互相传输数据
         context由结构体cl_context表示
     一个program是kernel的容器，由结构体cl_program表示
     一个kernel是编译好的源代码，由结构体cl_kernel表示
@@ -146,6 +162,9 @@
                 CL_KERNEL_LOCAL_MEM_SIZE                    cl_ulong    返回这个kernel函数执行时所分配的local_memory大小 
                 CL_KERNEL_PRIVATE_MEM_SIZE                  cl_ulong    返回这个kernel函数执行时所分配的private_memory大小
 
+    cl_int clFlush(cl_command_queue command_queue)
+    有时可能入队的任务并不会马上开始执行，所以使用这个函数强制让入队的任务开始执行
+    这个函数并不阻塞，会立刻返回
 
     clFinish(cl_command_queue queue)
     阻塞函数，等待queue中的所有command执行完毕才返回
@@ -160,6 +179,11 @@
             指向复杂类型的数据的指针，比如指向cl_mem的指针
             指向图像数据的指针
             NULL
+        这个函数也适用于创建内核的__local参数，此时需要将value指针设置为NULL，比如
+            clSetKernelArg(kernel, 0, 16*sizeof(float), NULL);
+            
+            /*kernel*/
+            __kernel void process(__local float* nums){}    //此时nums是一个指向local memory的指针
     
     cl_mem clCreateBuffer(cl_context context, cl_mem_flags options, size_t size, void* host_ptr, cl_int* err)
         options是一个枚举值，指定device对这块内存区域的访问权限（注意不是host端），可选值：
@@ -167,9 +191,15 @@
             CL_MEM_WRITE_ONLY   
             CL_MEM_READ_ONLY    
             CL_MEM_USE_HOST_PTR     device直接访问host_ptr所指向的host端内存区域
-            CL_MEM_COPY_HOST_PTR    device复制host_ptr所指向的host端内存区域
+            CL_MEM_COPY_HOST_PTR    在device上分配一片内存区域，并将host_ptr所指向的host端内存区域赋值到device上，所以不需要再调用clEnqueueWriteBuffer()来拷贝数据到device
+                cl_mem input=clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, size, host_ptr, NULL);
+                相当于：
+                cl_mem input=clCreateBuffer(context, CL_MEM_READ_ONLY, size, NULL, NULL);
+                clEnqueueWriteBuffer(queue, input, CL_TRUE, 0, size, host_ptr, 0, NULL, NULL);
             CL_MEM_ALLOC_HOST_PTR   指定将内存分配到host_ptr的区域必须对host端可见，必须与CL_MEM_COPY_HOST_PTR一起使用（罕见）
         在CL_MEM_WRITE_ONLY的情况下host_ptr可以设置成NULL，表明丢弃device输出的数据，不在host端分配内存
+        通常options参数是前三个选项和后三个选项中各选择一个，然后取逻辑或
+
 
     当一个kernel需要另一个kernel的一部分数据的时候，可以创建一个subbuffer
     cl_mem clCreateSubBuffer(cl_mem buffer, cl_mem_flags flags, cl_buffer_create_type type, const void* info, cl_int* error)
@@ -182,6 +212,12 @@
                 size_t size;    //subbuffer的大小
             } cl_buffer_region;
     
+    创建了内存区域后就需要从host端读取或者拷贝数据到device上
+        clEnqueueReadBuffer(cl_command_queue, cl_mem buffer, cl_bool blocking, size_t offset, size_t data_size, void* ptr, cl_uint num_events, const cl_event* wait_list, cl_event* event)
+            host<-device，host端读取device上的内存
+        clEnqueueWriteBuffer(cl_command_queue, cl_mem buffer, cl_bool blocking, size_t offset, size_t data_size, const void* ptr, cl_uint num_events, const cl_event* wait_list, cl_event* event)
+            host->device，host端写入device上的内存
+        
     传输图片数据：
         图片数据的内存也是由cl_mem结构体表示，图片分为2D结构和3D结构
             cl_mem clCreateImage2D(cl_context context, cl_mem_flags options, const cl_image_format* format, size_t width, size_t height, size_t row_pitch, void* data, cl_int* err)
@@ -405,3 +441,18 @@
         {
             return x + 4;
         });
+8.AMD
+    VGPRs: Number of general-purpose vector registers used by the kernel
+    SGPRs: Number of general-purpose scalar registers used by the kernel
+    GCN架构上，一个compute unit包含：
+        64KB local memory，每个work-group最大可分配32KB local memory
+        16KB L1 缓存
+        寄存器
+        4*SIMD，每个SIMD包含：
+            16*processing element
+    同一个work group里的一组work-item会被分配到一个compute unit上执行，称为wavefront，wavefront内的work item对不同的数据执行相同的指令
+    wavefront最多包含64个work-item，所以work group的大小最好是64的整数倍，这样就不会有闲置的wavefront空间被浪费
+
+9.Nvdia
+    在Nvidia平台上，OpenCL的kernel代码会被编译成PTX（parallel thread execution）
+    

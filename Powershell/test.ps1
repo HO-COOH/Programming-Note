@@ -1,12 +1,2 @@
-class Base 
-{
-    [int]$a
-    Base([int]$num)
-    {
-        $this.a = $num
-    }
-}
-class Derived 
-{
-    Derived():Base(100) {} 
-}
+for($i=0; $i -le 100; ++$i)
+{ Start-Process(.\test.ps1) }
