@@ -1,0 +1,1 @@
+git log --pretty=format:"Author : %an %nDate/Time :  %aD%nCommit : %s%n%n" > log.txt

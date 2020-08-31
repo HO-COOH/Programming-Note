@@ -70,6 +70,7 @@ ___
 <details>
 <summary>Click for some code.</summary>
 here it is
+
 ```cpp
 puts("Hello world");
 ```

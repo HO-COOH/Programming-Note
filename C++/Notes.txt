@@ -43,8 +43,12 @@
                         再取*a的值，得到**a，即取(指向这个数组第一个元素的)指针的值，得到这个整数
                         所以a的类型是int **
                         a[0]是a[3][10]的第一个元素，这个元素是一个10个整数的数组，所以a[0]也是这整个10整数数组，所以a[0]与*a相同
-
-
+        3.多维数组->一维的索引
+            设N维数组arr[s(N-1)][s(N-2)]...[s0]以行主序的方式存储在一个一维的连续内存区域中
+            则元素arr[i(N-1)][i(N-2)]...[i0]的地址是：
+                arr+sum(k=n-1 -> 0) i(k) * [product(j=n-2 -> 0) s(j)] + i0
+            例如3维数组arr[10][20][30],则a[i][j][k]的地址是
+                i*(20*30)+j*30+k
     main函数的完整版是：
         int main(int argc, char *argv[])    //运行程序时，不带其他任何参数，argc=1，agrv[0]是程序本身的绝对路径
     //argv是一个指针数组，argv[i]是指向第i+1个参数字符数组的首地址
@@ -877,6 +881,20 @@ cctype函数
                 }
         只能通过成员函数重载的运算符：
             = 赋值运算符 () 函数调用运算符  [] 下标运算符  -> 指针访问类成员运算符
+        由于new和delete也是运算符（注意不是函数），所以它们也可以被重载
+            定义：
+                void* operator new(size_t size)
+                {
+                    std::cerr << "Allocating: " << size << " bytes.\n";
+                    return malloc(size);
+                }
+                void operator delete(void* ptr)
+                {
+                    std::cerr << "Deleting: " << pt << '\n';
+                    free(pt);
+                }
+            当new和delete在类内定义重载时，将只对类中的函数调用new和delete起作用
+            当new和delete在类外（全局范围）重载时，对所有的new和delete都起作用
     友元函数：可以访问类的私有成员的函数
         在普通函数声明（函数原型）的类型前加friend，放在类声明中
         定义与普通函数相同，不加friend，也不加名称空间解析运算符::
@@ -962,16 +980,26 @@ cctype函数
         如果声明的位域的位数大于变量的类型所需的位数，这个变量所能存储的值的范围不会扩大，但是占用的空间等于位域所声明的空间，未使用的位成为空缺（padding）
         由于位域并不一定从整数字节起始，所以位域不能使用指针和非常量的引用，位域也不能是静态成员
         在C++20前，位域不能使用默认成员初始化器（类内初始化）来初始化，C++20后可以使用类内复制初始化或列表初始化
+    POD（plain old data）：
+        trivial类型
+            trivial类型是以下类型之一：
+                是内置的标量类型
+                使用编译器生成的构造函数（要么没有显式定义、要����在类内使用=default定义）、没有虚函数、没有虚基类、没有使用默认构造的
+                是一个trivial类型的数组类型
+            所有与C兼容的类型都是trivial类型
+        
+        POD是指可以用memcpy()来拷贝的一类数据类型，这些类型使得更容易跨语言使用
+
 继承：
     公有继承：从base基类公有继承得到derived派生类，声名：
         class derived:public base {...} 
         派生类需要自己的构造函数：
-            由于必须首先创造基类，而派生类又不能直接访问基类的private成员，所以这个构造函数应在成员初始化列表中调用基类的构造函数来构造其基类的部分
+            由于必须首先创造基类，而派生类又不能直接访问基类的private成员，所以这个构造函数应在成员初始化列表中调用基类的构造函数来构造其�����类的部分
                     若没有显式调用基类构造函数，将调用基类的默认构造函数
                     如果基类有可以无参调用的构造函数（构造函数有带默认值的参数或构造函数无参），则可以不用显式调用
                 若使用基类的一个对象作为基类构造函数来构造基类，则使用基类的复制构造函数
                     若没有定义复制构造函数，则使用默认复制构造函数（按成员赋值）
-                    使用基类的复制构造函数的派生类构造函数定义：derived::derived(... ,const base & obj) : base(obj) {...}
+                    使用基类的复制构���������函数的派生类构造函数定义：derived::derived(... ,const base & obj) : base(obj) {...}
             然后派生类构造函数再初始化新增的成员
         派生类的析构函数：在释放对象时，C++自动先调用派生类的析构函数，然后调用基类的析构函数，可以都使用默认析构函数，即不显式定义析构函数
             如果派生类显式定义析构函数，也会在调用完派生类析构函数后自动调用基类的析构函数（所以注意不要delete两次）
@@ -1812,7 +1840,7 @@ STL
                         return a/2+b/2;
                     }
         复制：        
-            copy()方法需要三个迭代器参数，第一和第二个迭代器参数指向源的范围（包括第一参数，而不包括第二参数），第三个迭代器参数指向目的地
+            copy()方法需要三个迭代器参数，第一和第二个迭代������指向源的范围（包括第一参数，而不包括第二参数），第三个迭代器参数指向目的地
             copy_backward()
         裸内存：
             尚未构造内部元素的容器（只定义了大小，用默认构造函数构造内部元素），可以就地构造增加性能
@@ -2178,8 +2206,33 @@ string类：C++标准类
         std::this_thread::sleep_for(duration<type> t)   //参数是一个时间段
         
 <random>C++11
+    -1.梅森素数
+        梅森数是指可以用(2^p - 1)，其中p为素数，的形式表示的数，如果这个数也是一个素数，则称为梅森素数，否则称为梅森合数
+        梅森素数的前几项：
+            2^2 - 1     3
+            2^3 - 1     7
+            2^5 - 1     31
+            2^7 - 1     127     注意2^11 - 1=2047并不是素数，所以并不是指数p为素数时2^p-1就一定是素数
+            2^13 -1     8191      
+        如果一个数恰好等于它的因子之和，则称为完美数
+        完美数的前几项：
+            6=1+2+3         //出现梅森数3
+            28=1+2+4+7+14   //出现梅森数7
+            496=1+2+4+8+16+31+62+124+248    //出现梅森数31
+        梅森素数与完美数之间存在关联，即每个完美数的因子和序列中一定存在一个梅森素数，而且完美数等于梅森素数乘以2^p
+        即2^(p-1) * (2^p - 1)是一个完美数
+            p   2^p - 1     2^(p-1)     完美数
+            2   3     *     2     =     6
+            3   7     *     4     =     28
+            5   31    *     16    =     496
+            7   127   *     64    =     8128
+            ...
+    0.Mersenne Twister
+        Mersenne Twister这个名字来自周期长度通常取Mersenne质数这样一个事实
+
     1.随机数生成引擎 random engine
-        随机数引擎是一种状态机，状态决定所生成的随机数，所以如果状态一样，生成的随机数也一样
+        伪随机数是用确定性的算法产生的，具有随机数的统计特性，但并不是真正的随机数，在初值（种子）确定时，伪随机数的序列也是确定的
+        随机数引擎是一种状态机，状态决定所生成的随机数，所以如果状态一样，生成的随机数也一样，这样产生的随机数就是伪随机数
         随机数引擎生成的随机数的最小和最大值不能更改
         std::default_random_engine
         std::mt19937（推荐）
@@ -2204,6 +2257,8 @@ string类：C++标准类
                 unsigned int min()
                 unsigned int max()
     3.随机数分配器
+        每个随机数分配器类都定义了一个param_type的类型别名和一个param_type .param()成员函数来返回定义当前这个分布的参数
+        这个函数的返回值与对应的分配器的构造函数类型相同，所以可以用来直接构造一个新的同类型的随机数分配器
         随机均匀分布：
             std::uniform_int_distribution<int>  //int是缺省模板参数，C++17后可省略<int>
                 构造函数：接收两个整数参数int a, int b，产生范围是[a,b]的随机分布的整数
@@ -2212,10 +2267,27 @@ string类：C++标准类
             std::uniform_real_distribution<double>
                 构造函数：接收两个double参数double a, double b，产生范围是[a,b)的随机分布小数
         正态分布：
+            std::normal_distribution
+            std::lognormal_distribution
+            std::chi_squared_distribution
+            std::cauchy_distribution
+            std::fisher_f_distribution
+            std::student_t_distribution
         泊松分布：
+            std::poisson_distribution
+            std::exponential_distribution
+            std::gamma_distribution
+            std::weibull_distribution
+            std::extreme_value_distribution
         伯努利分布：
+            std::bernoulli_distribution
+            std::binomial_distribution
+            std::negative_binomial_distribution
+            std::geometric_distribution
         采样分布：
-            
+            std::discrete_distribution
+            std::piecewise_constant_distribution
+            std::piecewise_linear_distribution
 范围for循环
     double a[5]={...};
     for(double x:a) {...}
@@ -2702,12 +2774,12 @@ C++11:
             T const &value() const &;
             T&& value() &&;
         };
-    lambda表达式：在需要函数指针、函数符的地方可以用lambda函数，有点类似于内联函数，在用lambda函数的地方需要完整定义整个函数
+    lambda表达式：在需要函��指针、函数符的地方可以用lambda函数，有点类似于内联函数，在用lambda函数的地方需要完整定义整个函数
         lambda函数的一般形式的定义：中括号 [] (参数列表) {函数体}
             [](int a) {return a % 3 == 0;}  //一个用于判断参数是否可以被3整除的lambda函数，将返回一个布尔值
         当lambda表达式没有参数时，可以省略圆括号()
             []{std::cout<<"Print in lambda\n";}
-        可以用auto关键字自动判断其类型并赋值给一个标识符作为别名
+        可以用auto关键字自动判断其类型并赋值给一个标识符作为���名
         lambda函数的真正类型是：[](paraType)->returnType
         例如可以将上面的lambda函数赋值给mod_3，使之成为函数的别名
             auto mod_3=[](int a ){return a % 3 == 0;};
@@ -3273,7 +3345,185 @@ C++11:
                         //clean up
                     }
                 }
+    8.SIMD（single instruction, multiple data）
+        内存对齐
+            size_t alignof(Type)
+                返回Type类型的内存对齐到多少字节
+                如果Type类型是一个引用类型，返回被引用类型的对齐数
+                如果是一个数组类型，返回数组元素的对齐数
+            alignas()
+                在类型声明的struct和class的关键字后、新变量的定义之前可以定义alignas(整数)关键字，来确保这个类型的对象只能分配到以整数内存对齐的内存区域中，如：
+                        struct alignas(16) SomeClass {/*...*/};要求SomeClass对象必须分配到以16字节对齐的内存区域
+                        alignas(128) char cacheLine[128];要求cacheLine变量必须创建在以128字节对齐的内存区域
+                alignas()的整数只能是2的幂，即2，4，8,16...
+                alignas()有三种形式：
+                    alignas(整数表达式)
+                    alignas(Type) 相当于alignas(alignof(Type))
+                    alignas(pack...)
+            如果要检测一个变量是否满足一个类型的对齐要求，可以取这个变量的地址（转换到一个整数类型），然后与alignof()求模运算，结果为0则对齐
+                (size_t)&var % alignof(Type) == 0
+        包含头文件：
+            <xmmintrin.h>: SSE, operations on 4 single precision floating point numbers (float).
+            <emmintrin.h>: SSE 2, operations on integers and on 2 double precision floating point numbers (double).
+            <pmmintrin.h>: SSE 3, horizontal operations on SIMD registers.
+            <tmmintrin.h>: SSSE 3, additional instructions.
+            <smmintrin.h>: SSE 4.1, dot product and many operations on integers
+            <nmmintrin.h>: SSE 4.2, additional instructions.
+            <immintrin.h>: AVX, operations on integers, 8 float or 4 double.
+            每个后面的都包含了前面的，所以只需要包含最高所需支持的SIMD指令的一个头文件
+        命名约定：
+            对于操作浮点类型的函数，命名形式通常为： _mm(XXX)_NAME_PT
+                XXX表示向量宽度，128位宽度通常省略不写
+                NAME表示函数的作用
+                P表示操作模式，当操作一整个向量时取p，当操作一个元素时取s
+                T表示浮点数的精度，当操作double时取d，当操作float时取s
+            对于操作整数类型的函数，命名形式通常为： _mm(XXX)_NAME_epSYY
+                XXX和NAME同上
+                S表示整数是否有符号，有符号取i，无符号取u
+                YY表示整数元素的位数
+        SSE1:向量128位宽，支持单精度浮点数的向量化操作，数据类型为__m128，CPU有8个用于存储128位向量的寄存器，命名为xmm0~xmm7
+            初始化
+                __m128 _mm_setzero_ps()全零初始化
+                __m128 _mm_set_ps(float num3, float num2, float num1, float num0)将向量初始化为{num0, num1, num2, num3}
+                __m128 _mm_setr_ps(float num3, float num2, float num1, float num0)将向量初始化为{num3, num2, num1, num0}
+                __m128 _mm_set_ps1(float num), __m128 _mm_set1_ps(float num) 这两个函数完全相同，都将向量初始化为{num, num, num, num}
+                __m128 _mm_set_ss(float num)将向量初始化为{num 0.0f}
+            读取
+                __m128 _mm_load_ps(float const* addr)将addr指针所指向的浮点数数组载入到一个128位宽的向量，必须对齐到16字节
+                __m128 _mm_loadu_ps(float const* addr)addr指针非对齐的版本
+                __m128 _mm_loadr_ps(float const* addr)倒序载入的版本，即将向量初始化为{addr[3], addr[2], addr[1], addr[0]}，addr必须对齐到16字节
+                __m128 _mm_load_ps1(float const* addr), __m128 _mm_load1_ps(float const* addr)将addr指针所指向的一个浮点数重复4次载入到128位宽的向量
+                __m128 _mm_load_ss(float const* addr)将addr指针所指向的一个浮点数载入到目标128位宽向量的低32位，高位置0
+            算术
+                加
+                    __m128 _mm_add_ps(__m128 a, __m128 b) -> a+b
+                    __m128 _mm_add_ss(__m128 a, __m128 b) -> {a[0]+b[0], a[1], a[2], a[3]}
 
+                减
+                    __m128 _mm_sub_ps(__m128 a, __m128 b) -> a-b
+                    __m128 _mm_sub_ss(__m128 a, __m128 b) -> {a[0]-b[0], a[1], a[2], a[3]}
+                乘 
+                    __m128 _mm_mul_ps(__m128 a, __m128 b) -> a*b
+                    __m128 _mm_mul_ss(__m128 a, __m128 b) -> {a[0]*b[0], a[1], a[2], a[3]}
+                除
+                    __m128 _mm_div_ps(__m128 a, __m128 b) -> a/b
+                    __m128 _mm_div_ss(__m128 a, __m128 b) -> {a[0]/b[0], a[1], a[2], a[3]}
+                其他
+                    __m128 _mm_rcp_ps(_mm128 a) -> a各个元素的倒数向量
+                    __m128 _mm_rcp_ss(_mm128 a) -> {1.0f/a[0], a[1], a[2], a[3]}
+
+                    __m128 _mm_sqrt_ps(__m128 a) -> a各个元素的平方根向量
+                    __m128 _mm_sqrt_ss(__m128 a) -> {sqrt(a[0]), a[1], a[2], a[3]}
+
+                    __m128 _mm_rsqrt_ps(__m128 a) -> a各个元素的平方根的倒数向量
+                    __m128 _mm_rsqrt_ss(__m128 a) -> {1.0f/sqrt(a[0]), a[1], a[2], a[3]}
+            逻辑
+                __m128 _mm_and_ps(__m128 a, __m128 b) -> 按位与a&b  
+                __m128 _mm_or_ps(__m128 a, __m128 b) -> 按位或a|b
+                __m128 _mm_xor_ps(__m128 a, __m128 b) -> 按位异或 a^b 
+                __m128 _mm_andnot_ps(__m128 a, __m128 b) -> 先将a按位取反，再与b按位与 ~a & b
+
+        SSE2:在SSE1的基础上增加了对双精度浮点数（128位也就是两个双精度浮点数）和整数的支持，数据类型分别为__m128d,__m128i
+            AMD在发明64位架构后将SSE2指令集包含了进去，所以每个64位CPU都至少支持SSE1和SSE2，同时又增加了8个128位向量寄存器，命名为xmm8~xmm15
+            初始化：
+                __m128d _mm_setzero_pd()全零初始化双精度浮点数向量
+                __m128d _mm_set_pd(double num1, double num2) 将向量从低位到高位设置为{num0, num1}
+                __m128d _mm_setr_pd(double num1, double num2) 将向量从低位到高位设置为{num1, num0}
+                __m128d _mm_set_pd1(double num) __m128d __mm_set1_pd(double num)将向量初始化为{num, num}
+                __m128d _mm_set_sd(double num)将向量初始化为{num, 0.0}
+
+                __m128i _mm_setzero_si128()全零初始化整数向量
+                __m128i _mm_set_epi8(char e15, char e14, char e13, char e12, char e11, char e10, char e9, char e8, char e7, char e6, char e5, char e4, char e3, char e2, char e1, char e0) -> {e0, e1, ..., e15}
+                __m128i _mm_setr_epi8(char e15, char e14, char e13, char e12, char e11, char e10, char e9, char e8, char e7, char e6, char e5, char e4, char e3, char e2, char e1, char e0)
+                __m128i _mm_set_epi16(short e7, short e6, short e5, short e4, short e3, short e2, short e1, short e0) -> {e0, e1, ..., e7}
+                __m128i _mm_setr_epi16(short e7, short e6, short e5, short e4, short e3, short e2, short e1, short e0)
+                __m128i _mm_set_epi32(int e3, int e2, int e1, int e0) -> {e0, e1, e2, e3}
+                __m128i _mm_setr_epi32(int e3, int e2, int e1, int e0)
+                __m128i _mm_set_epi64(__m64 e1, __m64 e0) __m128i _mm_set_epi64x(__int64 e1, __int64 e0) -> {e0, e1}
+                __m128i _mm_setr_epi64(__m64 e1, __m64 e0)
+
+            读取
+                __m128d _mm_load_pd(double const* addr) 将addr指针所指向的浮点数数组载入到一个128位宽的向量，必须对齐到16字节
+                __m128d _mm_loadu_pd(double const* addr)非对齐版本
+                __m128d _mm_loadr_pd(double const* addr)倒序载入版本，即将向量初始化为{addr[1], addr[0]}，addr必须对齐到16字节
+                __m128d _mm_loadl_pd(double const* addr)讲addr所指向的一个double重复填入新向量，即初始化为{*addr, *addr}
+                __m128d _mm_loadh_pd(__m128d a, double const* addr)将addr所指向的一个double存入新向量的高64位，复制a的低64位，即初始化为{a[0], *addr}
+                
+                __m128i _mm_loadu_si32(void const* addr)将addr指针所指向的32位整形数载入到128位宽的向量，高96位置0
+                __m128i _mm_load_si128(__m128i const* addr)将addr指针所指向的（任何类型的）整形数组载入到128位宽的向量，必须对齐到16字节
+                __m128i _mm_loadu_si128(__m128i const* addr)非对齐版本
+                __m128i _mm_loadl_epi64(__m128i const& addr)将addr指针所指向的（任何类型的）整形数组载入到向量的低64位，高64位置0
+            算术
+                加
+                    __m128d _mm_add_pd(__m128d a, __m128d b) -> a+b
+                    __m128d _mm_add_sd(__m128d a, __m128d b) -> {a[0]+b[0], a[1]}
+                减
+                    __m128d _mm_sub_pd (__m128d a, __m128d b) -> a-b
+                    
+                乘
+                除
+                其他
+                    __m128d _mm_sqrt_pd(__m128d a) -> a各个元素的平方根向量
+                    __m128d _mm_sqrt_sd(__m128d a, __m128d b) -> {sqrt(b[0]), a[1]}
+
+            逻辑
+                __m128d _mm_and_pd(__m128d a, __m128d b) -> 按位与a&b
+                __m128d _mm_or_pd(__m128d a, __m128d b) -> 按位或a|b
+                __m128d _mm_xor_pd(__m128d a, __m128d b) -> 按位异或a^b
+                __m128d _mm_andnot_pd(__m128d a, __m128d b) -> 先将a按位取反，再与b按位与 ~a & b
+
+                __m128i _mm_and_si128(__m128i a, __m128i b)
+                __m128i _mm_and_si128(__m128i a, __m128i b)
+                __m128i _mm_xor_si128(__m128i a, __m128i b)
+                __m128i _mm_andnot_si128(__m128i a, __m128i b)
+
+
+        AVX:向量256位宽，支持浮点数的向量化操作指令集，CPU有16个256位宽的寄存器命名为zmm0~zmm15，它们的低128位与xmm0~xmm15公用   
+            加
+                __m256 _mm256_add_ps (__m256 a, __m256 b)   单精度浮点数加法
+                __m256d _mm256_add_pd (__m256d a, __m256d b)双精度浮点数加法
+
+                __m256 _mm256_hadd_ps (__m256 a, __m256 b)
+                __m256d _mm256_hadd_pd (__m256d a, __m256d b)
+            减
+                __m256 _mm256_sub_ps (__m256 a, __m256 b)
+                __m256d _mm256_sub_pd (__m256d a, __m256d b)
+            乘
+                __m256 _mm256_mul_ps (__m256 a, __m256 b)
+                __m256d _mm256_mul_pd (__m256d a, __m256d b)
+            除
+                __m256 _mm256_div_ps (__m256 a, __m256 b)
+                __m256d _mm256_div_pd (__m256d a, __m256d b)
+            比较
+                
+            其他
+                __m256 _mm256_addsub_ps (__m256 a, __m256 b) 偶数序号的对应元素相减，奇数序号的对应元素相加
+                __m256d _mm256_addsub_pd (__m256d a, __m256d b)
+            位操作
+
+
+
+        AVX2:向量256位宽，支持整数的向量化操作指令集
+            加
+                __m256i _mm256_add_epi8(__m256i a, __m256i b)       __m256i _m256_adds_epi8(__m256i a, __m256i b)       __m256i _m256_adds_epu8(__m256i a, __m256i b)
+                __m256i _mm256_add_epi16(__m256i a, __m256i b)      __m256i _m256_adds_epi16(__m256i a, __m256i b)      __m256i _m256_adds_epu16(__m256i a, __m256i b)
+                __m256i _mm256_add_epi32(__m256i a, __m256i b)
+                __m256i _mm256_add_epi64(__m256i a, __m256i b)
+
+            减
+                __m256i _mm256_sub_epi8 (__m256i a, __m256i b)      __m256i _mm256_subs_epi8 (__m256i a, __m256i b)     __m256i _mm256_subs_epu8 (__m256i a, __m256i b)
+                __m256i _mm256_sub_epi16 (__m256i a, __m256i b)     __m256i _mm256_subs_epi16 (__m256i a, __m256i b)    __m256i _mm256_subs_epu16 (__m256i a, __m256i b)
+                __m256i _mm256_sub_epi32 (__m256i a, __m256i b)     
+                __m256i _mm256_sub_epi64 (__m256i a, __m256i b)
+            乘
+
+            除
+            绝对值：
+                __m256i _mm256_abs_epi8(__m256i a)
+                __m256i _mm256_abs_epi16(__m256i a)
+                __m256i _mm256_abs_epi32(__m256i a)
+            其他：
+        AVX512:向量512位宽，只有少数intel CPU支持
 C++11 正则表达式
     #include <regex>
     1.基础

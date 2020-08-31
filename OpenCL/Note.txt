@@ -455,4 +455,15 @@
 
 9.Nvdia
     在Nvidia平台上，OpenCL的kernel代码会被编译成PTX（parallel thread execution）
-    
+10.异常
+    在C++绑定中，要启用异常机制需要在#include <CL/cl2.hpp>前加一个宏定义#define __CL_ENABLE_EXCEPTIONS
+    之后便可在程序中catch cl::Error异常
+11.Spir-v
+    SPIR: standard portable intermediate representation
+    目的是
+        1.为GPU使用的shader program和kernel提供统一化可移植的二进制表示
+        2.支持OpenCL C/C++ 内核，GLSL，Vulkan
+    在SPIR-V之前，需要将kernel内核明文源代码植入发布的程序，而且每次运行需要重新编译kernel，不同的平台实现可能对标准的支持有细微差别，导致kernel无法成功编译
+    在SPIR-V之后，只需将SPIR-V代码植入发布的程序，降低编译kernel的耗时
+    与OpenCL 2.1一起推出，kernel支持C++14
+    clCreateProgramWithIL()
