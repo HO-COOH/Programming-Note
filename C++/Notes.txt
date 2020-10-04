@@ -253,8 +253,21 @@ atoi()  将nptr所指的字符串的开头部分转化为相应的整数，长�
             绝对值第二小的规约数：(1+2^-23) * 2^(1-127) = (1+2^-23)*2^-126
             这两个数之间的差为：2^-23 * 2^-126 = 2^-149，这个差值远小于绝对值最小的非规约数与0的差值，所以为了填补规约数到非规约数的空隙，就使用非规约数
             非规约数相当于填补了从0 ~ 2^-126之间的范围
+19.Unix多进程
+    #include<unistd.h>
+    几个头文件
+        sys/shm.h   shared memory
+        sys/ipc.h   inter-process communication
+        sys/msg.h   message queue
+        sys/sem.h   semaphore
+        sys/mman.h  memory locking/unlocking
 C++
 0.编译器相关
+    cc, c++
+        在linux操作系统上cc指向系统的默认C编译器，c++指向系统的默认C++编译器
+        /usr/bin/cc -> /etc/alternatives/cc -> /usr/bin/gcc
+        /usr/bin/c++ -> /etc/alternatives/c++ -> /usr/bin/g++
+        g++编译C++程序时默认链接libstdc++，gcc不会
     宏
         每一个#if宏都必须以一个#endif结束
             #if
@@ -277,13 +290,15 @@ C++
                 #include <unistd.h>
             #endif
     编译选项
-        编译期静态分析
-            gcc/Clang：
-                -Wall
-                -w 取消所有警告
-            MSVC：
-        性能分析
-
+        gcc/Clang：
+            -Wall
+            -w      取消所有警告
+            -pg     启用性能分析，通常应该与-g一起使用
+            -g      保留debug符号信息
+            -fconstexpr-depth=N         指定constexpr函数递归调用的层数为N，标准规定了最小值是512，即编译器至少要支持512层递归深度
+            -fconstexpr-loop-limit=N    指定constexpr函数中的循环的循环次数的最大值来避免死循环，默认值是262144(1<<18)
+            -fconstexpr-ops-limit=N     指定constexpr函数中的操作数（执行的语句的条数）的最大值来避免编译时间过长（与-fconstexpr-loop-limit共同起作用），默认值是33554432(1<<25)
+        MSVC：
 
         代码生成
             中间产物：
@@ -308,6 +323,30 @@ C++
                     if(MSVC)
                         add_definitions(/arch:AVX)
                     endif()
+    性能分析
+        valgrind
+            --tool=...
+                所使用的工具集，包含：
+                memcheck
+                cachegrind 分析CPU cache的使用情况，包含cache hit/miss数据
+                    cachegrind通过模拟一个CPU的缓存结构来运行程序，它模拟一个一级指令缓存I1和一级数据缓存D1，和一个统一二级缓存L2
+                    现代CPU常常包含一个三级缓存，由于三级缓存的使用情况通常对性能有很大影响，所以cachegrind模拟一级I1、D1和最后一级（三级）缓存LL
+                    cachegrind会统计这些信息：
+                        指令情况
+                            I refs：总共执行的指令数
+                            I1 misses/I1 miss rate   一级指令缓存
+                            LLi misses/LLi miss rate 三级缓存的指令部分
+                        数据情况
+                            D ref：总数据读写，其中rd表示读，wr表示写
+                            D1 misses/D1 miss rate
+                            LLd misses/LLd miss rate
+                        三级缓存的总情况
+                            LL ref：对三级缓存的总读取和写入，其中有一部分读取属于指令读取（指令是只读的）
+                            LL misses/LL miss rate
+                        分支判断情况（分支判断默认不启用，如需启用，要在--tool=cachegrind后加上--branch-sim=yes命令）
+
+                cg_annotate
+
 
 1. 字符串输入
     cin.getline(char *s, int n);//读取一行，最多读取n-1个字符拷贝给s所指的字符串，并添加'\0'，丢弃用户输入的换行符
@@ -650,6 +689,10 @@ cctype函数
         3.需要推导的模板参数必须连续位于模板参数列表的尾部，中间不能有不可推导的模板参数，如：
             template<typename T1, typename T2, typename T3>
             double func(T1 a, T2 b) {...}   //这里T1 T2是可推导的模板参数，但不位于模板参数列表的尾部，所以不能自动推导
+        4.带有默认值的函数形参的类型在使用其默认值的情况下不会自动推导，所以也应该给函数形参的类型加上默认模板参数
+            template<typename T1, typename T2>
+            void func(T1 a, T2 b=" "){...} 
+            func(1);//这里T2不会被自动推导为const char*，所以编译错误
     避免模板参数自动推导：(C++20)
         C++20标准库定义了一个模板结构体std::type_identity
             template<typename T>
@@ -881,6 +924,9 @@ cctype函数
                 }
         只能通过成员函数重载的运算符：
             = 赋值运算符 () 函数调用运算符  [] 下标运算符  -> 指针访问类成员运算符
+        重载的运算符的操作数中至少有一个必须是自定义类型
+            比如试图定义一个==运算符重载来比较两个C字符串的函数不能编译
+                bool operator==(const char* lhs, const char* rhs) {return strcmp(lhs, rhs);} //ERROR: must have an argument of class or enumerated type
         由于new和delete也是运算符（注意不是函数），所以它们也可以被重载
             定义：
                 void* operator new(size_t size)
@@ -935,7 +981,7 @@ cctype函数
                 {
                     className temp(object); //先构造一个object的副本temp
                     swap(*this, temp);  //将这个对象与temp对象交换
-                    return *this;   //返回交换过的这个对象的引用，由于temp的自动变量，所以自动销毁，这个方法也可以处理自我赋值的问题
+                    return *this;   //返回交����过的这个对象的引用，由于temp的自动变量，所以自动销毁，这个方法也可以处理自我赋值的问题
                 }
             方法3：可以将赋值运算符的形参声明为按值传递，而不是按引用传递，这样可以将方法2中临时对象temp的构造也省去
             className & className::operator=(className object)
@@ -976,7 +1022,7 @@ cctype函数
             变量名:位数; //声明一个具名的位域
             变量类型:位数;    //声明一个匿名的位域
         位域的类型只能是整数或枚举类型
-        将匿名的位域声明为0位大小将使得下一个位域从整数字节起始，而不是从相邻的位起始
+        将匿名的位域声明为0位大小将使得下一个位域从整数字节起始，而不是从相邻的位起���
         如果声明的位域的位数大于变量的类型所需的位数，这个变量所能存储的值的范围不会扩大，但是占用的空间等于位域所声明的空间，未使用的位成为空缺（padding）
         由于位域并不一定从整数字节起始，所以位域不能使用指针和非常量的引用，位域也不能是静态成员
         在C++20前，位域不能使用默认成员初始化器（类内初始化）来初始化，C++20后可以使用类内复制初始化或列表初始化
@@ -1213,6 +1259,14 @@ cctype函数
                     }
         定义模板类对象：className <typeName, 3> object; //定义了一个模板类className的对象object，其中className类中Type类型替换为typeName，所有的n替换为3
         其中n是非类型参数，将代替className模板类中n的值
+        非类型模板参数只能是以下类型：
+            整数类型
+            指向静态的对象或函数的指针或左值引用
+            指向成员函数或静态成员对象的指针
+            枚举类型
+            std::nullptr_t
+            浮点数类型（C++20）
+            字面值类
     多个类型参数：模板可以包含多个类型参数（特别是需要在一个类中包含多种不同类型的成员时）
         template <class T1, class T2>
         class className {...}
@@ -1289,7 +1343,174 @@ cctype函数
     模板别名：可以为模板具体化（指定了类型参数的模板类的类名）指定别名
         旧方法使用typedef：typedef className<type> alias;   //将alias作为className的type类型的具体化的别名
         C++11新方法：using alias=className<type>;   //将alias作为className的type类型的具体化的别名
-    
+    CRTP（Curiously recurring template pattern）
+        是一种将派生类作为模板基类的模板参数，从而利用模板的方法来使得可以在基类中调用和访问派生类的成员，而且不会带来运行期开销
+        通常的形式：
+            template<class T>
+            class Base
+            {
+                //Base类中的成员函数在是Derived类的友元的情况下可以用来访问Derived类中的成员和方法
+                void interface()
+                {
+                    static_cast<T*>(this)->implementation();
+                    //或者
+                    static_cast<T&>(*this).implementation();
+                }
+            };
+
+            class Derived:public Base<Derived>
+            {
+                friend Base<Derived>;
+            private:
+                void implementation()
+                {
+                    //这里implementation()函数既可以是public也可以是private，如果是private则需将Base<Derived>声明为友元类
+                }
+            };
+        而且由于Base是类模板，所以在Base类中使用Derived类的成员和方法前无需前向声明Derived类，只需要实际上Derived类中包含相关的实现即可
+    模板检测
+        #include <experimental/type_traits>
+        C++ TS2中定义了一个类型别名std::experimental::is_detected，配合decltype和std::declval可以用来检测一个类型是否包含相应的成员函数
+        比如要检测一个类型是否包含一个成员函数名叫get()
+            template<typename T>
+            using supports_get_T=decltype(std::declval<T>().get()); //一定需要这个类型别名，否则会导致is_detected模板参数错误
+            template<typename T>
+            using supports_get=std::experimental::is_detected<supports_get_T, T>;
+            int main()
+            {
+                std::cout<<supports_get<MyClass>::value;
+            }
+        除此之外还可以使用模板部分具体化（偏特化）的方法
+            #include <type_traits>
+            template<typename T, typename =void>
+            struct supports_get:std::false_type{};
+
+            template<typename T>
+            struct supports_get<T, decltype(std::declval<T>().get(), void())>:std::true_type{};
+            int main()
+            {
+                std::cout<<supports_get<MyClass>::value;
+            }
+    表达式模板
+        表达式模板是一种使用模板来代表一个表达式的计算过程，并且只在需要其结果的时候才执行所要求的计算从而提高程序运行效率的技巧
+        例如有一个Vec类需要支持加法运算，通常的做法是
+            class Vec
+            {
+                std::vector<double> elems;
+            public:
+                //... 
+            };
+            Vec operator+(Vec const& lhs, Vec const& rhs)
+            {
+                Vec sum(lhs.size());
+                //...
+                return sum; 
+            }
+        此时如果有连加表达式
+            Vec result = a + b + c; //a+b->Temp, Temp+c->Temp2，多构造了一个无用的临时对象Temp
+        解决这个问题，可以定义一个表达式模板VecExpression，来表示要对所需的操作数进行的操作，模板类型参数T是所需操作的类型
+            template<typename T>
+            class VecExpression
+            {
+            public:
+                auto operator[](size_t i) const
+                {
+                    return static_cast<E const&>(*this)[i]; //crtp技巧，调用VecExpression派生类中定义的下标运算符函数，并执行真正的计算，此例中调用VecSum::operator[]
+                }
+                auto size() const
+                {
+                    return static_cast<E const&>(*this).size();//crtp
+                }
+            };
+            template<typename LHS, typename RHS>
+            class VecSum: public VecExpression<VecSum<LHS, RHS>>
+            {
+                LHS const& lhs;
+                RHS const& rhs;
+            public:
+                VecSum(LHS const& lhs, RHS const& rhs):lhs(lhs), rhs(rhs) {}
+                auto operator[](size_t i) const //执行真正的计算
+                {
+                    return lhs[i]+rhs[i];
+                }
+                auto size() const
+                {
+                    return lhs.size();
+                }
+            };
+            class Vec:public VecExpression<Vec>
+            {
+                std::vector<double> elems;
+            public:
+                template<typename T>
+                Vec(VecExpression<T> const& expr):elems(expr.size())
+                {
+                    //定义一个从VecExpression到Vec的构造函数，这个构造函数只需调用VecExpression::operator[]来完成拷贝，在调用时执行真正的计算过程
+                    for(size_t i=0; i<expr.size(); ++i)
+                        elems[i]=expr[i];
+                }
+            };
+            template<typename LHS, typename RHS>
+            auto operator+(VecExpression<LHS> const& lhs, VecExpression<RHS> const& rhs)
+            {
+                return VecSum<LHS, RHS>(static_cast<LHS const&>(lhs), static_cast<RHS const&>(rhs));
+            }
+        此时同样的连加表达式
+            Vec result = a + b + c;//a+b->VecSum<Vec, Vec> temp, temp+c->VecSum<VecSum<Vec, Vec>, Vec> temp2, temp2->Vec的过程中展开连加表达式，最终只创建一个必须的临时对象，并赋值给result
+        
+        更一般的形式：
+            既然临时对象的产生是不可避免的，那就想办法构造一个成本低的临时对象，也就是表达式模板对象
+            template<class Callable, class... OperandType>
+            class Expr 
+            {
+                Callable f; //表示要执行的运算，相比于使用CRTP方案，简化了需要从基类继承的繁琐定义
+                std::tuple<OperandType const&...> args; //表示操作f的操作数，用const &既可以接受左值，也可以接受右值
+
+                template<class Operand>
+                static auto subscript(Operand const& v, size_t i)
+                {
+                    if constexpr(is_array<Operand>) //这里需要定义另一个模板变量，来区分是否定义了operator[]
+                    {
+                        return v[i];
+                    }
+                    else
+                        return v;
+                }
+            public:
+                Expr(Callable f, OperandType const&... args):f(f), args(args...){}
+                auto operator[](size_t i) const
+                {
+                    return std::apply(
+                        [this, i](OperandType const&... a)
+                        {
+                            return f(subscript(a, i)...);   //为了同时支持数列（定义了operator[]的类）和标量的运算（即数列x标量，数列x数列，标量x数列），这里要需要一个额外的函数subscript来分别处理数列和标量
+                        },
+                        args
+                    );
+                }
+            };
+            /*然后所有的操作符重载函数就将所需操作用一个lambda表达式来构造Expr对象*/
+
+            //为了使用SFINAE来防止某些类型实例化了运算符函数模板，可以使用一个模板变量
+            template<class LHS, class RHS>
+            constexpr bool is_binary_op_ok = /*...*/;
+
+            Expr<Add, Vec, Vec> operator+(Vec const& lhs, Vec const& rhs)
+            {
+            }
+
+            Expr<Mul, Vec, Vec> operator+(Vec const& lhs, Vec const& rhs)
+            {
+            }
+
+            template<class LHS, class RHS, class = std::enable_if_t<is_binary_op_ok<LHS, RHS>>
+            auto operartor*(LHS const& lhs, RHS const& rhs)
+            {
+                return Expr{
+                    [](auto const& l, auto const& r) { return l*r; },   //注意lambda表达式中的运算符应该与要重载的操作符相符合，不然极难发现
+                    lhs, rhs
+                };
+            }
 
 友元：
     单向友元：如果A类对象要控制（发送信息给B类）应考虑在B类定义中用friend关键字将A类声明为友元类，友元类声明的位置无关紧要，可以在public private protected中声明，不改变友元类的访问权限
@@ -1340,7 +1561,7 @@ cctype函数
             unique_ptr<Type>pt=std::make_unique<T>();
             unique_ptr<Type>pt=std::make_unique<T[]>();
         unique_ptr对象重点在于所有权的概念，即不允许复制（避免了auto_ptr在复制时导致两个指针指向同一块内存，然后超出作用域后释放同一块内存两次的问题）
-        例外是可以将一个临时指针变量赋值给另一个，此时调用移动构造函数或移动赋值运算符，这是由于返回值优化RVO，使得智能指针直接构造在返回地址上：
+        例外是可以将一个临时指针变量赋值给另一个，这是由于返回值优化RVO，使得智能指针直接构造在返回地址上：
         unique_ptr<Type> Create()
         {
             return unique_ptr<Type> (new Type);
@@ -1388,7 +1609,7 @@ cctype函数
                     Node(T data):data(std::move(data)){}
                 };
                 std::unique_ptr<Node> head; //所有权链从头结点开始，头结点管理整个链表所有结点的所有权
-                Node *tail;                 //尾节点的所有权由尾节点的前一个结点开始
+                Node *tail;                 //尾节点的所有权由尾节点的前一个结点管理
             public:
                 /*...插入删除算法*/
             };
@@ -1464,26 +1685,75 @@ STL
                 是用单链表实现的，与list类似，也是对插入、删除、移动元素效率较高，只能单向访问（迭代器）
                 与list不同，是唯一一个没有size()成员函数的容器
         关联容器：
-            set：
-            multiset：
-            map：
-            multimap：
-            unordered_map:实现一个哈希表结构，包含了若干键值对，所有的键必须是不同的，增加删除查找元素都具有常数时间复杂度
-                template<   typename Key,   //键
-                            typename T,     //值
-                            typename Hash = std::hash<Key>, //哈希函数
-                            typename KeyEqual = std::equal_to<Key>,//键的比较函数
-                            typename Allocator = std::allocator<std::pair<const Key, T>>>
-                class unordered_map;
+            set容器
+                set:实现了一个有序集合结构，集合中的元素称为键，所有的键必须是不同的，增加删除查找元素都具有对数时间复杂度，使用红黑树实现
+                    template<
+                        typename Key,   //键
+                        typename Compare = std::less<Key>, //键的比较函数，用于排序
+                        typename Allocator = std::allocator<Key>
+                    > class set;
+                unordered_set:实现了一个无序集合结构，集合中的元素称为键，所有的键必须是不同的，增加删除查找元素都具有常数时间复杂度
+                    键按照其哈希值放到不同的篮子中，键不应该被修改，因为被修改后也将改变其哈希值，导致数据结构被破坏
+                    template<
+                        typename Key,
+                        typename Hash = std::hash<Key>,
+                        typename KeyEqual = std::equal_to<Key>,
+                        typename Allocator = std::allocator<Key>
+                    > class unordered_set;
+                multiset：增加删除查找元素都具有对数时间复杂度
+                    template<
+                        typename Key,
+                        typename Compare = std::less<Key>,
+                        typename Allocator = std::allocator<Key>
+                    > class multiset;
+                unordered_multiset：增加删除查找元素都具有常数时间复杂度
+                    template<
+                        typename Key,
+                        typename Hash = std::hash<Key>,
+                        typename KeyEqual = std::equal_to<Key>,
+                        typeame Allocator = std::allocator<Key>
+                    > class unordered_multiset
+            map容器
+                map：增加删除查找元素都具有对数时间复杂度
+                    template<
+                        typename Key,   //键
+                        typename T,     //值
+                        typename Compare = std::less<Key>,  //键的比较函数
+                        typename Allocator = std::allocator<std::pair<const Key, T>>
+                    > class map;
+                unordered_map:实现一个哈希表结构，包含了若干键值对，所有的键必须是不同的，增加删除查找元素都具有常数时间复杂度
+                    template<   
+                        typename Key,   //键
+                        typename T,     //值
+                        typename Hash = std::hash<Key>, //哈希函数
+                        typename KeyEqual = std::equal_to<Key>,//键的比较函数
+                        typename Allocator = std::allocator<std::pair<const Key, T>>
+                    > class unordered_map;
+                multimap： 
+                    template <
+                        typename Key,
+                        typename T,
+                        typename Compare = std::less<Key>,
+                        typename Allocator = std::allocator<std::pair<const Key, T>>
+                    > class multimap;
+                unordered_multimap
+                    template<
+                        typename Key,
+                        typename T,
+                        typename Hash = std::hash<Key>,
+                        typename KeyEqual = std::equal_to<Key>,
+                        typename Allocator = std::allocator<std::pair<const Key, T>>
+                    > class unordered_multimap
+
                 std::hash对STL中的常见容器都进行了具体化，对于自定义类型，需要对自定义类型提供哈希函数的具体化来使用关联容器
-                    哈希函数是一个重载了()运算符的结构体（functor），这个函数接受一个键的常量引用，返回size_t
+                哈希函数是一个重载了() 运算符的结构体（functor），这个函数接受一个键的常量引用，返回size_t
                     可以直接向std名称空间中加入std::hash的具体化
                     namespace std
                     {
-                        template<>
+                        template <>
                         struct hash<Key>
                         {
-                            size_t operator()(const Key& key) const
+                            size_t operator()(const Key &key) const
                             {
                                 //...哈希函数定义
                             }
@@ -1666,7 +1936,7 @@ STL
                     const int size=100;
                     double data[size];
                     sort(data,data+size);   //或sort(&data[0],&data[size]);
-                sort()函数需要使用<运算符，所以对于自定义结构体、对象，需要sort的话需要定义一个重载<运算符函数
+                sort()函数需要使用<运算符，所以对于自定义结构体、对象，需要sort的话需要定义一个重载<����符函数
                 template <class RandomAccessIterator, class Compare>
                 void sort (RandomAccessIterator first, RandomAccessIterator last, Compare comp);
                 需要三个参数，最后一个参数是一个自定义比较函数
@@ -1689,8 +1959,60 @@ STL
             inplace_merge():
             is_sorted():
             is_sorted_until():
-        <numeric>算法：
+    函数子
+        #include <functional>
+        定义了一些常用的函数对象，即重载了operator()的struct
+        算数：
+            plus
+                可能的实现：
+                    template<typename T = void>
+                    struct MyPlus
+                    {
+                        T operator()(const T& lhs, const T& rhs) const
+                        {
+                            return lhs + rhs;
+                        }
+                    };
+                    template<>
+                    struct MyPlus<void>
+                    {
+                        template<typename T, typename U>
+                        auto operator()(const T &lhs, const U &rhs) const
+                        {
+                            return lhs + rhs;
+                        }
+                    };
+                    MyPlus m; //当直接定义一个plus函数对象时，不需要提供模板参数，此时会创建一个自动推断返回类型的MyPlus<void>对象
+                    std::accumulate(arr.begin(), arr.end(), std::plus{}); //同理
+            minus
+            multiplies
+            divides
+            modulus
+            negate
+        比较：
+            equal_to
+            not_equal_to
+            greater
+            less
+            greater_equal
+            less_equal
+        逻辑：
+            logical_and
+            logical_or
+            logical_not
+        位运算：
+            bit_and
+            bit_or
+            bit_xor
+            bit_not
+        
+#include <numeric>
             accumulate():求从[first,last)的和，这个算法按定义是顺序执行的，所以没有带执行顺序参数的重载版本
+                template< class InputIt, class T >
+                T accumulate( InputIt first, InputIt last, T init );    //使用元素的operator+
+                template< class InputIt, class T, class BinaryOperation >
+                T accumulate( InputIt first, InputIt last, T init, BinaryOperation op );    //使用一个接受两个参数的函数
+                函数的原型需符合：returnType fun(const Type1& a, const Type2& b);   //不一定需要const&限定，但T需要可以被隐式转换为Type1和Type2
             reduce():将一个序列中的元素两两简化，最后生成1个元素
                 主模板：
                     template<class InputIt, class T, class BinaryOp>
@@ -1713,8 +2035,7 @@ STL
             inner_product():求两个向量的内积，即两个向量对应元素相乘的和，可能的实现
                 template<class InputIt1, class InputIt2, class T>
                 constexpr // since C++20
-                T inner_product(InputIt1 first1, InputIt1 last1,
-                                InputIt2 first2, T init)
+                T inner_product(InputIt1 first1, InputIt1 last1, InputIt2 first2, T init)
                 {
                     while (first1 != last1)
                     {
@@ -1740,35 +2061,7 @@ STL
                     template<class InputIt1, class InputIt2, class T>
                     constexpr T transform_reduce(InputIt1 first1, InputIt1 last1, InputIt2 first2, T init);
                     等同于transform_reduce(first1, last1, first2, init, std::plus<>{}, std::multiples<>{});
-                
-    C++17并行算法：
-        C++17后大部分STL的算法都新增了一个以执行顺序的参数作为第一参数的函数的重载，比如
-            template< class ExecutionPolicy, class RandomIt, class Compare >
-            void sort( ExecutionPolicy&& policy, RandomIt first, RandomIt last, Compare comp );
-        这个执行顺序的参数可选，这些执行顺序实际上是对应类的一个全局对象
-            object <------------------------------> class
-            std::execution::seq             std::execution::sequenced_policy
-            std::execution::par             std::execution::parallel_policy
-                提供了基本的并行能力，执行顺序是确定的，“确定”的意思是顺序是由实现定义的，但具体的执行顺序是用户不能预知的
-                要求所提供的迭代器、可调用对象必须不能造成资源竞争，但是可以提供同步机制，比如访问一个全局对象（当然要有互斥量保护或者使用原子量）
-            std::execution::par_unseq       std::execution::parallel_unsequenced_policy
-                提供了最大化的并行能力，执行顺序是不确定的
-                对一个元素的操作可能在一个线程执行一半，再在另一个线程执行一半，或者穿插执行
-                所以这就要求所提供的迭代器、可调用对象必须不具有任何同步机制，而且只对当前元素进行操作
-            std::execution::unseq           std::execution::unsequenced_policy
-        注意，使用带执行参数的重载下，实际编译后的程序是否是并行的，由实现决定
-        注意，带执行顺序的重载算法可能要求更高级别的迭代器
-        使用了执行顺序参数后，任何没有catch的异常会直接导致std::terminate()来结束程序的运行，即使执行顺序是std::execution::seq（即默认值）
-            std::for_each(v.begin(), v.end(), [](auto x){ throw my_exception();});   //异常向外传播
-            std::for_each(std::execution::seq, v.begin(), v.end(), [](auto x){ throw my_exception();});  //std::terminate()
 
-#include <numeric>
-                template< class InputIt, class T >
-                T accumulate( InputIt first, InputIt last, T init );    //使用元素的operator+
-
-                template< class InputIt, class T, class BinaryOperation >
-                T accumulate( InputIt first, InputIt last, T init, BinaryOperation op );    //使用一个接受两个参数的函数
-                函数的原型需符合：returnType fun(const Type1& a, const Type2& b);   //不一定需要const&限定，但T需要可以被隐式转换为Type1和Type2
             equal():
                 比较从[first1,last1)的元素是否与[first2, first2+(last1-first1-1) )的相同
                 如果first2迭代器所指向的容器的元素比first1的多，则只比较与first1到last1相等个数的元素
@@ -1871,7 +2164,6 @@ STL
             template< class OutputIt, class Size, class T >
             void fill_n( OutputIt first, Size count, const T& value );
     for_each()循环:
-        #include <algorithm>
     transform():
         template <class InputIterator, class OutputIterator, class UnaryOperation>
         OutputIterator transform (InputIterator first1, InputIterator last1, OutputIterator result, UnaryOperation op);
@@ -1879,6 +2171,26 @@ STL
         template <class InputIterator1, class InputIterator2, class OutputIterator, class BinaryOperation>
         OutputIterator transform (InputIterator1 first1, InputIterator1 last1, InputIterator2 first2, OutputIterator result, BinaryOperation binary_op);
             与上面类似，函数op接受两个参数，分别是InputIterator1和InputIterator2解除引用后的参数，并返回一个值
+    C++17并行算法：
+            C++17后大部分STL的算法都新增了一个以执行顺序的参数作为第一参数的函数的重载，比如
+                template< class ExecutionPolicy, class RandomIt, class Compare >
+                void sort( ExecutionPolicy&& policy, RandomIt first, RandomIt last, Compare comp );
+            这个执行顺序的参数可选，这些执行顺序实际上是对应类的一个全局对象
+                object <------------------------------> class
+                std::execution::seq             std::execution::sequenced_policy
+                std::execution::par             std::execution::parallel_policy
+                    提供了基本的并行能力，执行顺序是确定的，“确定”的意思是顺序是由实现定义的，但具体的执行顺序是用户不能预知的
+                    要求所提供的迭代器、可调用对象必须不能造成资源竞争，但是可以提供同步机制，比如访问一个全局对象（当然要有互斥量保护或者使用原子量）
+                std::execution::par_unseq       std::execution::parallel_unsequenced_policy
+                    提供了最大化的并行能力，执行顺序是不确定的
+                    对一个元素的操作可能在一个线程执行一半，再在另一个线程执行一半，或者穿插执行
+                    所以这就要求所提供的迭代器、可调用对象必须不具有任何同步机制，而且只对当前元素进行操作
+                std::execution::unseq           std::execution::unsequenced_policy
+            注意，使用带执行参数的重载下，实际编译后的程序是否是并行的，由实现决定
+            注意，带执行顺序的重载算法可能要求更高级别的迭代器
+            使用了执行顺序参数后，任何没有catch的异常会直接导致std::terminate()来结束程序的运行，即使执行顺序是std::execution::seq（即默认值）
+                std::for_each(v.begin(), v.end(), [](auto x){ throw my_exception();});   //异常向外传播
+                std::for_each(std::execution::seq, v.begin(), v.end(), [](auto x){ throw my_exception();});  //std::terminate()
     Allocator 分配器：
     函数符（函数对象）：是可以以函数方式与一对圆括号()结合使用的任意对象，包括函数名、函数指针和重载了()运算符的类对象（即定义了operator()函数的类）
         生成器：不用参数就可以调用的函数符
@@ -2459,7 +2771,7 @@ C++11:
             int i4=int();   //后增加的圆括号默认值初始化，i4=0
             注意，不能int i4() 因为这是声明一个函数
             不要用圆括号初始化一个变量，因为只要是圆括号内没有参数，就会被认为声明了一个函数
-        这产生了一个问题，由于存在typedef类型别名，无法知道这是一个内置类型（可以用圆括号、赋值符）或是类（可以用圆括号）或是数组（可以用花括号）
+            这产生了一个问题，由于存在typedef类型别名，无法知道这是一个内置类型（可以用圆括号、赋值符）或是类（可以用圆括号）或是数组（可以用花括号）
         C++11后：
             用花括号列表初始化所有内置类型、用户定义类型（类、结构体），初始化列表可以加=号，也可以不加
             用花括号初始化方法如果有赋值缩短（赋值的范围超过变量的类型所能存储的范围）或精度损失，将产生编译错误
@@ -2512,6 +2824,13 @@ C++11:
                 常用于多个变量一次性赋值，如：
                     int a; double c; std::string c;
                     std::tie(a,b,c)=std::tuple{1,2.0,"helloworld"};
+        辅助函数
+            template<class F, class Tuple>
+            std::apply(F&& f, Tuple&& t);
+            将t中的所有元素用完美转发的形式转发给可调用对象f，相当于将Tuple t中的元素展开给给一个函数，这个函数必须要能接受Tuple中的各个元素
+            如果需要将参数一个个的转发，而不是一次全部转发，可以用C++17中的fold expression
+                std::apply([](auto&&... agrs){ (..., someFunction(args));}, tuple);
+            此时要求someFunction需要有重载接受tuple中各种元素的类型
     #include <type_traits>
         std::enable_if：
             C++11引入一个概念SFINAE (substituion failure is not an error)匹配失败不是错误，意思是当编译器根据函数调用来实例化模板函数时，可能会有几个函数模板在推导模板参数时无法编译通过，但只要有一个可以正确推导出来，就不会产生编译错误
@@ -2547,7 +2866,7 @@ C++11:
             using true_type = std::integral_constant<bool, true>
             using false_type = std::integral_constant<bool, false>
             所以可以通过继承这两个类，结合std::enable_if实现SFINAE
-            C++17新增了一个辅助类
+            C++17新增了一个���助���
                 template<bool B>
                 using bool_constant = integral_constant<bool, B>;
             
@@ -2560,16 +2879,47 @@ C++11:
                 class A
                 {
                     static const int a;
-                    static constexpr b=10; 
+                    static constexpr int b=10; 
                 };
                 A::a=3;
-            定义字面值
+            定义算术字面值
+                constexpr double half=0.5;      
+                static_assert(half<3, "Small"); //如果half是static const，则无法编译，但是constexpr可以
+                constexpr const char* str="hello";
+            constexpr值可以是
+                整数、浮点、字母字面值
+                指针字面值（比如const char*）
+                对象字面值
+            constexpr修饰的值是隐式const，如果对其使用const_cast，是未定义行为UB
         constexpr计算：
             定义函数
                 constexpr还可以作用于函数，使得函数成为一个常量表达式，在编译期就调用并计算结果
+                包括全局函数和成员函数
                 所以被声明为constexpr的函数调用必须能在编译期被计算为常量
                 由于函数调用成为了常量表达式，所以可以用作数组的大小
+                被声明为constexpr的函数仍然能在运行期调用，只是函数的参数和返回值类型必须满足constexpr值的要求
+                constexpr函数是隐式inline，所以必须在调用这个函数所在的.cpp文件中可见
+                constexpr函数可以抛出异常
             定义构造函数
+            显然IO函数都不能是constexpr
+            强迫constexpr函数在编译期执行的方法，需要C++17
+                template <auto V>
+                struct constant {
+                    constexpr static decltype(V) value = V;
+                };
+
+                constexpr uint64_t factorial(int n) {
+                    if (n <= 0)
+                    {
+                        return 1;
+                    }
+                    return n * factorial(n - 1);
+                }
+
+                int main() {
+                    std::cout << "20! = " << constant<factorial(20)>::value << std::endl;
+                    return 0;
+                }
     std::reference_wrapper
         #include <functional>
         是一个用法类似于引用的可复制对象，定义了一个转换成指向所引用对象的引用的转换函数
@@ -2633,7 +2983,7 @@ C++11:
     尖括号嵌套：之前为了避免和抽取运算符>>混淆，C++11不要求在嵌套的尖括号（尤其是模板类型的指定）中使用空格分开
         std::vector<std::list<int> > v1;    //可以去掉右尖括号之间的空格
     右值引用：
-        右值：所有的C++的值要么是左值，要么是右值，左值是表达式结束后依然存在的持久化对象，右值是表达式结束后就不存在的临时对象
+        右值：所有的C++的值要么是左值，要么是右值，左值是表达式结束后依然存在的持久化对象，右值是表达����束后就不存在的临时对象
             所有的具名变量、对象都是左值，而右值没有命名
             能取地址的值是左值，不能的是右值
             常见的右值包括常量表达式、变量表达式（等号右边的表达式）、函数返回的临时对象（包括返回的临时变量）注意：永远不要将函数的返回值定义为返回右值引用！
@@ -2709,6 +3059,74 @@ C++11:
             {
                 somefunc(std::forward<T>(a));
             }
+            std::forward原理：
+                template <class T>
+                inline T&& forward(typename std::remove_reference<T>::type& t) noexcept
+                {
+                    return static_cast<T &&>(t);
+                }
+
+                template <class T>
+                inline T&& forward(typename std::remove_reference<T>::type&& t) noexcept
+                {
+                    static_assert(!std::is_lvalue_reference<T>::value,
+                                "Can not forward an rvalue as an lvalue.");
+                    return static_cast<T &&>(t);
+                }
+            假设在myforward()中传进的a是一个左值，则T->U& （假设U为remove_reference_t<T>），调用std::forward<T>将使用第一个重载，T&&->U& &&，得到左值
+            假设在myforward()中传进的a是一个右值，则T->U，调用std::forward<T>将使用第二个重载，T&&->U&&，得到右值
+            同时由于std::forward()的形参是std::remove_reference<T>::type，模板参数T在::解析运算符的左边，所以不会进行
+        通用引用与模板
+            template<typename T>
+            void func(T&& a)
+            {
+                if constexpr (std::is_lvalue_reference_v<T>)
+                    puts("T is lvalue&");
+                if constexpr (std::is_rvalue_reference_v<T>)
+                    puts("T is rvalue&");
+                if constexpr (std::is_lvalue_reference_v<T &&>)
+                    puts("T&");
+                if constexpr (std::is_rvalue_reference_v<T &&>)
+                    puts("T&&");
+                putchar('\n');
+            }
+            int main()
+            {
+                int x{};
+                func(x);                       //T is lvalue&, T&
+                func(1);                       //T&&
+                func(std::forward<int &>(x));  //T is lvalue&, T&
+                func(std::forward<int &&>(x)); //相当于std::move(), T&&
+                func(std::move(x));            //T&&
+            }
+        定义一个既能存储左值引用又能将右值引用构造转为左值的类
+            template<typename T>
+            class Holder
+            {
+                T value;
+            public:
+                Holder(T && arg) : value{std::forward<T>(arg)}
+                {
+                    if constexpr (std::is_lvalue_reference_v<T>)
+                        puts("T is lvalue&");
+                    if constexpr (std::is_rvalue_reference_v<T>)
+                        puts("T is rvalue&");
+                    if constexpr (std::is_lvalue_reference_v<T &&>)
+                        puts("T&");
+                    if constexpr (std::is_rvalue_reference_v<T &&>)
+                        puts("T&&");
+                    putchar('\n');
+                }
+            };
+            template <typename T>
+            Holder(T &&) -> Holder<T>;
+            int main()
+            {
+                int x{};
+                Holder a{x};    //此时value是一个引用
+                Holder b{1};    //此时value是一个左值
+            }
+
         移动构造函数：形式上类似于用右值表达式做引用参数的构造函数，由于移动构造函数要修改引用参数的内容，所以不能将形参声明为const
             移动语义：将一个对象所占有的资源（常常是动态分配所得的指针）转移到自身，将对方对象的这个指针设置为nullptr，本质上是偷过来，由于这个指针所指向的内存区域没有变化，所以避免了不必要的复制
             原型：className(className && exp);
@@ -2725,7 +3143,7 @@ C++11:
             例如：vector<string> a; string temp("hello"); a.push_back(move(temp));  //将temp强制转换为右值，从而调用移动构造函数对vector中存储的新对象进行构造
             使用了move()函数后的左值不应该再继续使用，因为其中的动态分配的内存已经失效，例如此时不应该再输出temp字符串的值
             如果对象所属的类没有定义移动构造函数，move将使用复制构造函数，这是由于常量左值引用可以绑定右值，此时被复制的源对象没有失效，可以继续使用
-        C++11中的所有容器都实现了移动构造，所以容器之间的赋值会使用移动赋值函数，从而不需要将整个容器中存储的所有对象一个个的复制 
+        C++11中的所有容器（除了std::array）都实现了移动构造，所以容器之间的赋值会使用移动赋值函数，从而不需要将整个容器中存储的所有对象一个个的复制  
         悬空引用：
             注意常见的悬空引用的发生情况：
                 1.引用一个临时对象的部分成员
@@ -2806,7 +3224,34 @@ C++11:
                 std::cout << combined() << '\n';    //5
                 std::cout << combined(2) << '\n';   //20
             }
-
+        递归lambda
+            lambda可以递归调用自己，但是必须手动声名一个非auto的返回值类型
+            比如：
+                auto fib=[](unsigned long long i)
+                {
+                    if(i < 2)
+                        return 1;
+                    return fib(i-1)+fib(i-2);   //错误，这里fib还没有完全定义
+                };
+            解决方法一：
+                auto fib = [&](auto&& fib, unsigned long long i)//如果这个函数没有返回值，需要手动声明一个void
+                {
+                    if (i < 2)
+                        return 1;
+                    return fib(fib, i - 1) + fib(fib, i - 2);
+                };
+                std::cout << fib(fib, 20);
+            解决方法二（推荐）：
+                auto fib = [](unsigned long long i)
+                {
+                    auto fib_impl = [](auto&& fib, unsigned long long i)
+                    {
+                        if(i < 2)
+                            return 1;
+                        return fib(fib, i - 1) + fib(fib, i - 2);
+                    };
+                    return fib_impl(fib_impl, i);
+                }
     函数包装器：
         可调用对象：
             分为三种
@@ -2895,6 +3340,20 @@ C++11:
             }
 
 多线程C++11 std::thread：
+    -3.理论
+        阿姆达尔定律Amdahl's law
+            阿姆达尔定律给出了在一个并行计算的环境中，最理想情况下获得的加速比率（程序的理论最高速度）与程序的可并发部分占比的关系
+            阿姆达尔定律常用于预测一个多核心处理器在执行某个程序的预期性能提升
+            公式：
+                Speed=1/(1-p+p/s)，其中Speed是理论的速度，p是程序中可并发执行部分的占比，s是程序中可并发执行部分的执行速度，通常直接正比于核心数
+                1-p是程序中不可并发执行的部分所用的时间，p/s是可并发执行部分在并发的条件下所用的时间
+                当s->∞时，p/s->0，所以speed->1/(1-p)，即程序执行的最大速度受限于程序中不可并发执行的部分
+            例如处理一个单核心处理器下执行需要20小时的程序，其中有19小时的部分是可并发执行的（即p=19/20），那么在极限条件（无穷多核心）的条件下，这个程序可以得到最大：
+                SpeedUp=1/(1-19/20+(19/20)/∞)=20倍的速度
+        古斯塔夫森定律Gustafson's law
+            古斯塔夫森定律给出了在一个并行计算的环境中，最理想情况下在相同时间内所能执行的任务的量与程序的可并发部分占比的关系
+            公式：
+                T=1-p+sp，其中T是相同时间内执行的任务的量，p是程序中可并发执行的占比，s是程序中可并发执行部分的执行速度，通常直接正比于核心数          
     -2.C++抽象机器
         C++抽象机器只由两部分组成：一维的存储区域，和操作整块存储区域上的线程
         对象唯一的存储在这块存储区域上
@@ -3092,7 +3551,7 @@ C++11:
                     {
                         do{
                             int xLocal = x;
-                        } while(!x.compare_exchange_strong(xLocal, xLocal+1)){}
+                        } while (!x.compare_exchange_strong(xLocal, xLocal + 1)) {}
                     }
                 这个成员函数是多数无锁算法的核心
 
@@ -3120,19 +3579,17 @@ C++11:
             std::thread t(hello);   //创建一个线程对象t，并赋值给hello函数（这里可以用任何可调用的函数对象赋值）
             t.join();               //显式地表明要等待线程执行完毕，可以确保在函数退出前该线程执行完毕
         }
-        std::thread 的构造函数可以接收可调用对象（函数、lambda、可调用对象（重载了()操作符的类、结构体））
-        而对线程对象调用detach(void)方法表明这个函数不等待线程的完成，函数返回时线程可能还在运行
-        detach()打破了thread对象与线程的联系，确保thread对象被销毁时terminate()不会被调用
-        只需在std::thread对象被析构前决定是否join和detach，与线程是否已经执行完毕返回无关
-        如果对thread对象既不适用join()又不使用detach()，则在线程对象因为主线程main退出作用域被销毁时，新线程会调用std::terminate
-        如果主线程还没结束，也会被std::terminate()强行终止
-        可以用joinable()方法检查这个线程是否可以与thread对象结合或分离，已经分离的线程不能再与任�����thread对象结合，称为守护进程，joinable()函数返回一个布尔值
-        每个线程都有一个独特的id，获取当前线程的id，使用std::this_thread::get_id()函数
-        获取线程对象的id，使用get_id()成员方法
-    2.获取资源即初始化RAII
-        当thread对象绑定的函数有参数时，需要在thread对象的构造函数内传值调用，这是由于默认情况下创建新线程时，参数是拷贝到新线程的独立内存中
-        如果函数参数是引用，需要将构造函数内的参数用std::ref()显式转换
-        void add(int & a) {++a;}
+        std::thread 的构造函数可以接收可调用对象（函数、lambda、可调用对象（重载了() 操作符的类、结构体））
+        而对线程对象调用detach(void) 方法表明这个函数不等待线程的完成，函数返回时线程可能还在运行
+        detach() 打破了thread对象与线程的联系，确保thread对象被销毁时terminate() 不会被调用
+            只需在std::thread对象被析构前决定是否join和detach，与线程是否已经执行完毕返回无关
+            如果对thread对象既不适用join() 又不使用detach() ，则在线程对象因为主线程main退出作用域被销毁时，新线程会调用std::terminate
+            如果主线程还没结束，也会被std::terminate() 强行终止
+            可以用joinable() 方法检查这个线程是否可以与thread对象结合或分离，已经分离的线程不能再与任�����thread对象结合，称为守护进程，joinable() 函数返回一个布尔值
+            每个线程都有一个独特的id，获取当前线程的id，使用std::this_thread::get_id() 函数
+            获取线程对象的id，使用get_id() 成员方法 2.获取资源即初始化RAII 当thread对象绑定的函数有参数时，需要在thread对象的构造函数内传值调用，这是由于默认情况下创建新线程时，参数是拷贝到新线程的独立内存中
+            如果函数参数是引用，需要将构造函数内的参数用std::ref() 显式转换 void
+            add(int &a) { ++a; }
         int main() 
         {
             int x=0;
@@ -3552,7 +4009,7 @@ C++11 正则表达式
         条件
             使用|来表达逻辑或
         区间
-            一对中括号[]表示中括号的内容作为一个区间
+            一对中括号[]表示中括号的���容���为一个区间
             在区间中，^表示对区间的内容取逻辑非，匹配除了区间字符以外的字符
         捕获组
             捕获组是用圆括号()括起来的分组，捕获的内容是分组内与待匹配字符串的匹配部分
@@ -3721,9 +4178,10 @@ C++17：
         绑定数组：
             标识符列表 中的每个标识符均成为指代数组的对应元素的左值。标识符的数量必须等于数组的元素数量。每个标识符的被引用类型都是数组的元素类型
             int a[2] = {1,2};
-            auto [x,y] = a; // 创建 e[2]，复制 a 到 e，然后 x 指代 e[0]，y 指代 e[1]
-            auto& [xr, yr] = a; // xr 指代 a[0]，yr 指代 a[1]
+            auto [x,y] = a;     //x和y是数组a的拷贝
+            auto& [xr, yr] = a; //x和y是数组a的元素的引用
         绑定元组：
+            
         绑定数据成员：
             标识符列表 中的各个标识符，按声明顺序依次成为指代 e 的各个成员的左值的名字    
             struct A
@@ -4337,7 +4795,7 @@ Effective C++
             }
             ...
         };
-        而类模板中模板类名+类型参数与模板类名相同，所以可以省略类型参数，即Ratioanl<T>与Rational相同，所以又可以写为：
+        ��类模板��模��类名+类型参数与模板类名相同，所以可以省略类型参数，即Ratioanl<T>与Rational相同，所以又可以写为：
         template<typename T>
         class Rational
         {

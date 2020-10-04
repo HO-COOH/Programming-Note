@@ -196,9 +196,12 @@
                 相当于：
                 cl_mem input=clCreateBuffer(context, CL_MEM_READ_ONLY, size, NULL, NULL);
                 clEnqueueWriteBuffer(queue, input, CL_TRUE, 0, size, host_ptr, 0, NULL, NULL);
-            CL_MEM_ALLOC_HOST_PTR   指定将内存分配到host_ptr的区域必须对host端可见，必须与CL_MEM_COPY_HOST_PTR一起使用（罕见）
+            CL_MEM_ALLOC_HOST_PTR 在device端分配一块内存，并指定将内存分配到对host端可见
         在CL_MEM_WRITE_ONLY的情况下host_ptr可以设置成NULL，表明丢弃device输出的数据，不在host端分配内存
         通常options参数是前三个选项和后三个选项中各选择一个，然后取逻辑或
+            当在host端分配内存，并希望device端使用这一块内存，使用CL_MEM_USE_HOST_PTR
+            当在host端分配内存，并希望将这一块内存直接复制到device端，使用CL_MEM_COPY_HOST_PTR
+            当在device端分配内存，并希望host端使用这一块内存，使用CL_MEM_ALLOC_HOST_PTR，然后用map方法
 
 
     当一个kernel需要另一个kernel的一部分数据的时候，可以创建一个subbuffer
@@ -261,7 +264,13 @@
            函数的返回的值就是映射的内存的指针
         程序完成后必须释放所映射的内存
         int clEnqueueUnmapMemObject(cl_command_queue queue, cl_mem buffer, void* mapped_ptr, cl_uint num_events, const cl_event* wait_list, cl_event* event)
-    
+    释放内存
+        cl_int clReleaseMemObject(cl_mem memobject)
+            返回值：
+                CL_SUCCESS
+                CL_INVALID_MEM_OBJECT
+                CL_OUT_OF_RESOURCE  在释放内存的过程中可能需要在device端有额外的内存，如果不满足则返回这个错误
+                CL_OUT_OF_HOST_MEMORY 在释放内存的过程中可能需要在host端也有额外的内存，如果不满足则返回这个错误
 5.kernel的编程
     每一个kernel必须符合：
         以__kernel开头
@@ -325,6 +334,9 @@
 
     对于指针类型的参数，必须在指针类型前加一个地址类型标识符来表明这块内存区域的访问权限，可以是__global, __constant, __local, __private
     在内核函数体中，__global只能用于声明指针类型
+    可以直接在内核函数中声明local内存区域
+        local float* cache[SIZE];
+    但是这里的SIZE必须是编译期常量，不能是VLA
     __local不能直接被初始化，只能先声明再赋值
 
 6.七类自带函数

@@ -213,7 +213,7 @@ foreach($word in $arr)
 7. switch
 powershell的switch语句需要用花括号将分支括起来，所以不需要``break``结束与其他分支比较
 ```ps
-switch (3)
+switch ($i)
 {
     1 {"It is one."}
     2 {"It is two."}
