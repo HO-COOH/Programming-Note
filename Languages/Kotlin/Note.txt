@@ -1,0 +1,260 @@
+零、包
+    1.包的声明
+        一个源代码文件可以在第一行用package关键字+包名来声明这个文件属于一个包
+            package example
+        这使得本源文件内所有的内容将归属于这个包
+        本源文件内的所有内容的全名是包名+点运算符.+标识符名
+        如果没有声明包，本文件内的所有内容将归属于一个默认的无名的包
+    2.导入
+        使用import关键字+点运算符.+包名+点.+标识符（导入一个特定标识符）/*（导入包中的全部内容）
+        如果有多个包中包含同名标识符，在导入时用附加的as关键字来区别
+            import org.test.Message as testMessage 
+    3.默认导入
+        以下的包是每一个kotlin源文件默认导入
+            kotlin.*
+            kotlin.annotation.*
+            kotlin.collections.*
+            kotlin.comparison.*
+            kotlin.io.*
+            kotlin.ranges.*
+            kotlin.sequences.*
+            kotlin.text.*
+        附加包根据目标平台导入：
+            jvm:
+                java.lang.*
+                kotlin.jvm.*
+            javascript:
+                kotlin.js.*
+    4.可见性
+        在一个源文件内，一个标识符如果用：
+            private修饰，这个标识符只在本文件内可见
+            internal修饰，这个标识符在同模块内可见
+        如果没有任何修饰，默认public，在全局可见
+
+一、基本类型
+    val：值从不更改
+    var：值可以更改
+    Byte    8位
+    Int     32位
+    Short   16位
+    Long    64位
+    Float   32位    小数位24位  指数位8位   十进制精度6-7位
+    Double  64位    小数位53位  指数位11位  十进制精度15-16位
+    Char
+    Boolean true/false
+    String
+    整数字面值：Kotlin默认推断为Int
+        十进制后加L指定为Long
+        十六进制字面值以0x开头
+        二进制字面值以0b开头
+        不支持八进制字面值
+        对于很大的数，可以用下划线_作为整数字面值分隔符
+        val oneMillion=1_000_000
+        val hexNum=0xFF_3C_AE 
+
+    小数字面值Kotlin默认推断为Double类型，如需指定为Float，需要在字面值后加f或F后缀
+
+    Kotlin不允许赋值类型转换
+        val b:Byte=1
+        val i:Int=b //ERROR
+    但可以使用数字类型的方法来进行转换，所有数字类型都支持如下方法：
+        toByte()
+        toShort()
+        toInt()
+        toLong()
+        toFloat()
+        toDouble()
+        toChar()
+    
+    字符字面值以一对单引号''括起来，字符型不可以直接与整数比较，Unicode字符用'\u十六进制值'表示
+
+    字符串重载了方括号[]运算符来获取其中的字符，字符串字面值以一对双引号""括起来，原始字符串字面值以一对三引号""" """括起来
+    字符串可以通过$运算符将变量的值替代到字符串中
+        var i=10
+        var str="i is $i"   //str="i is 10"
+    也可以通过${}将表达式的值替代到字符串中
+        var s="abc"
+        var str="The length of s is ${s.length()}"  //str="The length of s is 3"
+二、语句
+    1.if
+        kotlin中的if语句可以作为语句，也可以作为一个表达式，有返回值
+            if(a<b)
+                max=b
+            else
+                max=a
+        如果将if语句作为表达式使用并赋值给一个变量，则if必须有配对的else语句，整个if else语句的值是满足的if 或 不满足的else语句块中最后一个语句的值
+            val max=if(a>b)
+                {
+                    print("Choose a")
+                    a
+                }
+                else
+                {
+                    print("Choose b")
+                    b
+                }
+    2.when
+        when语句可以作为语句，也可以作为一个表达式，有返回值
+        带参数的when语句：
+            when语句执行时，将参数与分支条件比较，匹配的分支将被执行，不匹配的被跳过，如果没有匹配的，执行else语句（如果存在的话）
+                when(x)
+                {
+                    1 -> print("x==1")
+                    2 -> print("x==2")
+                    else -> print("x is neither 1 nor 2")
+                }
+            如果需要对不同的分支执行相同的操作，可以将多个分支的条件用逗号,分隔，合并成一个分支
+                when(x)
+                {
+                    0,1 -> print("x==0 or x==1")
+                    else -> print("otherwise")
+                }
+        不带参数的when语句：
+            不带参数的when语句相当于if-else语句，
+                when
+                {
+                    x.isOdd() -> print("x is odd")
+                    x.isEven() -> print("x is even")
+                    else -> print("What")
+                }
+        作为表达式时，必须要有else语句，整个when语句的返回值是匹配分支语句块的最后一个语句的值
+    3.for循环
+        for循环可用于任何定义了迭代器的数据集合，包括：
+        定义了一个iterator()的方法，这个函数返回的对象需要：定义了方法next()和hasNext()
+            for(item in collection)
+            {
+                //...
+            }
+    4.while循环
+    5.do while循环
+    6.跳转语句，也均可以作为表达式
+        return
+        break
+        continue
+    
+
+二、数组 Array
+
+三、函数
+    1. 声明
+        fun functionName(arg1: ArgType, arg2: ArgType):returnType
+        {
+        }
+    2. 默认参数
+        默认参数在参数的类型后使用=定义
+        fun functionName(arg1: Int=2){ }    //整形参数arg1的默认值为2
+    3. 命名实参调用
+        如果一个函数有很多参数，在调用时可以显式打出形参名并赋值
+        fun aLotOfParameters(param1: Type1, param2: Type2, param3: Type3){ }
+        aLotOfParameters(param1=arg1, param2=arg2, param3=arg3)
+    4. 紧凑函数
+        当函数只包括一个表达式时，可以用等号=代替花括号{}写成紧凑形式
+            fun isHot(temperature: Int):Boolean = temperature > 30
+        紧凑函数的返回值类型可以被自动推导，所以可以进一步写成
+            fun isHot(temperature: Int) = temperature > 30
+            
+    5. 主函数的完全版
+    fun main(agrs: Array<String>){ }
+四、类
+    类的声明由类的类名、类的主构造函数和类的结构组成
+    一个类的结构可以为空，这样的类为空类，花括号可以省略
+        class Empty
+    1.主要构造函数和init代码块
+        一个Kotlin类包含一个主要构造函数和若干个次要构造函数组成，主要构造函数是类声明头的一部分，紧跟在类名之后
+            class Person constructor(firstName: String) { }
+        如果这个主要构造函数没有可见性修饰符（public private），constructor关键字可以省略
+            class Person(firstName: String){ }  //firstName是主要构造函数的一个参数
+        可以将需要初始化的类成员的声明直接放在主要构造函数中，使得主要构造函数可以直接对数据初始化
+            class Person(val firstName: String) //firstName是Person类的一个成员，并在主要构造函数中直接被初始化
+        主要构造函数只用于初始化，不能包含代码，代码要放在init语句块中，此时init语句块可以使用主要构造函数中的参数
+            class Person(fullName:String)
+            {
+                val firstName
+                val lastName
+                init
+                {
+                    firstName = fullName.substringBefore(' ')
+                    lastName = fullName.substringAfter(' ')
+                }
+            }
+        一个类中可以有多个init代码块，按他们被声明的顺序来执行，所有init代码块都在构造时被执行一次
+    2.次要构造函数
+        次要构造函数调用前，一定要先执行主要构造函数和init语句块（如果有的话）
+        次要构造函数通过关键字constructor()定义
+        当一个类定义了主要构造函数时，必须通过在constructor()之后加冒号通过this()调用主要构造函数并提供主要构造函数所需的参数完成构造
+            constructor(arg: argType):this(args) { }
+        所以一个类的构造函数的执行顺序是：主要构造函数->所有init代码块->次要构造函数
+    继承：
+        一个类要被继承，显示指明它允许被继承，在基类前加open关键字
+            open class Base{ }
+        类似的，要继承基类的成员、方法，在相应的成员方法前加open关键字
+        指定派生类从基类继承而来，需要在派生类的声明头部后用冒号:加基类名，并调用基类的一个构造函数(如果基类没有定义构造函数，编译器会隐式产生一个，所以依然需要用一对圆括号调用它)
+            class Derived: Base() {}
+    3.可见性
+        private：类内可见
+        protected：类内和派生类内可见
+        public：默认
+        internal：同样被声明成internal的同模块的类内可见
+    4.接口类
+        接口类使用关键字interface声明，接口类可以定义具体方法或抽象方法，与抽象类不同的是，接口类不能存储非抽象的数据成员，或者需要用get()方法来赋初值
+        接口类的方法如果没有定义，默认为abstract修饰的抽象方法
+        一个普通类或接口类可以同时继承多个接口类
+        如果一个普通类继承了包含同名方法的多个接口类，需要显式override重名的方法
+            interface A
+            {
+                fun foo() {print("A")}
+                fun bar()
+            }
+            interface B
+            {
+                fun foo() {print("B")}
+                fun bar() {print("B.bar")}
+            }
+            class MyClass: A, B
+            {
+                override fun foo()
+                {
+                    super<A>.foo()
+                    super<B>.foo()
+                    //...
+                }
+
+                override fun bar()
+                {
+                    super<B>.bar()
+                    //...
+                }
+            }
+    5.数据类
+        数据类是主要用来存储数据的类，用data class关键字声明
+五、继承
+
+六、Set
+    判重过程：
+        1.比较hash code，如果没有找到相同hash code的引用，则没有重复
+        2.当找到相同hash code的引用时，使用===运算符来比较两个引用是否指向相同对象，如果===返回相同，则是重复，如果===返回不相同，则使用操作符==来比较两个引用所指向的对象是否“等同”
+    所以Set中的两个引用相同的条件是：
+        两个引用指向同一对象（所以此时hash code相同，===返回相同）
+        hash code相同的不同一个对象（所以===返回不同），但是==返回相同
+        
+七、Lambda表达式
+    1.形式
+        Lambda表达式由一对花括号{}括起来，花括号中首先声明形参和其类型，然后用一个指向符号->加上函数体构成
+            {x:Int -> x+5}  //一个将形参+5的lambda表达式
+        如果lambda表达式没有形参，可以省略->符号
+            {"Hello world!"}    //一个返回字符串"Hello world!"的lambda表达式
+        lambda表达式可以赋值给一个对象
+            val myLambda={x:Int -> x+5}
+
+    2.调用lambda表达式
+        调用一个lambda表达式，使用其invoke()方法，并加上实参
+            myLambda.invokle(2)
+        也可以直接对lambda表达式对象使用函数调用的形式
+            myLambda(2)
+    3.类型
+        一个lambda表达式的类型是：(parameterType) -> returnType
+        所以上面的myLambda的完整声明是：val myLambda:(Int) -> Int = {x:Int -> x+5}
+        如果lambda表达式只有一个形参，可以省略形参名，并在函数体中用it指代这个形参
+            val myLambda:(Int) -> Int = { it+5 }    //注意这里myLambda的类型不能省略，因为省略了之后编译器无法知道形参的类型
+        如果一个lambda表达式没有返回值，或者不需要其返回值时，将returnType声明为Unit
+        

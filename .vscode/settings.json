@@ -90,5 +90,7 @@
     "editor.cursorSmoothCaretAnimation": true,
     "editor.smoothScrolling": true,
     "python.pythonPath": "C:\\Users\\Peter\\anaconda3\\python.exe",
-    "cmake.configureOnOpen": false
+    "cmake.configureOnOpen": false,
+    "C_Cpp.formatting": "Disabled",
+    "workbench.list.smoothScrolling": true
 }

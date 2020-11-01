@@ -1,0 +1,508 @@
+-1.运行栈
+                        应用
+                支持库 | OpenCL编译器前端 | SPIR-V
+                OpenCL运行时 | OpenCL IR编译器（IR: intermediate representation）
+                        GPU内核驱动
+                        硬件层
+            
+    对比CUDA运行栈：
+                        应用
+                    CUDA编译器前端
+            Host端编译器    | Device端编译器
+            原生目标代码文件 | Nvidia PTX
+                        可执行文件
+
+0.体系结构
+    context：捆绑到一个device
+    platform
+    program：
+    kernel：运行在device上的代码
+    command queue：操作一个device的通道，可能是一个FIFO（先进先出）的队列结构
+    buffer：device上的全局内存，与context和device相捆绑
+
+    一个platform代表一个OpenCL的实现，一个platform通常包含相同的芯片厂商，比如AMD的cpu和gpu，由结构体cl_platform_id表示
+        定义platform的目的是，相同的芯片厂商之间的设备交互可能会提供更优化的性能，比如amd的gpu和cpu之间传输数据，可能有优化的方法
+    一个device代表一个platform上的设备，由结构体cl_device_id表示
+    一个context可以包含几个device，但是只能是同一个platform上的不同device，不能包含不同platform上的device，比如几个A卡可以运行在同一个context下（因为是同一个platform），但是A卡和N卡不能在同一个context
+        一个context决定了什么设备之间可以传输数据，同一个context的设备才能互相传输数据
+        context由结构体cl_context表示
+    一个program是kernel的容器，由结构体cl_program表示
+    一个kernel是编译好的源代码，由结构体cl_kernel表示
+    一个work-group是一些work-item的集合，这些work-item访问相同的内存区域成为local内存，可以使用内存栅栏来同步
+
+
+1.数据类型
+    定义在<CL/cl_platform.h>
+    cl_char
+    cl_uchar
+    cl_short
+    cl_ushort
+    cl_int
+    cl_uint
+    cl_long
+    cl_ulong
+    cl_half
+    cl_float
+    cl_double
+2.平台
+    cl_int clGetPlatformIDs(cl_uint num_entries, cl_platform_id* platforms, cl_uint* num_platforms)
+        函数返回错误代码
+
+    cl_int clGetPlatformInfo(cl_platform_id platform, cl_platform_info param_name, size_t param_value_size, void* param_value, size_t* param_value_size_ret)
+        函数返回错误代码
+        param_name可选参数：
+            CL_PLATFORM_NAME 返回platform名称
+            CL_PLATFORM_VENDOR 返回platform的供应商名
+            CL_PLATFORM_VERSION 返回platform所支持的最高OpenCL版本
+
+    cl_int clGetDeviceIDs(cl_platform_id platform, cl_device_type device_type, cl_uint num_entries, cl_device_id* devices, cl_uint* num_devices)
+        函数返回错误代码
+        device_type可选参数：
+            CL_DEVICE_TYPE_ALL          返回platform的所有设备
+            CL_DEVICE_TYPE_DEFAULT      返回platform上的默认设备
+            CL_DEVICE_TYPE_CPU          返回host端CPU
+            CL_DEVICE_TYPE_GPU          返回platform上的GPU
+            CL_DEVICE_TYPE_ACCELERATOR  返回platform上的加速器
+    
+    cl_int clGetDeviceInfo(cl_device_id device, cl_device_info param_name, size_t param_value_size, void* param_value, size_t* param_value_size_ret)
+        函数返回错误代码
+        param_name可选参数：
+            CL_DEVICE_NAME                  char[]
+            CL_DEVICE_VENDOR                char[]
+            CL_DEVICE_EXTENSIONS            char[]
+            CL_DEVICE_GLOBAL_MEM_SIZE       cl_ulong
+            CL_DEVICE_ADDRESS-BITS          cl_uint
+            CL_DEVICE_AVAILABLE             cl_bool
+            CL_DEVICE_COMPILER_AVAILABLE    cl_bool
+    
+    用devices数组指定的设备创建一个context
+    cl_context clCreateContext(const cl_context_properties* properties, cl_uint num_devices, const cl_device_id* devices, (void CL_CALLBACK* notify_func)(...),
+        void* user_data, cl_int* error)
+
+    用device_type类型的设备创建一个context
+    cl_context clCreateContextFromType(const cl_context_properties* properties, cl_device_type device_type, (void CL_CALL_BACK* notify_func)(...), 
+        void* user_data, cl_int* error)
+    多数情况下，properties是一个NULL指针，notify_func是一个回调函数，在错误发生时调用，user_data是传给回调函数的参数
+    这两个函数都返回一个cl_context
+
+    clGetContextInfo(cl_context context, cl_context_info param_name, size_t param_value_size, void* param_value, size_t* param_value_size_ret)
+        param_name可选参数：
+            CL_CONTEXT_NUM_DEVICES                          cl_uint
+            CL_CONTEXT_DEVICES                              cl_device_id[]
+            CL_CONTEXT_PROPERTIES                           cl_context_properties
+            CL_CONTEXT_REFERENCE_COUNT                      cl_uint
+            CL_CONTEXT_D3D10_PREFER_SHARED_RESOURCES_KHR    cl_bool
+    由于创建context的函数都直接返回一个cl_context结构体，所以不同的cl_context变量可能指向的是同一个实际的context，所以一个context会包含一个引用计数
+    所以在写外部函数来访问一个context的时候需要调用clRetainContext(context)函数来增加这个引用计数，在函数完成后调用clReleaseContext(context)来减少这个引用计数
+
+    clCreateProgramWithSource(cl_context context, cl_uint src_num, const char** src_strings, const size_t* src_sizes, cl_int* err_code)
+        源代码存储在字符串数组src_strings中，src_num表示这个指针数组有多少个元素，src_sies数组的每个元素表示src_strings对应字符串的长度
+
+    clBuildProgram(cl_program program, cl_uint num_devices, const cl_device_id* devices, const char* options, (void CL_CALLBACK* notify_func)(...), void* user_data)
+    clGetProgramInfo(cl_program program, cl_program_info param_name, size_t param_value_size, void* param_value, size_t* param_value_size_ret)
+        param_name可选参数：
+            CL_PROGRAM_CONTEXT          cl_context
+            CL_PROGRAM_DEVICES          cl_device_id[]
+            CL_PROGRAM_NUM_DEVICES      cl_uint
+            CL_PROGRAM_SOURCE           char[]  返回源代码字符串，多个源代码文件将被拼接成一个字符串
+            CL_PROGRAM_BINARIES         unsigned_char** 返回源代码编译成的二进制
+            CL_PROGRAM_BINARY_SIZES     size_t[] 返回各个源代码二进制程序大小的数组
+            CL_PROGRAM_REFERENCE_COUNT  cl_uint 返回程序引用计数
+    
+    clGetProgramBuildInfo(cl_program program, cl_device_id device, cl_program_build_info param_name, size_t param_value_size, void* param_value, size_t* param_value_size_ret)
+        param_name可选参数：
+            CL_PROGRAM_BUILD_STATUS     cl_build_status
+            CL_PROGRAM_BUILD_OPTIONS    char[]
+            CL_PROGRAM_BUILD_LOG        char[]
+
+    clCreateKernelsInProgram(cl_program program, cl_uint num_kernels, cl_kernel* kernels, cl_uint* num_kernels_ret)
+    由编译好的cl_program生成cl_kernel，一个函数是一个kernel，存储在kernels数组中
+
+    clCreateKernel(cl_program program, const char* kernel_name, cl_int* error)
+    这个函数将编译好的cl_program中的某一个函数生成一个cl_kernel，要生成kernel的函数由"kernel_name"函数名指定
+    如果所指定的函数名不存在，则函数返回NULL，并且将error的值设定为CL_INVALID_KERNEL_NAME
+
+    clKernelInfo(cl_kernel kernel, cl_kernel_info param_name, size_t param_value_size, void* param_value, size_t* param_value_size_ret)
+        param_name可选参数：
+            CL_KERNEL_FUNCTION_NAME     char[]      返回kernel函数的函数名
+            CL_KERNEL_NUM_ARGS          cl_uint     返回kernel函数的参数个数
+            CL_KERNEL_REFERENCE_COUNT   cl_uint
+            CL_KERNEL_CONTEXT           cl_context
+            CL_KERNEL_PROGRAM           cl_program
+
+    clReleaseKernel(cl_kernel kernel)
+    释放kernel
+
+    cl_command_queue clCreateCommandQueue(cl_context context, cl_device_id device, cl_command_queue_properties properties, cl_int* err)
+        cl_command_queue_properties是一个枚举类型，包含以下枚举值
+            CL_QUEUE_PROFILING_ENABLE
+            CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE
+
+    clEnqueueTask(cl_command_queue queue, cl_kernel kernel, cl_uint num_events, const cl_event* wait_list, cl_event* event)
+
+    与clEnqueueTask()不同，clEnqueueNDRangeKernel()可以控制内核函数参数的数据分布
+    设备支持的最大数据维度可以用clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS, ...)来获取
+    clEnqueueNDRangeKernel(cl_command_queue queue,
+        cl_kernel kernel,
+        cl_uint work_dims,                  //数据的维度
+        const size_t* global_work_offset,   //每个维度数据的偏移量的数组，可以为NULL
+        const size_t* global_work_size,     //每个维度的work-items的数量的数组
+        const size_t* local_work_size,      //每个维度的work-groups中work-items的数量的数组，可以为NULL，此时OpenCL自动根据设备来分配work-item的数目
+        cl_uint num_events,                 //可以为0
+        const cl_event* wait_list,          //可以为NULL
+        cl_event* event)                    //可以为NULL
+    一个work-group是由一些work-item组成的，这些work-item共享一片local memory的内存区域，其中每个work-item有自己的group id
+    一个kernel程序能生成的work-item的总数几乎是无限的（SIZE_MAX个），所以最好把实际的数据量作为work-item的个数
+    一个work-group所能包含的work-item数目（即local_work_size）视具体设备和kernel程序而定，程序消耗的local memory多，一个work-group所能包含的work-item就少
+        cl_int clGetKernelWorkGroupInfo(cl_kernel kernel, cl_device_id device, cl_kernel_work_group_info param_name, size_t param_value_size, void* param_value, size_t* param_value_size_ret)
+            查询编译好的kernel程序的有关work-group信息
+            param_name可选参数：
+                CL_KERNEL_WORK_GROUP_SIZE                   size_t      返回这个kernel函数执行时最大的local_work_size
+                CL_KERNEL_PREFERED_WORK_GROUP_SIZE_MULTIPLE size_t      当不需要使用最大local_work_size时，同时要实现高性能时最好使用的local_work_size 
+                CL_KERNEL_LOCAL_MEM_SIZE                    cl_ulong    返回这个kernel函数执行时所分配的local_memory大小 
+                CL_KERNEL_PRIVATE_MEM_SIZE                  cl_ulong    返回这个kernel函数执行时所分配的private_memory大小
+
+    cl_int clFlush(cl_command_queue command_queue)
+    有时可能入队的任务并不会马上开始执行，所以使用这个函数强制让入队的任务开始执行
+    这个函数并不阻塞，会立刻返回
+
+    clFinish(cl_command_queue queue)
+    阻塞函数，等待queue中的所有command执行完毕才返回
+
+3.数据传输
+    clSetKernelArg(cl_kernel kernel, cl_uint index, size_t size, const void* value)
+        将value指针所指向的数据传递给kernel函数的第index（从0开始）个参数
+        size是传递数据的大小，以字节为单位，常用sizeof(obj)得到
+        value指针可以是以下的形式：
+            指向基本类型的数据的指针
+                此时需要注意：指针所指向的数据的类型需要与kernel函数的参数的类型对应，比如kernel函数中的unsigned long类型与host端程序的cl_ulong类型对应，而host端的unsigned long通常是32位无符号整形，所以并不对应
+            指向复杂类型的数据的指针，比如指向cl_mem的指针
+            指向图像数据的指针
+            NULL
+        这个函数也适用于创建内核的__local参数，此时需要将value指针设置为NULL，比如
+            clSetKernelArg(kernel, 0, 16*sizeof(float), NULL);
+            
+            /*kernel*/
+            __kernel void process(__local float* nums){}    //此时nums是一个指向local memory的指针
+    
+    cl_mem clCreateBuffer(cl_context context, cl_mem_flags options, size_t size, void* host_ptr, cl_int* err)
+        options是一个枚举值，指定device对这块内存区域的访问权限（注意不是host端），可选值：
+            CL_MEM_READ_WRITE   
+            CL_MEM_WRITE_ONLY   
+            CL_MEM_READ_ONLY    
+            CL_MEM_USE_HOST_PTR     device直接访问host_ptr所指向的host端内存区域
+            CL_MEM_COPY_HOST_PTR    在device上分配一片内存区域，并将host_ptr所指向的host端内存区域赋值到device上，所以不需要再调用clEnqueueWriteBuffer()来拷贝数据到device
+                cl_mem input=clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, size, host_ptr, NULL);
+                相当于：
+                cl_mem input=clCreateBuffer(context, CL_MEM_READ_ONLY, size, NULL, NULL);
+                clEnqueueWriteBuffer(queue, input, CL_TRUE, 0, size, host_ptr, 0, NULL, NULL);
+            CL_MEM_ALLOC_HOST_PTR 在device端分配一块内存，并指定将内存分配到对host端可见
+        在CL_MEM_WRITE_ONLY的情况下host_ptr可以设置成NULL，表明丢弃device输出的数据，不在host端分配内存
+        通常options参数是前三个选项和后三个选项中各选择一个，然后取逻辑或
+            当在host端分配内存，并希望device端使用这一块内存，使用CL_MEM_USE_HOST_PTR
+            当在host端分配内存，并希望将这一块内存直接复制到device端，使用CL_MEM_COPY_HOST_PTR
+            当在device端分配内存，并希望host端使用这一块内存，使用CL_MEM_ALLOC_HOST_PTR，然后用map方法
+
+
+    当一个kernel需要另一个kernel的一部分数据的时候，可以创建一个subbuffer
+    cl_mem clCreateSubBuffer(cl_mem buffer, cl_mem_flags flags, cl_buffer_create_type type, const void* info, cl_int* error)
+        flags可选的值与clCreateBuffer的相同
+        type参数指定为CL_BUFFER_CREATE_TYPE_REGION
+        info指针需要接受一个cl_buffer_region的结构体，定义是
+            typedef struct _cl_buffer_region
+            {
+                size_t origin;  //offset
+                size_t size;    //subbuffer的大小
+            } cl_buffer_region;
+    
+    创建了内存区域后就需要从host端读取或者拷贝数据到device上
+        clEnqueueReadBuffer(cl_command_queue, cl_mem buffer, cl_bool blocking, size_t offset, size_t data_size, void* ptr, cl_uint num_events, const cl_event* wait_list, cl_event* event)
+            host<-device，host端读取device上的内存
+        clEnqueueWriteBuffer(cl_command_queue, cl_mem buffer, cl_bool blocking, size_t offset, size_t data_size, const void* ptr, cl_uint num_events, const cl_event* wait_list, cl_event* event)
+            host->device，host端写入device上的内存
+        
+    传输图片数据：
+        图片数据的内存也是由cl_mem结构体表示，图片分为2D结构和3D结构
+            cl_mem clCreateImage2D(cl_context context, cl_mem_flags options, const cl_image_format* format, size_t width, size_t height, size_t row_pitch, void* data, cl_int* err)
+
+            cl_mem clCreateImage3D(cl_context context, cl_mem_flags options, const cl_image_format* format, size_t width, size_t height, size_t depth, size_t row_pitch, size_t slice_pitch, void* data, cl_int* err)
+        options参数与clCreateBuffer()相同
+        format参数指定图片的数据是如何存储的
+            typedef struct _cl_image_format 
+            {
+                cl_channel_order image_channel_order;   //枚举值，代表各个通道的顺序，可选CL_RGB, CL_RGBA, CL_ARGB, CL_BGRA, CL_RG, CL_RA, CL_R, CL_A, CL_LUMINANCE（黑白图像）
+                cl_channel_type image_channel_data_type;//枚举值，代表每个通道的数据的格式，最常用CL_UNSIGNED_INT8
+            } cl_image_format;
+        row_pitch参数指定图片一行的字节数，通常情况下等于width*pixel_size，但是可以设置为0让opencl自动计算
+        slice_pitch参数指定图片每个维度的字节数，与row_pitch类似
+
+    clGetMemObjectInfo(cl_mem object, cl_mem_info param_name, size_t param_value_size, void* param_value, size_t* param_value_size_ret)
+        param_name可选参数
+            CL_MEM_TYPE	                cl_mem_object_type  返回一个枚举值表示内存对象的类型，可能是CL_MEM_OBJECT_BUFFER, CL_MEM_OBJECT_IMAGE2D, CL_MEM_OBJECT_IMAGE3D	
+            CL_MEM_FLAGS	            cl_mem_flags	
+            CL_MEM_HOST_PTR	            void*	
+            CL_MEM_SIZE	                size_t	
+            CL_MEM_CONTEXT	            cl_context	
+            CL_MEM_ASSOCIATED_MEMOBJECT	cl_mem	
+            CL_MEM_OFFSET	            size_t  只在内存对象是一个subbuffer时有效
+            CL_MEM_REFERENCE_COUNT	    cl uint	
+
+    为了减少数据拷贝的开销，可以将device上的内存区域映射到host端的一个指针上，然后host端的程序可以把这个指针当做一片内存来用
+        首先需要创建一个内存对象，将host_ptr设置为NULL指针
+            cl_mem buffer = clCreateBuffer(context, CL_MEM_READ_WRITE, size, NULL, NULL);
+        然后使用下面的函数创建内存映射命令
+        void* clEnqueueMapBuffer(cl_command_queue queue,
+           cl_mem buffer,
+           cl_bool blocking,
+           cl_map_flags map_flags,  //控制host端程序对所映射内存区域的访问权限，可选CL_MAP_READ和CL_MAP_WRITE
+           size_t offset,
+           size_t data_size,
+           cl_uint num_events,
+           const cl_event *wait_list,
+           cl_event *event,
+           cl_int *errcode_ret)
+           函数的返回的值就是映射的内存的指针
+        程序完成后必须释放所映射的内存
+        int clEnqueueUnmapMemObject(cl_command_queue queue, cl_mem buffer, void* mapped_ptr, cl_uint num_events, const cl_event* wait_list, cl_event* event)
+    释放内存
+        cl_int clReleaseMemObject(cl_mem memobject)
+            返回值：
+                CL_SUCCESS
+                CL_INVALID_MEM_OBJECT
+                CL_OUT_OF_RESOURCE  在释放内存的过程中可能需要在device端有额外的内存，如果不满足则返回这个错误
+                CL_OUT_OF_HOST_MEMORY 在释放内存的过程中可能需要在host端也有额外的内存，如果不满足则返回这个错误
+5.kernel的编程
+    每一个kernel必须符合：
+        以__kernel开头
+        必须返回void
+        大部分OpenCL设备不兼容无参数的kernel
+    形式：
+        __kernel void Function(args)
+        {...}
+    kernel的参数只支持原始类型和指针类型，不支持结构体类型
+    原始类型分为数值类型和对应的向量类型，向量类型的n值可以取2,3,4,8,16
+        bool
+        (unsigned) char         (u)charn
+        (unsigned) short        (u)shortn
+        (unsigned) int          (u)intn
+        (unsigned) long         (u)longn
+        half                    
+        float                   floatn
+        intptr_t
+        uintptr_t
+        ptrdiff_t
+        size_t
+        void
+        double(当设备支持cl_khr_fp64扩展时支持，需要在kernel源代码中加#pragma OPENCL EXTENSION cl_khr_fp64 : enable宏来启用)
+        由于设备的不同，原始类型可能是大端序或者小端序，在小端序的设备上，kernel中可以利用OpenCL定义的宏__ENDIAN_LITTLE__来根据条件编译不同的代码
+    向量类型的初始化必须将元素用圆括号括起来，向量和原始类型可以相互组合
+        float4 some_data=(float4)(1.0, 2.0, 3.0, 4.0)
+        float4 some_data2=(float4)(1.0);    //4个元素都是1.0
+        float2 a=(float2)(1.0, 2.0);
+        float2 b=(float2)(3.0, 4.0);
+        float4 c=(float4)(a, b);    //合并向量a和b
+        float3 rgb=(float3)(0.25, 0.5, 0.75);
+        float4 rgba=(float4)(rgb, 1.0);
+    向量类型的索引
+        数字索引：在变量后加.sN（N是索引号，超过10之后用十六进制，ABCDEF），也可以接多个索引来同时索引多个元素形成一个新向量
+            char a=msg.s0;      //向量msg的第0个元素
+            char4 b=msg.s5431;
+        字母索引：在变量后加.x或.y或.z或.w，等效于.s0到.s3，与数字索引一样也可以接多个索引，但不能与数字索引混用
+        条件索引：
+            .hi     表示高部分的一半N/2 ~ N - 1
+            .lo     表示低部分的一半0~N/2 - 1 
+            .even   偶数索引号的元素
+            .odd    奇数索引号的元素
+    运算符：
+        数学运算：+-* / % ++ --
+        逻辑比较：== != > >= < <=
+        逻辑运算：&& || ! 
+        位运算： & | ^ ~ >> << 
+        三目： ? :
+        赋值： += -= *= /= %= <<= >>= &= |= ^=
+    原始->向量
+        vector_type vloadN(size_t offset, const (访问权限标识符) scalar* mem)
+            N的取值为2,3,4,8,16，mem指针所指向的数据的类型必须与向量元素的类型相同
+            offset是按向量的大小的倍数来偏移
+    向量->原始
+        void vstoreN(vector_type vec, size_t offset, (访问权限标识符)scalar* mem)
+            offset是按原始类型的大小的倍数来偏移
+
+    字节对齐：任何一个数据结构（原始类型或者向量类型或者结构体（虽然OpenCL中不允许结构体））总是对齐到不小于这个数据结构大小的2的幂次的内存地址中，比如4字节的变量会存储到4的整数倍的内存地址，而12字节的变量会存储到16的整数倍的内存地址
+        可以用__attribute__((aligned(x)))来控制对齐方式，比如：
+            short x __attribute__((aligned(4)));
+
+    对于指针类型的参数，必须在指针类型前加一个地址类型标识符来表明这块内存区域的访问权限，可以是__global, __constant, __local, __private
+    在内核函数体中，__global只能用于声明指针类型
+    可以直接在内核函数中声明local内存区域
+        local float* cache[SIZE];
+    但是这里的SIZE必须是编译期常量，不能是VLA
+    __local不能直接被初始化，只能先声明再赋值
+
+6.七类自带函数
+    kernel id识别：
+        work-item的维度是由数据所需索引的个数来决定的，比如一个要对一些二维点集做一些处理，需要两个下标point[x][y]，那么维度就是2
+        uint get_work_dim()
+            返回kernel的维度
+        size_t get_global_size(uint dim)
+            返回dim维度上work-item的数目
+        size_t get_global_id(uint dim)
+            返回dim维度上这个work-item的索引
+        size_t get_global_offset(uint dim)
+            OpenCL1.1新标准，返回dim维度上这个work-item序号的偏移量
+
+        size_t get_num_groups(uint dim)
+        size_t get_group_id(uint dim)
+        size_t get_local_id(uint dim)
+        size_t get_local_size(uint dim)
+
+
+    数据传输
+    浮点函数
+        
+    整数函数
+    乱序和选择函数
+        vector_type shuffle(vector_type x, uintegerm mask)
+        vector_type shuffle2(vector_type x, vector_type y, uintegerm mask)
+            mask是一个无符号整型数（uchar, ushort, uint, ulong）组成的向量，元素的个数决定返回的向量的元素个数，而且mask的元素的宽度要和输入向量的元素的宽度相同
+            mask中的每个元素的k个最低位作为索引来决定所选择的元素，如果输入向量x有n个元素，k的值为log(2)n
+        vector_type bitselect(vector_type a, vector_type b, integerm mask)
+            mask是一个整形数（无符号或有符号均可）组成的向量，mask的总宽度（即位的总数=元素的位数*元素数）决定返回的向量的总宽度
+            当mask的元素中的位为0时，选择a中的对应位，否则选择b中的对应位
+        vector_type select(vector_type a, vector_type b, integerm mask)
+            mask是一个整形数（无符号或有符号均可）组成的向量，元素的个数决定返回的向量的元素个数
+            当mask元素中的最高位为0时，选择a中的对应元素，否则选择b中的对应元素
+
+    向量函数
+        int all(vec_type v)
+            测试一个向量类型变量v的所有元素的最高位是否为1，如果是，返回true
+        int any(vec_type v)
+            测试一个向量类型变量v的任何一个元素的最高位是否为1
+    同步函数
+        void barrier(cl_mem_fence_flags flags)
+            创建一个barrier
+            flags可选值：
+                CLK_LOCAL_MEM_FENCE
+                CLK_GLOBAL_MEM_FENCE
+        void read_mem_fence(cl_mem_fence_flags flags)   //阻塞后面的读取操作直到work_group中的所有work-item完成
+        void write_mem_fence(cl_mem_fence_flags flags)  //阻塞后面的写入操作
+        void mem_fence(cl_mem_fence_flags flags)        //阻塞后面的读取和写入操作
+
+7.事件
+    一些函数接受一个cl_event作为回调函数，此时函数运行在非阻塞模式下，主线程可以继续执行，当函数执行完成后调用回调函数
+    这样的函数有：
+        clEnqueueTask(cl_command_queue queue, cl_kernel kernel, cl_uint num_events, const cl_event* wait_list, cl_event* event)
+        clEnqueueNDRangeKernel(cl_command_queue queue,
+            cl_kernel kernel,
+            cl_uint work_dims,                  
+            const size_t* global_work_offset,   
+            const size_t* global_work_size,     
+            const size_t* local_work_size,      
+            cl_uint num_events,                 
+            const cl_event* wait_list,          
+            cl_event* event)
+    给事件添加回调函数
+        cl_int clSetEventCallback(cl_event event, cl_int callback_type, void (CL_CALLBACK *func)(cl_event event, cl_int status, void* data), void* data)
+        callback_type参数的唯一可选值为CL_COMPLETE
+        func是回调函数的函数指针，回调函数的函数签名与函数指针类型显然要符合，即返回值必须为void，接受3个参数，分别是cl_event, cl_int, void*
+        这个函数必须在enqueue-task函数之后调用，否则会引发segfault
+    创建host端事件：
+        不但opencl command可以创建事件，host端也可以创建
+            cl_event clCreateUserEvent(cl_context context, cl_int* err)
+        由于这个函数只和一个context联系，而不与具体的设备（command_queue）联系，所以可以将这个事件用于多个设备
+        将这个函数返回的cl_event结构体用于wait_list参数时，所执行的函数将暂停执行，直到host端更新这个事件的状态
+        更新事件的状态使用这个函数
+            cl_int clSetUserEventStatus(cl_event event, cl_int status)
+                status可以被设置为0，此时等待这个事件的函数将继续执行，或者为负数，此时等待这个事件的函数将被中止
+        释放事件
+            clReleaseEvent(cl_event event)
+    其他事件：
+        标记事件
+            标记事件直接创建在一个command_queue中，并且与所有在它之前入队的command相联系
+            创建一个标记事件
+                cl_int clEnqueueMarker(cl_command_queue command_queue, cl_event* event)
+            比如可以将对这个标记事件设置一个回调函数，表明在这个标记事件前面的command都执行完时就调用这个回调函数
+                cl_event ev;
+                cl_int clSetEventCallback(ev, CL_COMPLETE, &callback_func, NULL);
+                cl_int clEnqueueMarker(queue, &ev);
+        等待事件
+            等待事件直接创建在一个command_queue中，所有在它之后入队的command暂停执行，直到host端更新这个事件的状态
+            创建一个或一些等待事件
+                cl_int clEnqueueWaitForEvents(cl_command_queue queue, cl_uint num_events, const cl_event* wait_list)
+                num_events表示等待事件的个数，wait_list指向等待事件的数组，之后入队的command将暂停执行直到所有wait_list数组中的时间全部满足
+        障碍事件
+            障碍事件只有一个简单用途，就是防止command_queue中在它后面的command在它之前执行，确保在它前面的command全部执行完毕才能继续执行后面的command
+                cl_int clEnqueueBarrier(cl_command_queue queue)
+    
+    性能测试：
+        有了事件就可以测试函数执行的性能
+        需要做3件事：在创建command_queue时，将参数设置为CL_QUEUE_PROFILING_ENABLE，创建一个cl_event事件，并将enqueue函数的事件指针设置为这个事件，调用下面的函数来获取性能信息
+            cl_int clGetEventProfilingInfo(cl_event event, cl_profiling_info param, size_t param_value_size, void* param_value, size_t* param_value_size_ret)
+                param可选参数：所有的返回值的时间单位都是纳秒
+                    CL_PROFILING_COMMAND_QUEUED     cl_ulong    返回函数入队的时间
+                    CL_PROFILING_COMMAND_SUBMIT     cl_ulong    返回函数提交到device的时间
+                    CL_PROFILING_COMMAND_START      cl_ulong    返回函数（或kernel）开始执行的时间
+                    CL_PROFILING_COMMAND_END        cl_ulong    返回函数（或kernel）执行完成的时间
+        不是所有的OpenCL设备都可以将计时精度精确到纳秒，要查看真实的计时精度，将CL_DEVICE_PROFILING_TIMER_RESOLUTION作为clGetDeviceInfo()函数的参数
+            size_t timeResolution;
+            clGetDeviceInfo(device, CL_DEVICE_PROFILING_TIMER_RESOLUTION, sizeof(timeResolution), &timeResolution, NULL);
+
+
+    自定义opencl函数可以用BOOST_COMPUTE_FUNCTION(returnType, name, argument)宏
+        BOOST_COMPUTE_FUNCTION(int, add_four, (int x),
+        {
+            return x + 4;
+        });
+
+8.C++绑定
+    Buffer
+        Buffer (const Context &context, cl_mem_flags flags, size_type size, void *host_ptr=NULL, cl_int *err=NULL)
+    Context
+        Context (
+            const vector< Device > &devices, 
+            cl_context_properties *properties=NULL,
+            void(CL_CALLBACK *notifyFptr)( const char *, const void *, size_type, void *)=NULL,
+            void *data=NULL, 
+            cl_int *err=NULL
+        )
+        Context (
+            const Device &device, 
+            cl_context_properties *properties=NULL, 
+            void(CL_CALLBACK *notifyFptr)( const char *, const void *, size_type, void *)=NULL, 
+            void *data=NULL, 
+            cl_int *err=NULL
+        )
+    typedef std::vector<std::vector<unsigned char>> Binaries;
+    typedef std::vector<std::string> Sources;
+    Program
+        Program(const string& source, bool build=false);
+        Program(const Context& context, const string& source, bool build = false);
+        
+        Program(const Sources& sources)
+        Program()
+8.AMD
+    VGPRs: Number of general-purpose vector registers used by the kernel
+    SGPRs: Number of general-purpose scalar registers used by the kernel
+    GCN架构上，一个compute unit包含：
+        64KB local memory，每个work-group最大可分配32KB local memory
+        16KB L1 缓存
+        寄存器
+        4*SIMD，每个SIMD包含：
+            16*processing element
+    同一个work group里的一组work-item会被分配到一个compute unit上执行，称为wavefront，wavefront内的work item对不同的数据执行相同的指令
+    wavefront最多包含64个work-item，所以work group的大小最好是64的整数倍，这样就不会有闲置的wavefront空间被浪费
+
+9.Nvdia
+    在Nvidia平台上，OpenCL的kernel代码会被编译成PTX（parallel thread execution）
+10.异常
+    在C++绑定中，要启用异常机制需要在#include <CL/cl2.hpp>前加一个宏定义#define __CL_ENABLE_EXCEPTIONS
+    之后便可在程序中catch cl::Error异常
+11.Spir-v
+    SPIR: standard portable intermediate representation
+    目的是
+        1.为GPU使用的shader program和kernel提供统一化可移植的二进制表示
+        2.支持OpenCL C/C++ 内核，GLSL，Vulkan
+    在SPIR-V之前，需要将kernel内核明文源代码植入发布的程序，而且每次运行需要重新编译kernel，不同的平台实现可能对标准的支持有细微差别，导致kernel无法成功编译
+    在SPIR-V之后，只需将SPIR-V代码植入发布的程序，降低编译kernel的耗时
+    与OpenCL 2.1一起推出，kernel支持C++14
+    clCreateProgramWithIL()
