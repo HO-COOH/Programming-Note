@@ -1,3 +1,22 @@
+- [语法基础](#语法基础)
+- [Project](#project)
+- [add_executable](#add_executable)
+- [Variables](#variables)
+- [Library](#library)
+- [Build specification](#build-specification)
+- [target_link_libraries](#target_link_libraries)
+- [Message](#message)
+- [include](#include)
+- [GNUInstallDir](#gnuinstalldir)
+- [option](#option)
+- [CMakePackageConfigHelpers](#cmakepackageconfighelpers)
+- [configure_file](#configure_file)
+- [Install](#install)
+- [list函数](#list函数)
+- [find_package](#find_package)
+- [Global setup](#global-setup)
+  - [FindBoost](#findboost)
+
 # 语法基础
 CMake中任何的变量、参数都是字符串，如果字符串中包含空格而且要将这个字符串作为一个整体（例如作为一个参数）时，需要将字符串用双引号括起来作为一个参数
 
@@ -43,7 +62,13 @@ foreach(<loop_var> RANGE <start> <stop> [<step>])
 # List
 foreach(<loop_var> IN LISTS <list>)
 ```
-
+循环一个文件夹中的文件
+```cmake
+file(GLOB <variable> pattern)
+foreach(file <variable>)
+  #...
+endforeach()
+```
 
 - 逻辑运算符
   + ``NOT``
@@ -74,6 +99,131 @@ function(<name> [<arg1> ...])
   <commands>
 endfunction()
 ```
+
+- 作用域
+
+  CMake的作用域规不同寻常，当函数体中引用一个全局变量时，这个全局变量的值是在函数调用时计算的
+  ```cmake
+  function(PrintVar)
+      message(${var})
+  endfunction()
+
+  set(var 3)
+  PrintVar() #3
+  ```
+  对比
+  ```cmake
+  set(var 3)
+  function(PrintVar)
+      message(${var})
+  endfunction()
+
+  set(var 4)
+  PrintVar() #4
+  ```
+  在函数调用时，CMake实际上是在函数调用时的全部作用域内变量复制到所调用函数的作用域中，所以在函数中修改这个变量的值不影响原先的变量
+  ```cmake
+  set(var 3)
+  function(PrintVar)
+      message(${var}) #4
+      set(var 5)
+      message(${var}) #5
+  endfunction()
+
+  set(var 4)
+  PrintVar()
+  message(${var}) #4
+  ```
+  要改变原先变量的值，需要在`set()`调用时加一个`PARENT_SCOPE`参数，加了这个参数以后，set不影响函数作用域内的同名变量的值，这个方法也常用于作为函数的返回值用
+  ```cmake
+  set(var 3)
+  function(PrintVar)
+      message(${var}) #4
+      set(var 5 PARENT_SCOPE)
+      message(${var}) #4
+  endfunction()
+
+  set(var 4)
+  PrintVar()
+  message(${var}) #5
+  ```
+
+  ```cmake
+  set(var 3)
+  function(PrintVar)
+      message(${var}) #4
+      set(var 5 PARENT_SCOPE)
+      set(var 6)
+      message(${var}) #6
+  endfunction()
+
+  set(var 4)
+  PrintVar()
+  message(${var}) #5
+  ```
+
+  ```cmake
+  function(SetVar)
+      set(var 5 PARENT_SCOPE)
+  endfunction()
+      
+  SetVar()
+  message(${var}) #5，但是这里var显得很突兀，不便于阅读，不推荐这样做
+  ```
+  更好的做法是使得函数多一个参数只用作返回值
+  ```cmake
+  function(SetVar result)
+      set(result 5 PARENT_SCOPE)
+  endfunction()
+
+  SetVar(result)
+  message(${result}) #5，这样做使得result的来源更清晰
+  ```
+
+- 可变参数函数
+  
+  可以使用CMake 3.5版本之后的`cmake_parse_arguments()`命令来定义可变参数函数，函数可以有能接收多个值的参数和可选的参数，而且调用函数的参数名可以按任意顺序排列。没有parse到的参数存放在变量`<prefix>_UNPARSED_ARGUMENTS`中，此时往往会产生非预想中的行为，所以应该用`message(WARNING "warning message")`向用户发出警告
+  ```cmake
+  cmake_parse_arguments
+      PARSE_ARGV              #模式
+      <N>                     #跳过多少个参数
+      <prefix>                #定义变量名的前缀，所以parse后产生的变量名为<prefix>_
+      <options>               #可选参数（布尔值）的名称
+      <one_value_keywords>    #单值参数
+      <multi_value_keywords>  #多值参数
+  )
+  ```
+  在使用这个方法时，通常需要先调用`set()`来定义各个参数名，例如
+  ```cmake
+  function(Print)
+    set(options OPTIONAL)
+    set(args ESSENTIAL)
+    set(list_args MORE)
+    cmake_parse_arguments(
+        PARSE_ARGV  #mmode
+        0           #number of argumets to skip 
+        test        #variable prefix
+        ${options}
+        ${args}        #one-value-keywords
+        ${list_args}   #multi-value-keywords
+    )   
+    
+    foreach(arg IN LISTS test_UNPARSED_ARGUMENTS)
+        message("Unparsed arguments: ${arg}")        
+    endforeach()
+
+    message("ESSENTIAL: ${test_ESSENTIAL}")
+
+    message("OPTIONAL: ${test_OPTIONAL}")
+
+    foreach(item IN LISTS test_MORE)
+        message("More: ${item}")
+    endforeach()
+  endfunction()
+
+  Print(OPTIONAL ESSENTIAL 1 MORE 2 3 4)
+  #OPTIONAL -> True, test_ESSENTIAL -> 1, test_MORE -> {2, 3, 4}
+  ```
 
 
 # Project
@@ -157,11 +307,14 @@ MSYS : is TRUE when using the MSYS developer environment in Windows
 
 CYGWIN : is TRUE on Windows when using the CygWin version of cmake
 ```
+[cmake_host_system_information](https://cmake.org/cmake/help/latest/command/cmake_host_system_information.html?highlight=cmake_host_system_information)
 ```cmake
 function(printSystemInfo)
     message(${CMAKE_SYSTEM_NAME})
     message(${CMAKE_SYSTEM_PROCESSOR})
     message(${CMAKE_SYSTEM_VERSION})
+    cmake_host_system_information(RESULT PhysicalMem QUERY TOTAL_PHYSICAL_MEMORY)
+    message(${PhysicalMem})
     message(${WIN32})
     message(${MINGW})
 endfunction()
@@ -170,8 +323,48 @@ endfunction()
 [build] Windows
 [build] AMD64
 [build] 10.0.19041
+[build] 65488
 [build] 1
 [build] 1
+```
+检测编译器的简单方法
+```cmake
+if(MSVC)
+    add_compile_options(/W3 /WX)
+else()
+    add_compile_options(-W -Wall -Werror)
+endif() 
+``` 
+- 运行程序
+
+可以在``CMakeLists.txt``中运行其他程序，程序执行的输出到stdout中的结果可以存储到变量中
+```cmake
+execute_process(COMMAND "vcpkg" "version"
+    OUTPUT_VARIABLE result
+)
+```
+``exec_program``在CMake3.0之后的版本后弃用
+
+- 查找程序
+```cmake
+find_program (
+          <VAR> #如果程序存在，则变量存储程序的实际位置，如果不存在，则定义<VAR>-NOTFOUND
+          name | NAMES name1 [name2 ...] [NAMES_PER_DIR]
+          [HINTS path1 [path2 ... ENV var]]
+          [PATHS path1 [path2 ... ENV var]]
+          [PATH_SUFFIXES suffix1 [suffix2 ...]]
+          [DOC "cache documentation string"]
+          [REQUIRED]
+          [NO_DEFAULT_PATH]
+          [NO_PACKAGE_ROOT_PATH]
+          [NO_CMAKE_PATH]
+          [NO_CMAKE_ENVIRONMENT_PATH]
+          [NO_SYSTEM_ENVIRONMENT_PATH]
+          [NO_CMAKE_SYSTEM_PATH]
+          [CMAKE_FIND_ROOT_PATH_BOTH |
+           ONLY_CMAKE_FIND_ROOT_PATH |
+           NO_CMAKE_FIND_ROOT_PATH]
+)
 ```
 
 # Library
@@ -523,14 +716,39 @@ Ordering
   list(SORT <list> [...]) # 
 ```
 
+# find_package
+``find_package()`` 的查找顺序：
+
+- ``CMAKE_SYSTEM_PREFIX_PATH``
+  ```cmake
+  foreach(item ${CMAKE_SYSTEM_PREFIX_PATH})
+      message(${item})
+  endforeach()
+  ```
+
+  Windows输出：
+  ```
+  1> [CMake] C:/Program Files
+  1> [CMake] C:/Program Files (x86)
+  1> [CMake] C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake
+  1> [CMake] C:/Users/Peter/source/repos/CMakeTest/out/install/x64-Debug (default)
+  ```
+
+  Linux输出：
+  ```
+  1> [CMake] /usr/local
+  1> [CMake] /usr
+  1> [CMake] /
+  1> [CMake] /usr
+  1> [CMake] /mnt/c/Users/Peter/source/repos/CMakeTest/out/install/WSL-GCC-Debug
+  1> [CMake] /usr/X11R6
+  1> [CMake] /usr/pkg
+  1> [CMake] /opt
+  ```
+
+
 # Global setup
-```cmake
-if(MSVC)
-    add_compile_options(/W3 /WX)
-else()
-    add_compile_options(-W -Wall -Werror)
-endif() 
-``` 
+
 变量``CMAKE_<LANG>_COMPILER_ID``可能的值有
 ```
 Absoft = Absoft Fortran (absoft.com)
@@ -567,4 +785,96 @@ XLClang = IBM Clang-based XL (ibm.com)
 foreach(item ${CMAKE_CXX_COMPILE_FEATURES})
     message(${item})
 endforeach()
+```
+
+## FindBoost
+是一个Cmake模块，当调用
+```cmake
+find_package(Boost
+  [version] [EXACT]      # Minimum or EXACT version e.g. 1.67.0
+  [REQUIRED]             # Fail with error if Boost is not found
+  [COMPONENTS <libs>...] # Boost libraries by their canonical name
+                         # e.g. "date_time" for "libboost_date_time"
+  [OPTIONAL_COMPONENTS <libs>...]
+                         # Optional Boost libraries by their canonical name)
+)                      # e.g. "date_time" for "libboost_date_time"
+```
+时会搜索boost库的位置，并定义了几个变量
+```
+Boost_FOUND            - True if headers and requested libraries were found，当没找到时会定义Boost_NOTFOUND
+Boost_INCLUDE_DIRS     - Boost include directories
+Boost_LIBRARY_DIRS     - Link directories for Boost libraries
+Boost_LIBRARIES        - Boost component libraries to be linked
+Boost_<C>_FOUND        - True if component <C> was found (<C> is upper-case)
+Boost_<C>_LIBRARY      - Libraries to link for component <C> (may include
+                         target_link_libraries debug/optimized keywords)
+Boost_VERSION_MACRO    - BOOST_VERSION value from boost/version.hpp
+Boost_VERSION_STRING   - Boost version number in x.y.z format
+Boost_VERSION          - if CMP0093 NEW => same as Boost_VERSION_STRING
+                         if CMP0093 OLD or unset => same as Boost_VERSION_MACRO
+Boost_LIB_VERSION      - Version string appended to library filenames
+Boost_VERSION_MAJOR    - Boost major version number (X in X.y.z)
+                         alias: Boost_MAJOR_VERSION
+Boost_VERSION_MINOR    - Boost minor version number (Y in x.Y.z)
+                         alias: Boost_MINOR_VERSION
+Boost_VERSION_PATCH    - Boost subminor version number (Z in x.y.Z)
+                         alias: Boost_SUBMINOR_VERSION
+Boost_VERSION_COUNT    - Amount of version components (3)
+Boost_LIB_DIAGNOSTIC_DEFINITIONS (Windows)
+                       - Pass to add_definitions() to have diagnostic
+                         information about Boost's automatic linking
+                         displayed during compilation
+```
+在使用boost库时，还可以用`set()`设置一些选项
+```
+Boost_USE_DEBUG_LIBS     - Set to ON or OFF to specify whether to search
+                           and use the debug libraries.  Default is ON.
+Boost_USE_RELEASE_LIBS   - Set to ON or OFF to specify whether to search
+                           and use the release libraries.  Default is ON.
+Boost_USE_MULTITHREADED  - Set to OFF to use the non-multithreaded
+                           libraries ('mt' tag).  Default is ON.
+Boost_USE_STATIC_LIBS    - Set to ON to force the use of the static
+                           libraries.  Default is OFF.
+Boost_USE_STATIC_RUNTIME - Set to ON or OFF to specify whether to use
+                           libraries linked statically to the C++ runtime
+                           ('s' tag).  Default is platform dependent.
+Boost_USE_DEBUG_RUNTIME  - Set to ON or OFF to specify whether to use
+                           libraries linked to the MS debug C++ runtime
+                           ('g' tag).  Default is ON.
+Boost_USE_DEBUG_PYTHON   - Set to ON to use libraries compiled with a
+                           debug Python build ('y' tag). Default is OFF.
+Boost_USE_STLPORT        - Set to ON to use libraries compiled with
+                           STLPort ('p' tag).  Default is OFF.
+Boost_USE_STLPORT_DEPRECATED_NATIVE_IOSTREAMS
+                         - Set to ON to use libraries compiled with
+                           STLPort deprecated "native iostreams"
+                           ('n' tag).  Default is OFF.
+Boost_COMPILER           - Set to the compiler-specific library suffix
+                           (e.g. "-gcc43").  Default is auto-computed
+                           for the C++ compiler in use.  A list may be
+                           used if multiple compatible suffixes should
+                           be tested for, in decreasing order of
+                           preference.
+Boost_LIB_PREFIX         - Set to the platform-specific library name
+                           prefix (e.g. "lib") used by Boost static libs.
+                           This is needed only on platforms where CMake
+                           does not know the prefix by default.
+Boost_ARCHITECTURE       - Set to the architecture-specific library suffix
+                           (e.g. "-x64").  Default is auto-computed for the
+                           C++ compiler in use.
+Boost_THREADAPI          - Suffix for "thread" component library name,
+                           such as "pthread" or "win32".  Names with
+                           and without this suffix will both be tried.
+Boost_NAMESPACE          - Alternate namespace used to build boost with
+                           e.g. if set to "myboost", will search for
+                           myboost_thread instead of boost_thread.
+```
+通常的做法是
+```cmake
+set(Boost_USE_STATIC_LIBS ON)
+find_package(Boost REQUIRED)
+include_directories(${Boost_INCLUDE_DIR})
+
+add_executable(<Target> main.cpp)
+target_link_libraries(<Target> PRIVATE ${Boost_LIBRARIES})
 ```

@@ -387,6 +387,12 @@
         void read_mem_fence(cl_mem_fence_flags flags)   //阻塞后面的读取操作直到work_group中的所有work-item完成
         void write_mem_fence(cl_mem_fence_flags flags)  //阻塞后面的写入操作
         void mem_fence(cl_mem_fence_flags flags)        //阻塞后面的读取和写入操作
+    work-group相关函数
+        work_group_all()
+        work_group_any()
+        work_group_broadcast()
+        work_group_reduce()
+        work_group_scan()
 
 7.事件
     一些函数接受一个cl_event作为回调函数，此时函数运行在非阻塞模式下，主线程可以继续执行，当函数执行完成后调用回调函数
@@ -506,3 +512,8 @@
     在SPIR-V之后，只需将SPIR-V代码植入发布的程序，降低编译kernel的耗时
     与OpenCL 2.1一起推出，kernel支持C++14
     clCreateProgramWithIL()
+12.与CUDA术语对照
+    get_group_id(uint dimindx)      blockIdx.[xyz]
+    get_local_size(uint dimindx)    blockDim.[xyz]
+    get_local_id(uint dimindx)      threadIdx.[xyz]
+    get_num_groups(uint dimindx)    gridDim.[xyz]

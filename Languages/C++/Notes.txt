@@ -1538,7 +1538,33 @@ cctype函数
                     lhs, rhs
                 };
             }
-
+    依赖名称
+        一个模板名后的跟的名称（比如成员函数、成员变量、静态成员、嵌套模板等）是一个依赖名称
+        比如:
+            template<typename T>
+            struct Foo
+            {
+                template<typename U>
+                void bar() {}
+            };
+        这里Foo<T>::bar是一个依赖名称，这会导致下面这段调用成员函数发生编译错误
+            template<typename T>
+            void func(Foo<T> foo)
+            {
+                foo.bar<int>(); //由于foo是一个依赖名称，编译器在第一阶段检查语法时不知道bar存在于foo中，所以这里会被解释为foo.bar < int，造成歧义
+            }
+        正确的方法是在依赖名称前家关键字template
+            template<typename T>
+            void func(Foo<T> foo)
+            {
+                foo.template bar<int>();
+            }
+            template<typename T>
+            void func(F foo)
+            {
+                foo.template bar<int>();
+            }
+        
 友元：
     单向友元：如果A类对象要控制（发送信息给B类）应考虑在B类定义中用friend关键字将A类声明为友元类，友元类声明的位置无关紧要，可以在public private protected中声明，不改变友元类的访问权限
         class B
@@ -3010,9 +3036,49 @@ C++11:
     尖括号嵌套：之前为了避免和抽取运算符>>混淆，C++11不要求在嵌套的尖括号（尤其是模板类型的指定）中使用空格分开
         std::vector<std::list<int> > v1;    //可以去掉右尖括号之间的空格
     右值引用：
-        右值：所有的C++的值要么是左值，要么是右值，左值是表达式结束后依然存在的持久化对象，右值是表达����束后就不存在的临时对象
-            所有的具名变量、对象都是左值，而右值没有命名
-            能取地址的值是左值，不能的是右值
+        值类别：
+            值的类别是表达式的特征，与一个具体的对象无关
+            表达式是由运算符、操作对象或函数调用构成，表达式通常要产生一个结果
+            一些表达式的例子：
+                42                      //expression evaluate to value 42
+                17+42                   //expression evaluate to value 59
+                a=23                    //expression evaluate to 23
+                static_cast<float>(a)   //expression evaluate to 23.0f
+                sizeof a                //expression evaluate to the byte size of 'a'
+                []{return 3;}           //expression evaluate to a closure
+                printf("Hello")         //expression evaluate to the number of characters written
+            一个表达式具有两个特征：类型和值类别
+            C++的基本值类别有：左值lvalue、纯右值prvalue、亡值xvalue
+                衍生出了复合值类别：泛左值glvalue=lvalue+xvalue、右值rvalue=prvalue+xvalue
+            判断一个表达式的值类别时，考虑以下两个方面：
+                1.这个表达式是否指向一个具体对象，如果表达式指向一个具体对象，就可以对这个表达式取地址
+                    a   //has identity
+                    "Hello" //has identity，字符串字面值具有静态生存期，所以可以取它的地址
+                    ++a //has identity
+                    std::move(a)    //has identity
+                    
+                    a+2 //has no identity
+                    a++ //has no identity
+                    42  //has no identity
+                    nullptr 
+                    false
+                    []{return 3;}
+                    static_cast<float>(a) //has no identity
+                2.这个表达式的资源是否可以被安全地转移
+                    如果表达式是指向一个匿名的临时对象或者指向一个即将被析构的对象，其资源就可以安全转移
+            所以值类别可以用下表总结：
+                            指向具体对象        不指向具体对象
+                资源可以转移  xvalue                prvalue     rvalue
+                资源不可转移  lvalue                 不存在
+                            glvalue
+            一些值类别的例子：
+                42      //prvalue
+                nullptr //prvalue
+                "Hello" //lvalue
+                ++x     //lvalue
+                x++     //prvalue
+                std::move(x) //xvalue
+        右值：
             常见的右值包括常量表达式、变量表达式（等号右边的表达式）、函数返回的临时对象（包括返回的临时变量）注意：永远不要将函数的返回值定义为返回右值引用！
             用将右值赋给一个类型名+两个取地址符&&+变量名，得到一个命名的右值，名字是变量名，这就形成了一个新的左值，多用于移动构造
                 如：int &&a =1;   int && b=c+d;     int && e=somefunc();    //somefunc()返回一个int
@@ -3219,7 +3285,7 @@ C++11:
             T const &value() const &;
             T&& value() &&;
         };
-    lambda表达式：在需要函��指针、函数符的地方可以用lambda函数，有点类似于内联函数，在用lambda函数的地方需要完整定义整个函数
+    lambda表达式：在需要函数指针、函数符的地方可以用lambda函数，有点类似于内联函数，在用lambda函数的地方需要完整定义整个函数
         lambda函数的一般形式的定义：中括号 [] (参数列表) {函数体}
             [](int a) {return a % 3 == 0;}  //一个用于判断参数是否可以被3整除的lambda函数，将返回一个布尔值
         当lambda表达式没有参数时，可以省略圆括号()
