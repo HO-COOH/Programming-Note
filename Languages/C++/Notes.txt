@@ -4318,10 +4318,33 @@ C++17：
     4.std::any
         #include <any> 
         any是一个可以存储任何类型的对象，可以在构造any对象时初始化赋值，也可以先定义后赋值
+        当any所存储的对象较小时，可能不需要分配堆区内存
         any var;    //定义了一个没有存储任何数据的any对象var  
         当any对象中实际存的是T类型的数据时，可以使用any_cast<T>(var)运算符来返回一个所存储的对象的拷贝，如果是T*则返回指针，T&则返回引用，如果类型不符，则抛出bad_any_cast异常
             bool has_value()
             const type_info& type(); //返回一个type_info对象的引用，有name()方法可以返回一个类型的C风格字符串
+        构造函数：
+            constexpr any() noexcept //默认构造函数
+            any(const any& other)   //复制构造函数
+            any(any&& other) noexcept//移动构造函数
+
+            template<class ValueType> any(ValueType&& value)    //当std::decay_t<ValueType>是可以复制构造时才被启用
+            
+            template<class ValueType, class...Args>
+            explicit any(std::in_place_type_t<ValueType>, Args&&... args) //当std::decay_t<ValueType>是可以复制构造时才被启用
+
+            template<class ValueType, class U, class... Args>
+            explicit any(std::in_place_type_t<ValueType>, std::initializer_list<U> il, Args&&...args) //当std::decay_t<ValueType>是可以复制构造时才被启用，将il和args...一起转发给std::decay_t<ValueType>的构造函数
+            要求std::is_copy_constructible_v<std::decay_t<ValueType>>的原因是因为std::any需要支持复制构造
+        重置内部数据：
+            .emplace() 重新构造any内部的数据，函数返回一个新构造的内部数据的引用
+                template<class ValueType, class...Args>
+                std::decay_t<ValueType>& emplace(Args&&... args)
+
+                template<class ValueType, class U, class... Args>
+                std::decay_t<ValueType>& emplace(std::initializer_list<U> il, Args&&... args)
+            .reset() 析构内部数据
+            .swap(any& other) 与另一个any对象交换
     5.返回值优化
         C++17中，函数返回局部变量（对象）有两种情况
         假设有类A

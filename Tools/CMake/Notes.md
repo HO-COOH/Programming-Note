@@ -16,6 +16,9 @@
 - [find_package](#find_package)
 - [Global setup](#global-setup)
   - [FindBoost](#findboost)
+  - [Testing](#testing)
+    - [CTest](#ctest)
+    - [Google Test](#google-test)
 
 # 语法基础
 CMake中任何的变量、参数都是字符串，如果字符串中包含空格而且要将这个字符串作为一个整体（例如作为一个参数）时，需要将字符串用双引号括起来作为一个参数
@@ -878,3 +881,39 @@ include_directories(${Boost_INCLUDE_DIR})
 add_executable(<Target> main.cpp)
 target_link_libraries(<Target> PRIVATE ${Boost_LIBRARIES})
 ```
+
+## Testing
+### CTest
+CTest 是CMake自带的一个工具，通过命令行参数来运行测试用的可执行文件。CTest本身不是一个测试框架，所以通常需要配合其他测试框架例如Google test来使用。通常的做法是使用测试框架来生成一个可执行文件，再由Ctest来运行
+### Google Test
+`GoogleTest`是一个CMake模块，方便通过CMake来运行相关的单元测试，定义了两个函数
+- `gtest_add_tests()`函数通过使用正则表达式并扫描源文件来获取测试项目，当测试代码改变时，通常需要重新运行cmake来配置，由于使用`cmake --build .`时cmake会检测源代码改动，所以，cmake通常会检测到改变并重新生成测试目标，但是如果手动编译，比如使用`make`，此时直接再运行`ctest`就会出问题。注意这个函数在新版cmake中更改了行为，需要`cmake_minimum_required(VERSION 3.10)`，否则会报语法错误
+  ```cmake
+  gtest_add_tests(
+      TARGET target           #测试的可执行文件，通常是一个add_executable()的目标
+      [SOURCES src1...]       #当提供了该参数时，只从src1...中获取测试目标，否则从生成target的源文件中获取
+      [EXTRA_ARGS arg1...]    #每个测试项目所需的额外参数
+      [WORKING_DIRECTORY dir] #指定寻找测试项目的目录，否则使用当前的binary directory
+      [TEST_PREFIX prefix]    
+      [TEST_SUFFIX suffix]
+      [SKIP_DEPENDENCY]
+      [TEST_LIST outVar]
+  )
+  ```
+- `gtest_discover_tests()`函数通过扫描生成的可执行文件来获取测试项目，所以当测试代码改变时不需要重新运行cmake
+  ```cmake
+  gtest_discover_tests(
+      target
+      [EXTRA_ARGS arg1...]
+      [WORKING_DIRECTORY dir]
+      [TEST_PREFIX prefix]
+      [TEST_SUFFIX suffix]
+      [NO_PRETTY_TYPES]
+      [NO_PRETTY_VALUES]
+      [PROPERTIES name1 value1...]
+      [TEST_LIST var]
+      [DISCOVERY_TIMEOUT seconds]
+      [XML_OUTPUT_DIR dir]
+      [DISCOVERY_MODE <POST_BUILD|PRE_TEST>]
+  )
+  ```

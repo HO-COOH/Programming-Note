@@ -1,19 +1,159 @@
 # 数据结构
 
 ## 线性表
+```cpp
+template<class T>
+class LinearList
+{
+public:
+    virtual ~LinearList();
+    virtual bool empty() const = 0;
+    virtual int size() const = 0;
+    virtual const T& operator[](int index) const = 0;
+    virtual int indexOf(const T& element) const = 0;//返回element元素第一次出现时的索引
+    virtual void erase(int index) = 0;              //删除索引为index的元素 
+};
+```
 ### 数组
-### 链表
-#### 单链表
-#### 双向链表
+```cpp
+template<typename T>
+class ArrayList: public LinearList<T>
+{
+protected:
+    T* element;
+    int capacity;
+    int size;
+public:
+    /*...*/
+};
+```
 
+### 链表
+单节点的定义
+```cpp
+template<class T>
+struct Node
+{
+    T element;
+    Node<T>* next;
+};
+```
+#### 单链表
+```cpp
+template<class T>
+class List: public LinearList<T>
+{
+protected:
+    Node<T>* first;
+    int size;
+};
+```
+#### 单向循环链表
+在单链表的最前面增加一个节点成为头节点，将尾节点与头节点连起来便成为单向循环链表
+```cpp
+template<class T>
+class CircularList
+{
+
+};
+```
+#### 双向链表
+```cpp
+template<class T>
+struct DoublyLinkedNode
+{
+    T element;
+    DoublyLinkedNode<T>* previous, next;
+};
+
+template<class T>
+class DoublyLinkedList: public LinearList<T>
+{
+protected:
+    DoublyLinkedNode<T>* first;
+    int size;
+};
+```
 ## 栈
 
 ## 队列
 
 ## 树
+- 一棵树t是一个非空的有限元素的集合，其中的一个元素称为**根**，其余的元素（如果有的话）组成t的**子树**
+- 树中没有孩子的元素称为**叶子**
+- 树根是1级，其孩子（如果有）是2级，孩子的孩子是3级
+- 一棵树的**高度/深度**是树中级的个数
+- 一个元素的**度**是指其孩子的个数
+- 一棵树的**度**是其元素的度的最大值
 
 ### 二叉树
+- 一棵二叉树t是有限个元素的集合，当二叉树非空时，其中一个元素称为**根**，余下的元素（如果有的话）被划分为两棵二叉树，分别为**左子树**和**右子树**
+- 二叉树的每个元素都恰好又两棵子树（可能为空），而树的每个元素可以有任意数量的子树
+- 二叉树中每个元素的子树都是有序的，也就是有左子树和右子树之分，而树的子树是无序的
+- 如果一棵二叉树有n个元素（n>0），则有(n-1)条边
+  ```
+  证明：
+    ∵二叉树除了根节点外的每个节点有且只有一个父节点，节点与其父节点有且只有一条边，这样的节点有(n-1)个，而根节点没有父节点
+    ∴共有(n-1)条边
+  ```
+- 如果一棵二叉树的高度为h（h>=0），则最少有h个元素，最多有(2^h - 1)个元素
+  ```
+  证明：
+    ∵每级至少有1个元素
+    ∴h级至少有h个元素
+    ∵第i级最多有2^(i-1)个元素
+    ∴h级最多有Sum(2^0 + 2^1 +...+2^(h-1))=2^h - 1个元素
+  ```
+- 如果一棵二叉树有n个元素（n>0）则它的高度最大为n，最小为ceil(log2(n+1))
+  ```
+  证明：
+    ∵每级至少有1个元素
+    ∴最大高度为n
+    ∵高度为h的二叉树最多有(2^h - 1)个元素
+    ∴n<=(2^h - 1), h>=log2(n+1)
+    又∵h为整数
+    ∴h>=ceil(log2(n+1))
+  ```
+- 当高度为h的二叉树恰好有(2^h - 1)个元素时，称为**满二叉树**
+- 将满二叉树按从第一层到最后一层，每一层从左到右编号，从1->(2^h - 1)，按编号从大到小的顺序删除k个元素，得到**完全二叉树**
+- 所以满二叉树是完全二叉树
+- 若完全二叉树的编号是1<=i<=n，则下面的特性成立：
+  - 如果i=1，则该元素为根，若i>1，则其父节点的编号为floor(i/2)
+  - 如果2i>n，则该元素无左孩子，否则其左孩子的编号为2i
+  - 如果2i+1>n，则该元素无右孩子，否则其右孩子的编号为2i+1
 
+```cpp
+template<class T>
+struct BinaryTreeNode
+{
+    T element;
+    BinaryTreeNode<T>* leftChild, *rightChild;
+};
+```
+#### 二叉树的遍历
+按根节点与左右子树的访问顺序可以分为：
+- 前序  preOrder
+- 中序  inOrder
+- 后序  postOrder
+```cpp
+template<class T>
+class BinaryTree
+{
+    T* root;
+    int nodes;
+public:
+    ~BinaryTree();
+    bool empty() const;
+    int size() const;
+    void preOrder(void (*)(T*)) const;//此成员函数接收一个函数作为参数，该函数参数是访问根节点所执行的操作
+    void inOrder(void (*)(T*)) const;
+    void postOrder(void (*)(T*)) const;
+    void levelOrder(void (*)(T*)) const;
+};
+
+template<class T>
+using LinkedBinaryTree = BinaryTree<BinaryTreeNode<T>>;
+```
 ### 堆
 
 ### 竞赛树
