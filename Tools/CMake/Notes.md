@@ -203,7 +203,7 @@ endfunction()
     set(args ESSENTIAL)
     set(list_args MORE)
     cmake_parse_arguments(
-        PARSE_ARGV  #mmode
+        PARSE_ARGV  #mode
         0           #number of argumets to skip 
         test        #variable prefix
         ${options}

@@ -1251,17 +1251,25 @@ cctype函数
             virtual const char* what() const noexcpet   //返回一个错误信息的字符串
     标准中还额外定义了以下几类异常：
         #include <stdexcept>
-        class logic_error: public exception
-        class runtime_error: public exception
-        
-        class invalid_argument: public logic_error
-        class domain_error: public logic_error
-        class length_error: public logic_error
-        class out_of_range: public logic_error
-        
-        class range_error: public runtime_error
-        class overflow_error: public runtime_error
-        class underflow_error: public runtime_error
+            class logic_error: public exception
+            class runtime_error: public exception
+            
+            class invalid_argument: public logic_error
+            class domain_error: public logic_error
+            class length_error: public logic_error
+            class out_of_range: public logic_error
+                数组访问超过数组长度，例如std::vector::at()
+
+            class range_error: public runtime_error
+            class overflow_error: public runtime_error
+            class underflow_error: public runtime_error
+        #include <new>
+            class bad_alloc: public std::exception
+                在分配堆区内存出错时抛出
+            class bad_array_new_length: public bad_alloc
+                数组新长度为负数
+                数组新长度超过具体实现所允许的最大值
+                用于初始化的元素的个数超过数组的新长度
     std::terminate()会调用std::terminate_handler，这是一个函数指针的类型别名：
         typedef void (*terminate_handler)()，即一个没有参数并返回空的函数
         C++标准提供了一个默认的std::terminate_handler，即std::abort()，这个函数被调用时，栈区对象、thread_local对象、静态对象的析构函数将不会被调用，所以应该确保资源已经被释放
@@ -4386,6 +4394,57 @@ C++20：
         模块名：[模块名]
     2.范围 Ranges
     3.概念 Concepts
+        Concept是一个具名的布尔值谓词，在编译器用来评估模板参数是否符合某种要求，作用类似于SFINAE与traits相结合
+        concepts引入了两个新关键字concept和require和一个新头文件<concepts>
+        concept关键字用来定义一个布尔值谓词，concept+名称+评估为布尔值的表达式组成一个concept语句
+            template<typename T>
+            concept is_floating_point=std::is_floating_point_v<T>;
+        require表达式可以写在函数头后，表明模板参数需要满足什么条件，表达式也必须是一个评估为布尔值的表达式
+            template<typename T>
+            auto f(T l, T r) requires std::is_floating_point_v<T>
+            {
+                return l + r;
+            }
+        concept习惯上不写is，这样配合require表达式时更可读
+            template<typename T>
+            concept floating_point=std::is_floating_point_v<T>;
+
+            template<typename T>
+            auto f(T l, T r) requires floating_point<T>
+            {
+                return l + r;
+            }
+        也可以用concept名代替模板参数声明中的typename关键字
+            template<typename T>
+            concept floating_point=std::is_floating_point_v<T>;
+
+            template<floating_point T>
+            auto f(T l, T r)
+            {
+                return l + r;
+            }
+        还可以将concept直接写进形参的类型里，加上一个auto，表明形参的类型需要满足的条件，此时template声明可以省略
+            template<typename T>
+            concept floating_point=std::is_floating_point_v<T>;
+
+            auto f(floating_point auto l, floating_point auto r)
+            {
+                return l + r;
+            }
+        还可以将concept写进普通变量、返回值类型里，同样加上auto，表明返回值类型自动推断时需要满足的条件
+            template<typename T>
+            concept floating_point=std::is_floating_point_v<T>;
+
+            floating_point auto f(floating_point auto l, floating_point auto r)
+            {
+                return l + r;
+            }
+            int main()
+            {
+                floating_point auto val = f(1, 2.0f);
+            }
+        
+
     4.协程 Coroutines
     5.is_constant_evaluated
     6.<version>

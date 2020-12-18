@@ -1,43 +1,145 @@
 #include "Array.hpp"
-#include <ctime>
-#include <cstdlib>
+#include <gtest/gtest.h>
+#include <random>
+#include <unordered_map>
 
-using namespace std;
-
-void Random_Insert_Test()
+TEST(ArrayList, DefaultArrayList)
 {
-    Array<int> a;
-    for(int i=0;i<10;++i)
+    ArrayList<int> arr;
+    EXPECT_EQ(arr.capacity(), 10);
+    EXPECT_EQ(arr.size(), 0);
+}
+
+TEST(ArrayList, EmptyArrayList)
+{
+    ArrayList<int> arr{0};
+    EXPECT_EQ(arr.capacity(), 0);
+    EXPECT_EQ(arr.size(), 0);
+}
+
+TEST(ArrayList, InsertFront)
+{
+    ArrayList<int> arr;
+    arr.insert(0, 10);
+    arr.insert(0, 11);
+    arr.insert(0, 12);
+    EXPECT_EQ(arr.get(0), 12);
+    EXPECT_EQ(arr.get(1), 11);
+    EXPECT_EQ(arr.get(2), 10);
+}
+
+TEST(ArrayList, InsertBack)
+{
+    ArrayList<int> arr;
+    arr.insert(arr.size(), 10);
+    arr.insert(arr.size(), 11);
+    arr.insert(arr.size(), 12);
+    EXPECT_EQ(arr.get(0), 10);
+    EXPECT_EQ(arr.get(1), 11);
+    EXPECT_EQ(arr.get(2), 12);
+}
+
+TEST(ArrayList, InsertNegative)
+{
+    ArrayList<int> arr;
+    arr.insert(0, 10);
+    EXPECT_ANY_THROW(arr.insert(-1, 11));
+}
+
+TEST(ArrayList, InsertWrong)
+{
+    ArrayList<int> arr;
+    EXPECT_ANY_THROW(arr.insert(1, 1));
+}
+
+TEST(ArrayList, GetWrong)
+{
+    ArrayList<int> arr;
+    arr.insert(arr.size(), 10);
+    arr.insert(arr.size(), 11);
+    arr.insert(arr.size(), 12);
+    EXPECT_ANY_THROW(arr.get(3));
+}
+
+TEST(ArrayList, IncreaseSize)
+{
+    ArrayList<int> arr{5};
+    EXPECT_EQ(arr.capacity(), 5);
+    for (auto i = 0; i < 5; ++i)
     {
-        a.insert(i,rand());
+        arr.insert(arr.size(), i + 10);
+        EXPECT_EQ(arr.capacity(), 5);
     }
-    a.output(cout);
+    arr.insert(arr.size(), 20);
+    EXPECT_EQ(arr.capacity(), 10);
 }
 
-void Manual_Insert_And_Find_Test()
+TEST(ArrayList, FindElement)
 {
-    Array<int>a(5);
-    a.insert(0,2);
-    a.insert(1,3);
-    a.insert(2,10);
-    a.insert(3,0);
-    a.insert(4,20);
-    //a.insert(5,11);
-    a.output(cout); //should be: 2 3 10 0 20
-    a.erase(2);     //should be: 2 3 0 20
-    a.output(cout);
-    a.get(3);       //should be 20
-    cout<<endl<<"The index of element 20 is "<<a.indexOf(20)<<endl;  //should be 3
-    cout<<"The size of array is "<<a.size()<<endl;  //should be 4
-    cout<<"The capacity of array is "<<a.capacity()<<endl;  //should be 5
+    std::mt19937 eng{std::random_device{}()};
+    constexpr int testSize = 50;
+    ArrayList<int> arr{testSize};
+    std::unordered_map<int, int> numbers;   //{element, indices}
+    for (auto i = 0; i < testSize; ++i)
+    {
+        auto const number = eng();
+        arr.insert(arr.size(), number);
+        if (auto iter = numbers.find(number);  iter!= numbers.cend())
+            iter->second = std::min(iter->second, i);
+        else
+            numbers[number] = i;
+    }
+    for(auto element:numbers)
+    {
+        auto const findResult = arr.indexOf(element.first);
+        EXPECT_NE(findResult, -1);
+        EXPECT_EQ(findResult, element.second);
+    }
 }
 
-int main()
+TEST(ArrayList, EraseFront)
 {
-    srand(unsigned(time(NULL)));
-    /*Tests*/
-    Random_Insert_Test();
-    cout<<endl;
-    Manual_Insert_And_Find_Test();
-
+    ArrayList<int> arr;
+    arr.insert(arr.size(), 10);
+    arr.insert(arr.size(), 11);
+    arr.insert(arr.size(), 12);
+    arr.erase(0);
+    EXPECT_EQ(arr.size(), 2);
+    EXPECT_EQ(arr.get(0), 11);
+    EXPECT_EQ(arr.get(1), 12);
 }
+
+TEST(ArrayList, EraseBack)
+{
+    ArrayList<int> arr;
+    arr.insert(arr.size(), 10);
+    arr.insert(arr.size(), 11);
+    arr.insert(arr.size(), 12);
+    arr.erase(2);
+    EXPECT_EQ(arr.size(), 2);
+}
+
+TEST(ArrayList, EraseEmpty)
+{
+    ArrayList<int> arr;
+    EXPECT_ANY_THROW(arr.erase(0));
+}
+
+TEST(ArrayList, EraseNegative)
+{
+    ArrayList<int> arr;
+    arr.insert(arr.size(), 10);
+    arr.insert(arr.size(), 11);
+    arr.insert(arr.size(), 12);
+    EXPECT_ANY_THROW(arr.erase(-1));
+}
+
+TEST(ArrayList, EraseWrong)
+{
+    ArrayList<int> arr;
+    arr.insert(arr.size(), 10);
+    arr.insert(arr.size(), 11);
+    arr.insert(arr.size(), 12);
+    EXPECT_ANY_THROW(arr.erase(arr.size()));
+}
+
