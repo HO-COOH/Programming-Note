@@ -1,0 +1,168 @@
+一些unix定义的数据类型
+    ssize_t 类似于size_t，但是带符号，可以存储的范围[-1, SSIZE_MAX]，当需要返回-1作为错误代码时使用，通常是long的别名
+
+为了使应用程序可以兼容UNIX和BSD平台，定义了下面两种规范
+    POSIX(Portable operating system interface for unix)
+    SUS(Single Unix specification)
+进程的状态
+    created     terminated
+     |             | 
+    waiting <-> running (running on CPU)
+     to be schedule   |
+                blocked (IO)
+fork()函数
+    #include <sys/types.h>
+    #include <unistd.h>
+    fork()函数将父进程复制一份，称为子进程，子进程中函数返回0，父进程中函数返回当前pid
+        if(fork()==0)
+        {
+            //child process
+        }
+        else
+        {
+            //parent process
+        }
+    子进程与父进程分配独立的内存空间，共用stdout，但是不共用stdin，stdin只对父进程有效
+exec()族函数
+    #include <unistd.h>
+    int execv(const char* pathname, char* const argv[]);
+    将一个字符串数组argv作为参数传给新程序，argv数组的最后一个元素必须是一个空指针NULL
+    int execvp(const char *file, char *const argv[]);
+    与execv()类似，但当file字符串中不包含目录时（即不包含字符'/'时）将搜索PATH环境变量来找到file指定的文件，否则与execv()效果一致
+   
+    int execl(const char *pathname, const char *arg, ...,(char*)NULL);
+    将可变参数列表arg作为参数传给新程序，最后必须要一个(char*)NULL作为结尾
+    int execlp(const char *file, const char *arg, ...,(char*)NULL);
+    与execl()类似，但当file字符串中不包含目录时（即不包含字符'/'时）将搜索PATH环境变量来找到file指定的文件，否则与execv()效果一致
+
+    int execle(const char *pathname, const char *arg, ..., (char*)NULL, char *const envp[]);
+    将可变参数列表arg作为参数传递给新程序，并将envp数组作为环境变量传递给新程序，envp数组的最后一个元素必须是空指针NULL
+    
+    int execvpe(const char *file, char *const argv[], char *const envp[]);
+
+    通常如果要在父进程中新创建一个子进程来执行其他程序，需要先fork()再调用一个exec族函数
+        if(fork()==0)
+        {
+            execv(...)
+        }
+    环境变量就是一个name=value的字符串，例如"TERM=xterm"
+_exit()函数
+    #include <unistd.h>
+    void _exit(int status)
+    或者
+    #include <stdlib.h>
+    void _Exit(int status)
+    这两个函数完全相同，加下划线的目的是为了与C标准库中的exit()函数区分
+    一个进程可以自行结束，这个进程如果有子进程，将交由init代管称为init进程的子进程
+    _exit()函数接收一个整形数（范围是0~0xFF 255）作为返回给父进程指示推出状态，父进程可以调用wait()族函数来取得这个返回值
+wait()族函数
+    #include <sys/types.h>
+    #include <sys/wait.h>
+    pid_t wait(int* wstatus)
+        阻塞父进程，直到其中一个子进程结束，等同于waitpid(-1, &wstatus, 0)
+    pid_t waitpid(pid_t pid, int* wstatus, int options)
+        阻塞父进程，直到子进程的状态发生改变，如果在调用此函数前子进程的状态已经改变，则该调用立即返回，状态改变可以是下列情况：
+            子进程结束
+            子进程收到一个停止运行的信号
+            子进程收到一个恢复运行的信号
+        pid的值可以是：
+            < -1 任何process group id与其pid绝对值相同的子进程
+            -1 任何一个子进程
+            0  任何一个process group id与父进程相同的子进程
+            >0 指定pid
+        options的值可以是：
+            WNOHANG 如果没有子进程结束，函数立刻返回
+    
+权限
+    对于文件夹的意义
+        r：可以获取文件名
+        w：可以添加/删除/重命名文件
+        x：可以作为路径使用（意思是可以cd进入这个文件夹）
+    例如/usr/bin/passwd程序的权限为-rwsr-xr-x，所有者为root，密码文件/etc/passwd权限为-rw-r--r--，所有者为root
+    然而用户可以直接运行passwd程序来修改密码，这是因为setuid位被置位，使得执行这个程序的用户拥有与文件所有者相同的权限
+    类似的，有setgid位，使得执行这个程序的用户拥有与文件所有者所属的用户组相同的权限
+
+    每个进程都有3个记录权限的user id
+        real id：进程的所有者
+        effective id：决定进程的特权
+        saved id：由exec族函数所设置，通常情况下会匹配effective id，但如果exec执行的程序有setuid位，则将id设置为带有setuid位程序的所有者
+    setuid()
+        #include <sys/types.h>
+        #include <unistd.h>
+        int setuid(uid_t uid)
+
+文件
+    一个典型的ls -al的输出
+    -rwxrw-r--    1    root   root 2048    Jan 13 07:11 afile.exe
+        文件类型：
+            - : regular file
+            d : directory
+            c : character device file
+            b : block device file
+            s : local socket file
+            p : named pipe
+            l : symbolic link
+        file permissions (-rwxrw-r--),
+        number of (hard) links (1),
+        owner name (root),
+        owner group (root),
+        file size in bytes (2048),
+        time of last modification (Jan 13 07:11)
+        file/directory name (afile.exe)
+
+    #include <sys/types.h>
+    #include <sys/stat.h>
+    #include <fcntl.h>
+    open()函数
+        int open(const char* pathname, int flags, mode_t mode)
+            打开一个由pathname指定的文件，打开文件成功后，系统将文件描述符添加进全局文件描述符表中，并返回这个文件描述符
+            文件描述符记录了一个指向这个文件的引用和一个偏移量
+        int creat(const char* pathname, mode_t mode)
+            等同于open(pathname, O_CREAT|O_WRONLY|O_TRUNC)
+    close()函数
+        int close(int fd)
+        关闭文件名描述符fd所引用的文件，成功返回0，否则返回-1并设置errno
+    read()函数
+        硬盘 --(syscall read)---> buffer(OS) ----> Process
+        通常read()函数是阻塞性的
+        ssize_t read(int fd, void* buf, size_t count)
+    write()函数
+        Process --(syscall write)---> buffer(OS) ----> 硬盘
+        通常write()函数是非阻塞的
+    lseek()函数
+        off_t lseek(int fd, off_t offset, int whence)
+
+    umask()函数
+        mode_t umask(mode_t mask)
+    chmod()函数
+    chown()函数
+   
+    mkdir()函数
+        int mkdir(const char* pathname, mode_t mode)
+    rmdir()函数
+        int rmdir(const char* pathname)
+    chdir()函数
+        改变进程的当前工作目录，对使用相对路径时有效
+        int chdir(const char* path)
+    inode
+        根目录/的inode号为2
+    mmap()函数
+        memory mapped file
+
+        munmap()
+信号
+    SIGSEGV
+    SIGFPE 浮点数计算异常，例如除以0
+    SIGSTOP
+    SIGCONT
+    kill 向一个进程发送一个信号，不一定是结束进程的信号，可以是任何信号
+    signal 为某个信号设置一个handler
+    
+19.Unix多进程
+    #include<unistd.h>
+    几个头文件
+        sys/shm.h   shared memory
+        sys/ipc.h   inter-process communication
+        sys/msg.h   message queue
+        sys/sem.h   semaphore
+        sys/mman.h  memory locking/unlocking

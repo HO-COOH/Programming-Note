@@ -253,14 +253,7 @@ atoi()  将nptr所指的字符串的开头部分转化为相应的整数，长�
             绝对值第二小的规约数：(1+2^-23) * 2^(1-127) = (1+2^-23)*2^-126
             这两个数之间的差为：2^-23 * 2^-126 = 2^-149，这个差值远小于绝对值最小的非规约数与0的差值，所以为了填补规约数到非规约数的空隙，就使用非规约数
             非规约数相当于填补了从0 ~ 2^-126之间的范围
-19.Unix多进程
-    #include<unistd.h>
-    几个头文件
-        sys/shm.h   shared memory
-        sys/ipc.h   inter-process communication
-        sys/msg.h   message queue
-        sys/sem.h   semaphore
-        sys/mman.h  memory locking/unlocking
+
 C++
 0.编译器相关
     cc, c++

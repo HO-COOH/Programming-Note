@@ -1,3 +1,4 @@
+#pragma once
 #include <iterator>
 #include <iostream>
 #include <algorithm>
@@ -12,32 +13,90 @@ class ArrayList : public LinearList<T>
 {
 protected:
     T *elements;                      //data
-    int m_capacity;                     //capacity of the Array
-    int m_size;                         //number of elements in the Array
+    int m_capacity;                   //capacity of the Array
+    int m_size;                       //number of elements in the Array
     int const m_increaseSize;         //练习4新增
-    void indexCheck(int index) const; //if index is invalid, throw std::out_of_range exception
-    void changeLength(int newLength); //if newLength is invalid, throw std::bad_array_new_length
+    
+    /**
+     * @brief 检查下标是否越界，范围必须是(0, m_size]之间
+     * 
+     * @throw 下标越界时抛出std::out_of_range
+     */
+    void indexCheck(int index) const;
+
+    /**
+     * @brief 改变数组大小
+     * 
+     * @param newLength 数组的新大小，必须是非负整数
+     * @throw 如果不是，throw std::bad_array_new_length
+     */
+    void changeLength(int newLength);
+
 public:
-    ArrayList(int initialCapacity = 10); //Constructor with an initialCapacity
+    /**
+     * @brief 构造时预分配初始容量
+     * 
+     * @param initialCapacity 初始容量
+     */
+    ArrayList(int initialCapacity = 10);
     
     /**
      * @brief 允许构造时指定数组空间满时数组长度的增加量
+     * 
      * @param increaseWhenFull 数组空间满时数组长度的增加量
      * @param initialCapacity 构造时预分配的内存大小
      */
     ArrayList(int increaseWhenFull, int initialCapacity);
 
-    ArrayList(const ArrayList<T> &); //Copy constructor
+    //复制构造函数
+    ArrayList(const ArrayList<T> &);
 
-    ~ArrayList() { delete[] elements; } //Destructor
+    //析构函数
+    ~ArrayList() { delete[] elements; }
 
-    //Linear List Methods
+    //继承自LinearList类的方法
+
+    /**
+     * @brief Return whether the linear list is empty
+     */
     bool empty() const override { return m_size == 0; }
+
+    /**
+     * @brief Return the number of elements in the linear list
+     */
     int size() const override { return m_size; }
+
+    /**
+     * @brief Get the element at i-th index
+     * 
+     * @param index Index of the element
+     * @return T& A reference to the elements
+     */
     T &get(int index) const override;
+
+    /**
+     * @brief Get the index of an element first appeared in the linear list, using comparison operator
+     * 
+     * @param theElement the element to be found
+     * @return the index of the found element, return -1 when not found
+     */
     int indexOf(const T &theElement) const override;
+
+    /**
+     * @brief  Erase the index-th element
+     */
     void erase(int index) override;
+
+    /**
+     * @brief all the elements following element[index] including element[index] right shift one position, element[index]=new element
+     */
     void insert(int index, const T &theElement) override;
+
+    /**
+     * @brief Print the linearlist to output stream
+     * 
+     * @param out The output stream object
+     */
     void output(std::ostream &out) const override;
 
     //Array Method
@@ -57,7 +116,11 @@ public:
 
         //构造函数
         Iterator(T* position = nullptr):m_position(position){}
+        
+        //解除引用运算符
         auto &operator*() const { return *m_position; }
+        
+        //箭头运算符
         auto* operator->() const { return m_position;}
 
         //迭代器向前
@@ -73,7 +136,14 @@ public:
         auto operator==(const Iterator right) const { return m_position == right.m_position; }
     };
 
+    /**
+     * @brief 返回指向数组第一个元素的迭代器
+     */
     auto begin() { return Iterator{elements}; }
+
+    /**
+     * @brief 返回指向数组超尾元素的迭代器
+     */
     auto end() { return Iterator{elements + m_size}; }
 };
 
