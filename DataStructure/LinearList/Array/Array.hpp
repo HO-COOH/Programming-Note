@@ -172,7 +172,7 @@ ArrayList<T>::ArrayList(int initialCapacity) : ArrayList(0, initialCapacity)
 }
 
 template <typename T>
-ArrayList<T>::ArrayList(int increaseWhenFull, int initialCapacity):m_increaseSize(increaseWhenFull), m_size(0), m_capacity(initialCapacity)
+ArrayList<T>::ArrayList(int increaseWhenFull, int initialCapacity):  m_capacity(initialCapacity), m_increaseSize(increaseWhenFull), m_size(0)
 {
     if(initialCapacity < 0)
         throw std::bad_array_new_length{};
