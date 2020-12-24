@@ -143,3 +143,92 @@ TEST(ArrayList, EraseWrong)
     EXPECT_ANY_THROW(arr.erase(arr.size()));
 }
 
+TEST(Practice4, SpecifyIncreasingSize)
+{
+    ArrayList<int> arr{2, 3};
+    EXPECT_EQ(arr.size(), 0);
+    EXPECT_EQ(arr.capacity(), 3);
+    arr.insert(arr.size(), 10);
+    arr.insert(arr.size(), 11);
+    arr.insert(arr.size(), 12);
+    EXPECT_EQ(arr.size(), 3);
+    EXPECT_EQ(arr.capacity(), 3);
+    arr.insert(arr.size(), 13);
+    EXPECT_EQ(arr.size(), 4);
+    EXPECT_EQ(arr.capacity(), 5);
+}
+
+TEST(Practice5, TrimToSize0)
+{
+    ArrayList<int> arr{3};
+    arr.trimToSize();
+    EXPECT_EQ(arr.capacity(), 1);
+}
+
+TEST(Practice5, TrimToSize1)
+{
+    ArrayList<int> arr{3};
+    arr.insert(arr.size(), 10);
+    arr.insert(arr.size(), 11);
+    arr.insert(arr.size(), 12);
+    arr.insert(arr.size(), 13);
+    arr.trimToSize();
+    EXPECT_EQ(arr.size(), arr.capacity());
+}
+
+TEST(Practice6, SetSize0)
+{
+    ArrayList<int> arr{3};
+    arr.insert(arr.size(), 10);
+    arr.insert(arr.size(), 11);
+    arr.insert(arr.size(), 12);
+    arr.setSize(4);
+    EXPECT_EQ(arr.size(), 3);
+}
+
+TEST(Practice6, SetSize1)
+{
+    ArrayList<int> arr{3};
+    arr.insert(arr.size(), 10);
+    arr.insert(arr.size(), 11);
+    arr.insert(arr.size(), 12);
+    arr.setSize(2);
+    EXPECT_EQ(arr.size(), 2);
+}
+
+TEST(Practice8, EqualityCompareTrue)
+{
+    ArrayList<int> arr1{3};
+    arr1.insert(arr1.size(), 10);
+    arr1.insert(arr1.size(), 11);
+    arr1.insert(arr1.size(), 12);
+    ArrayList<int> arr2{3};
+    arr2.insert(arr2.size(), 10);
+    arr2.insert(arr2.size(), 11);
+    arr2.insert(arr2.size(), 12);
+    EXPECT_TRUE(arr1==arr2);
+}
+
+TEST(Practice8, EqualityCompareFalse)
+{
+    ArrayList<int> arr1{3};
+    arr1.insert(arr1.size(), 10);
+    arr1.insert(arr1.size(), 11);
+    arr1.insert(arr1.size(), 12);
+    ArrayList<int> arr2{3};
+    arr2.insert(arr2.size(), 10);
+    arr2.insert(arr2.size(), 11);
+    arr2.insert(arr2.size(), 1);
+    EXPECT_FALSE(arr1==arr2);
+}
+
+TEST(Practice9, InequalityCompareFalse)
+{
+
+}
+
+TEST(Practice9, InequalityCompareTrue)
+{
+
+}
+

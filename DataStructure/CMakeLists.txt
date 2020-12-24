@@ -12,6 +12,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(CmakeCommon.cmake)
 
+#add public include for all targets
+include_directories(include)
+
 #add all the subdirectories, which contains the target
 add_subdirectory(LinearList)
 #add_subdirectory(Tree)

@@ -383,7 +383,7 @@ C++
             ios_base::out 打开文件以写入                <-
             ios_base::ate 打开文件并移到文件尾            | ofstream open和构造函数的默认值
             ios_base::app 追加到文件尾                   |
-            ios_base::trunc 如果文件存在，则截短文件     <-
+            ios_base::trunc 如果文件存在，则截短文件      <-
             如果要在打开文件输出时不删除，要追加到文件尾，可以用ofstream fout("file", ios_base::out|ios_base::app);
     ifstream:
         seekg(streamoff, ios_base::seekdir);    //定位到离第二个参数指定的文件位置特定距离的位置，距离单位为字节
@@ -754,10 +754,6 @@ cctype函数
     可以将函数声明为static returnType func()使得函数只在本文件内可用
     mutable关键字：若结构和类声明为const，可以将某个成员声明为mutable，使得可以修改这种结构和类的实体中被声明为mutable的成员
         也可以在const成员函数中修改mutable的类成员
-    定位new：
-        new(ptr)type
-        new(ptr)type []
-        指定在ptr所指的内存区域上动态分配新内存
 语言链接性
     由于C++对函数名会进行修饰，所以要使用C语言中的函数，需要在函数原型前加extern "C"
         extern "C"
@@ -847,7 +843,7 @@ cctype函数
                 className(){}
         调用构造函数：
         若className类有构造函数：className(paraType para)，则有如下的调用方法来构造object对象
-        className object=className(paraValue);  //可能会创建一个临时对象
+        className object=className(paraValue);
         className object(paraValue);            //是上面的简写
         className object={paraValue};           //C++11列表初始化
         className object{paraValue};            //是上面的简写
@@ -1007,8 +1003,6 @@ cctype函数
             }
         等价于：
             className::className() : mem1(value), mem2(&object) {...}  
-    定位new运算符生成的对象：需要显式地为用定位new运算符生成的对象调用其析构函数，然后再释放存储有那个对象的内存空间
-        直接delete掉new的对象再释放内存会发生异常
     位域：
         在类中可以使用位域显式指定数据成员占用多少个位（是bit，不是字节）,所以相邻位域的成员可以挤到一个字节内
         位域声明语法：
@@ -2059,7 +2053,7 @@ STL
             bit_or
             bit_xor
             bit_not
-        
+
 #include <numeric>
             accumulate():求从[first,last)的和，这个算法按定义是顺序执行的，所以没有带执行顺序参数的重载版本
                 template< class InputIt, class T >
@@ -2245,7 +2239,86 @@ STL
             使用了执行顺序参数后，任何没有catch的异常会直接导致std::terminate()来结束程序的运行，即使执行顺序是std::execution::seq（即默认值）
                 std::for_each(v.begin(), v.end(), [](auto x){ throw my_exception();});   //异常向外传播
                 std::for_each(std::execution::seq, v.begin(), v.end(), [](auto x){ throw my_exception();});  //std::terminate()
-    Allocator 分配器：
+    动态内存管理
+        #include <memory>
+        pointer_traits
+            pointer_traits提供了一套标准化的获取关于指针类的信息的接口和类型的定义，是allocator_traits的基础
+            template<class Ptr>
+            struct pointer_traits;
+            类型别名：
+                pointer         Ptr
+                element_type    Ptr::element_type（如果存在的话），否则为
+        Allocator 分配器：
+            由于使用new在堆区构造一个用户自定义类型时，必须构造对象，无法对内存进行更细致的管理
+                struct MyClass
+                {
+                    MyClass() = delete;
+                };
+                auto p=new MyClass; //编译错误
+            Allocator是抽象了分配和回收资源、构造和析构对象策略的类
+            在标准库中，除了std::array外的每个容器例如std::string, std::vector，都需要使用std::allocator_traits中定义好的接口
+
+            template<class T>
+            std::allocator;
+                被所有需要动态分配内存的C++标准库的容器使用
+                allocator是无状态的，所以是默认构造的，而且所有的成员函数都是静态的
+                类型别名：
+                    value_type = T
+                    size_type = std::size_t
+                    difference_type = std::ptrdiff_t
+                成员函数：（至于为什么既然std::allocator是无状态的而其成员函数不是static，有个尚未被回答的SO问题 https://stackoverflow.com/questions/26395560/why-arent-member-functions-of-stdallocator-static）
+                    .allocate()
+                        只分配裸内存，不构造对象，返回所分配的内存的指针，不应该对该指针进行解除引用操作
+                        T* allocate(std::size_t n)
+                            分配n*sizeof(T)字节的裸内存
+                            等同于::operator new(n, std::align_val_t{})
+                            当所需空间超过理论上限（即std::numeric_limits<std::size_t>::max() < n*sizeof(T)）时抛出std::bad_array_new_length异常
+                            当分配失败，即内存空间不够时，抛出std::bad_alloc异常
+                    .deallocate()
+                        void deallocate(T* p, std::size_t n)
+                            p应该是allocate()返回的值，n的值应该与allocate()时所指定的大小相同
+
+            template<class Alloc>
+            std::allocator_traits;
+                类型别名：
+                    allocator_type = alloc
+                    value_type = Alloc::value_type //Alloc所必须定义的
+                静态成员函数：
+                    ::allocate()
+                        只分配内存，不构造对象，返回所分配的内存的指针，即返回a.allocate()所返回的值
+                        static pointer allocate(Alloc& a, size_type n)
+                            调用a分配n*sizeof(Alloc::value_type)字节的裸内存，即
+                            a.allocate(n)
+                        static pointer allocate(Alloc& a, size_type n, const_void_pointer hint)
+                            如果可能的话，调用a使用hint来分配locality更好的裸内存，否则等同于a.allocate(n)
+                    ::deallocate()
+                        static void deallocate(Alloc& a, pointer p, size_type n)
+                            调用a释放p所指向的内存，即
+                            a.deallocate(p, n)
+                    ::construct()
+                        template<class T, class... Args>
+                        static void construct(Alloc& a, T* p, Args&&... args)
+                            如果可能的话，调用a在p所指向的未初始化的存储空间使用完美转发的参数args...构造一个对象T，即
+                                a.construct(p, std::forward<Args>(args)...)
+                            否则（例如Alloc没有定义construct()方法），则使用定位new
+                                new(static_cast<void*>(p)) T(std::forward<Args>(args)...)
+                                C++20后std::construct_at(p, std::forward<Args>(args)...)
+                            该函数很多STL容器中被使用，例如插入、复制
+                    ::destory()
+                        template<class T>
+                        static void destory(Alloc& a, T* p)
+                            如果可能的话，调用a来析构p所指向的内存，即
+                                a.destory(p)
+                            否则（例如Alloc没有定义destory()方法），则调用p的析构函数
+                                p->~T();
+                    ::max_size()
+                        static size_type max_size(const Alloc& a) noexcept
+                            如果可能的话，返回a.max_size()
+                            否则返回std::numeric_limits<size_type>::max()/sizeof(value_type)
+                    ::select_on_container_copy_construction()
+
+
+
     函数符（函数对象）：是可以以函数方式与一对圆括号()结合使用的任意对象，包括函数名、函数指针和重载了()运算符的类对象（即定义了operator()函数的类）
         生成器：不用参数就可以调用的函数符
         一元函数：用一个参数就可以调用的函数符，可以作为for_each()的第三个参数
@@ -2923,7 +2996,31 @@ C++11:
             C++17新增了一个���助���
                 template<bool B>
                 using bool_constant = integral_constant<bool, B>;
-            
+        用std::enable_if来模拟C++20的concepts
+            在GCC10.2中有这样一些定义（去掉下划线的重写）
+                /*其实这就是C++17中std::conjunction的实现*/
+                template <typename...>
+                struct and;
+
+                template <>
+                struct and<> : publlic true_type {};
+                
+                template <typename B1>
+                struct and<B1> : public B1 {};
+
+                template <typename B1, typename B2>
+                struct and<B1, B2> : public conditional<B1::value, B2, B1>::type {};    //当B1为真，则使用B2的值，否则为假
+
+                template <typename B1, typename B2, typename B3, typename... Bn>
+                struct and<B1, B2, B3, Bn...>
+                    : public conditional<B1::value, and<B2, B3, Bn...>, B1>::type {};   //当B1为真，则递归调用and判断剩余的值，否则为假
+
+                template <typename... Bn>
+                struct conjunction : and<Bn...> {};
+
+                template<typename...Cond>
+                using Require = enable_if_t<and<Cond...>::value>;
+
                 
     constexpr关键字：
         constexpr值：
@@ -5018,7 +5115,7 @@ More Effective C++
         A* a_array=static_cast<A*>(rawMemory);          //将这块裸内存的指针类型转换为指向A对象的指针
         for(int i=0; i<10; ++i)
             new(&a_aray[i])A(整数);                    //用定位new在这块内存上构造10个A类对象
-        ... //现在可以用跟栈对象一样的下标访问法a_array[i]来使用这些对象
+        //现在可以用跟栈对象一样的下标访问法a_array[i]来使用这些对象
         for(int i=9; i>=0; --i)
             a_array[i].~A();    //无论A类有没有缺省虚构函数，都需要显式调用来析构裸内存中构造的对象
         operator delete[](rawMemory);   //释放裸内存
@@ -5086,35 +5183,7 @@ More Effective C++
     一个不管理资源的类，不需要定义除了构造函数之外的特殊成员函数，称为零法则
 
 
-1.高级数据类型
-    为了统一成大写，VC++给很多类型取了大写的typedef
-    INT->int
-    UINT->unsigned int
-    CHAR->char
-    WCHAR->wchar_t
-    
-    WinDef.h:
-    BYTE 8位无符号
-    DWORD 32位无符号
-    INT32
-    INT64
-    LONG 32位有符号
-    LONGLONG 64位有符号
 
-    UINT32
-    UINT64
-    ULONG
-    ULONGLONG
-    WORD 16位无符号
-    windows里P开头表示是指针，LP开头表示长指针（为了便于将给16位计算机设计的代码移植到32位），现在P和LP没有区别，与变量类型*的指针表示也没有区别
-    指针的长度是编译时决定的，所以64位系统中运行32位的程序，指针长度仍然是32位
-
-    BOOL {FALSE->0, TRUE->1}
-
-    LRESULT->long (winnt.h:typedef long LONG    windef.h:typedef LONG LRESULT)
-    HRESULT->long (winnt.h)初始化COM库的函数的返回值
-    LPTSTR 字符串指针
-    LPTCSTR 常量字符串指针
 2.函数参数的类型
     T快照snapshot，每次函数被调用时都会拷贝一次当前的值    T const 
     T&修改modify，由于引用不能是空值引用，所以这个T&要求调用时被引用的对象一定要存在      T const&观察view observe

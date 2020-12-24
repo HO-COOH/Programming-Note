@@ -1,3 +1,0 @@
-C:/Users/Peter/Desktop/Programming-Note/DataStructure/SkipList/out/build/x64-Release/CMakeFiles/SkipList.dir
-C:/Users/Peter/Desktop/Programming-Note/DataStructure/SkipList/out/build/x64-Release/CMakeFiles/edit_cache.dir
-C:/Users/Peter/Desktop/Programming-Note/DataStructure/SkipList/out/build/x64-Release/CMakeFiles/rebuild_cache.dir

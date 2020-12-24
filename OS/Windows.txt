@@ -1,0 +1,29 @@
+1.高级数据类型
+    为了统一成大写，VC++给很多类型取了大写的typedef
+    INT->int
+    UINT->unsigned int
+    CHAR->char
+    WCHAR->wchar_t
+    
+    WinDef.h:
+    BYTE 8位无符号
+    DWORD 32位无符号
+    INT32
+    INT64
+    LONG 32位有符号
+    LONGLONG 64位有符号
+
+    UINT32
+    UINT64
+    ULONG
+    ULONGLONG
+    WORD 16位无符号
+    windows里P开头表示是指针，LP开头表示长指针（为了便于将给16位计算机设计的代码移植到32位），现在P和LP没有区别，与变量类型*的指针表示也没有区别
+    指针的长度是编译时决定的，所以64位系统中运行32位的程序，指针长度仍然是32位
+
+    BOOL {FALSE->0, TRUE->1}
+
+    LRESULT->long (winnt.h:typedef long LONG    windef.h:typedef LONG LRESULT)
+    HRESULT->long (winnt.h)初始化COM库的函数的返回值
+    LPTSTR 字符串指针
+    LPTCSTR 常量字符串指针

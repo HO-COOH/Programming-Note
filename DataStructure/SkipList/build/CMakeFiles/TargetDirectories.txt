@@ -1,3 +1,0 @@
-C:/Users/Peter/Desktop/Programming-Note/DataStructure/SkipList/build/CMakeFiles/SkipList.dir
-C:/Users/Peter/Desktop/Programming-Note/DataStructure/SkipList/build/CMakeFiles/edit_cache.dir
-C:/Users/Peter/Desktop/Programming-Note/DataStructure/SkipList/build/CMakeFiles/rebuild_cache.dir
