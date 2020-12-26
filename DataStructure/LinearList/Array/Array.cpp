@@ -224,11 +224,131 @@ TEST(Practice8, EqualityCompareFalse)
 
 TEST(Practice9, InequalityCompareFalse)
 {
-
+    ArrayList<int> arr1{3};
+    arr1.insert(arr1.size(), 10);
+    arr1.insert(arr1.size(), 11);
+    arr1.insert(arr1.size(), 12);
+    ArrayList<int> arr2{3};
+    arr2.insert(arr2.size(), 10);
+    arr2.insert(arr2.size(), 11);
+    arr2.insert(arr2.size(), 12);
+    EXPECT_FALSE(arr1!=arr2);
 }
 
 TEST(Practice9, InequalityCompareTrue)
 {
+    ArrayList<int> arr1{3};
+    arr1.insert(arr1.size(), 10);
+    arr1.insert(arr1.size(), 11);
+    arr1.insert(arr1.size(), 12);
+    ArrayList<int> arr2{3};
+    arr2.insert(arr2.size(), 10);
+    arr2.insert(arr2.size(), 11);
+    arr2.insert(arr2.size(), 1);
+    EXPECT_TRUE(arr1!=arr2);
+}
 
+TEST(Practice10, LessThanCompareTrue)
+{
+    ArrayList<int> arr1{3};
+    arr1.insert(arr1.size(), 0);
+    arr1.insert(arr1.size(), 1);
+    arr1.insert(arr1.size(), 2);
+    ArrayList<int> arr2{3};
+    arr2.insert(arr2.size(), 0);
+    arr2.insert(arr2.size(), 3);
+    arr2.insert(arr2.size(), 2);
+    EXPECT_TRUE(arr1 < arr2);
+}
+
+TEST(Practice10, LessThanCompareFalse0)
+{
+    ArrayList<int> arr1{3};
+    arr1.insert(arr1.size(), 0);
+    arr1.insert(arr1.size(), 1);
+    arr1.insert(arr1.size(), 2);
+    ArrayList<int> arr2{3};
+    arr2.insert(arr2.size(), 0);
+    arr2.insert(arr2.size(), 1);
+    arr2.insert(arr2.size(), 2);
+    EXPECT_FALSE(arr1 < arr2);
+}
+
+TEST(Practice10, LessThanCompareFalse1)
+{
+    ArrayList<int> arr1{3};
+    arr1.insert(arr1.size(), 0);
+    arr1.insert(arr1.size(), 2);
+    arr1.insert(arr1.size(), 2);
+    ArrayList<int> arr2{3};
+    arr2.insert(arr2.size(), 0);
+    arr2.insert(arr2.size(), 1);
+    arr2.insert(arr2.size(), 2);
+    EXPECT_FALSE(arr1 < arr2);
+}
+
+TEST(Practice11, PushBack)
+{
+    ArrayList<int> arr{3};
+    for (int i = 0; i < 10; ++i)
+        arr.push_back(i * 2);
+    for (int i = 0; i < 10; ++i)
+        EXPECT_EQ(arr[i], i * 2);
+}
+
+TEST(Practice12, PopBack)
+{
+    ArrayList<int> arr{5};
+    arr.push_back(0);
+    arr.push_back(1);
+    arr.push_back(2);
+    arr.push_back(3);
+    arr.pop_back();
+    EXPECT_EQ(*(--arr.end()), 2);
+}
+
+TEST(Practice13, Swap)
+{
+
+}
+
+TEST(Practice15, Set)
+{
+    ArrayList<int> arr{5};
+    arr.push_back(0);
+    arr.push_back(1);
+    arr.push_back(2);
+    arr.push_back(3);
+    EXPECT_EQ(arr.set(1, 10), 1);
+    EXPECT_EQ(arr[1], 10);
+}
+
+TEST(Practice15, SetWrong)
+{
+    
+}
+
+TEST(Practice16, Clear)
+{
+    ArrayList<int> arr{5};
+    arr.push_back(0);
+    arr.push_back(1);
+    arr.push_back(2);
+    arr.push_back(3);
+    arr.clear();
+    EXPECT_EQ(arr.size(), 0);
+}
+
+
+
+TEST(Practice18, LastIndexOf)
+{
+    ArrayList<int> arr{5};
+    arr.push_back(0);
+    arr.push_back(10);
+    arr.push_back(20);
+    arr.push_back(30);
+
+    EXPECT_EQ(arr.lastIndexOf(30), 3);
 }
 

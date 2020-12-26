@@ -1391,28 +1391,42 @@ cctype函数
             };
         而且由于Base是类模板，所以在Base类中使用Derived类的成员和方法前无需前向声明Derived类，只需要实际上Derived类中包含相关的实现即可
     模板检测
-        #include <experimental/type_traits>
-        C++ TS2中定义了一个类型别名std::experimental::is_detected，配合decltype和std::declval可以用来检测一个类型是否包含相应的成员函数
-        比如要检测一个类型是否包含一个成员函数名叫get()
-            template<typename T>
-            using supports_get_T=decltype(std::declval<T>().get()); //一定需要这个类型别名，否则会导致is_detected模板参数错误
-            template<typename T>
-            using supports_get=std::experimental::is_detected<supports_get_T, T>;
-            int main()
-            {
-                std::cout<<supports_get<MyClass>::value;
-            }
-        除此之外还可以使用模板部分具体化（偏特化）的方法
-            #include <type_traits>
-            template<typename T, typename =void>
-            struct supports_get:std::false_type{};
+        检测成员函数
+            #include <experimental/type_traits>
+            C++ TS2中定义了一个类型别名std::experimental::is_detected，配合decltype和std::declval可以用来检测一个类型是否包含相应的成员函数
+            比如要检测一个类型是否包含一个成员函数名叫get()
+                template<typename T>
+                using supports_get_T=decltype(std::declval<T>().get()); //一定需要这个类型别名，否则会导致is_detected模板参数错误
+                template<typename T>
+                using supports_get=std::experimental::is_detected<supports_get_T, T>;
+                int main()
+                {
+                    std::cout<<supports_get<MyClass>::value;
+                }
+            除此之外还可以使用模板部分具体化（偏特化）的方法
+                #include <type_traits>
+                template<typename T, typename =void>
+                struct supports_get:std::false_type{};
 
-            template<typename T>
-            struct supports_get<T, decltype(std::declval<T>().get(), void())>:std::true_type{};
-            int main()
-            {
-                std::cout<<supports_get<MyClass>::value;
-            }
+                template<typename T>
+                struct supports_get<T, decltype(std::declval<T>().get(), void())>:std::true_type{};
+                int main()
+                {
+                    std::cout<<supports_get<MyClass>::value;
+                }
+        检测类型别名
+            比如要检测一个类型T是否定义了value_type
+                template<typename T, typename = void>                                   
+                struct HasValueType : std::false_type                                  
+                {                                                                        
+                };                                                                       
+                template <typename T>                                                    
+                struct HasValueType<T, std::void_t<typename T::value_type>> : std::true_type 
+                {                                                                        
+                };
+            使用C++20 concepts可以写成
+                template<typename T>
+                concept HasValueType = requires {typename T::value_type;};
     表达式模板
         表达式模板是一种使用模板来代表一个表达式的计算过程，并且只在需要其结果的时候才执行所要求的计算从而提高程序运行效率的技巧
         例如有一个Vec类需要支持加法运算，通常的做法是
@@ -2249,14 +2263,37 @@ STL
                 pointer         Ptr
                 element_type    Ptr::element_type（如果存在的话），否则为
         Allocator 分配器：
-            由于使用new在堆区构造一个用户自定义类型时，必须构造对象，无法对内存进行更细致的管理
+            由于使用new在堆区构造一个用户自定义类型时，必须构造对象
                 struct MyClass
                 {
                     MyClass() = delete;
                 };
                 auto p=new MyClass; //编译错误
-            Allocator是抽象了分配和回收资源、构造和析构对象策略的类
+            解决方法是先分配一块裸内存，然后使用定位new
+            
+            由于内存又有快慢、共享与独占、paging之分，所以需要更细致的管理
+            Allocator是抽象了分配和回收资源、构造和析构对象策略的类，使得测试、debug成为可能
+            通用的Allocator在大多数情况下够用，而特殊Allocator可以在某些场景下更优秀
+            全局Allocator控制一片程序所有的全部内存区域，在程序整个运行期间生效
+            局部Allocator控制一片特定内存区域（arena memory）
+            在C的标准中，只定义了使用全局Allocator的函数如malloc（dynamic）, free（dynamic）和使用局部Allocator的函数如alloca，这不是Allocator，类似的C++中的new和delete也只是使用全局Allocator的方式
             在标准库中，除了std::array外的每个容器例如std::string, std::vector，都需要使用std::allocator_traits中定义好的接口
+            一个基本的Allocator定义
+                class LocalAllocator
+                {
+                    //internals
+                public:
+                    //Local allocator should not be copied
+                    LocalAllocator(const LocalAllocator&)=delete;
+                    LocalAllocator& operator=(const LocalAllocator&)=delete;
+
+                    //Allocators should control a block of memory
+                    LocalAllocator(void* begin, void* end);
+                    
+                    void* allocate(std::size_t nBytes);
+                    void deallocate(void *address);
+                    void release(); //local allocators only, release the block of memory it controls
+                };
 
             template<class T>
             std::allocator;
@@ -3630,7 +3667,8 @@ C++11:
             struct C {long x; long y; long z;
             };                                  //肯定不是lock_free
             struct D {long x; int y;};          //x86平台是lock_free因为它对其到16字节，所以与B一样
-            struct E {int x; int y; int z; };   //肯定不是lock_free因为12字节
+            struct E {int x; int y; int z;
+            }; //肯定不是lock_free因为12字节
             所以对于原子性来说，字节对其很重要
         std::atomic<>对象（除了std::atomic_flag）包含一个.is_lock_free()的成员函数来检查对这个原子量的操作是否是真的原子的
         C++17新增了一个静态成员函数.is_always_lock_free()，当这个原子对象在所有当前代码可能被编译到的硬件环境中都是原子操作时返回true

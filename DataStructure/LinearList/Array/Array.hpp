@@ -9,6 +9,7 @@
 #include <optional>
 #include <new>
 #include <memory>
+#include <iterator>
 
 /*Definition of Array*/
 template <typename T>
@@ -142,12 +143,12 @@ public:
     /**
      * @brief 返回指向数组第一个元素的迭代器
      */
-    auto begin() { return Iterator{elements}; }
+    auto begin() const { return Iterator{elements}; }
 
     /**
      * @brief 返回指向数组超尾元素的迭代器
      */
-    auto end() { return Iterator{elements + m_listSize}; }
+    auto end() const { return Iterator{elements + m_listSize}; }
 
     /**
      * @brief 练习5，编写一个方法，它使数组的长度等于max{m_listSize, 1}
@@ -186,7 +187,7 @@ public:
     {
         if(m_listSize==rhs.size()) //optimize a little bit
         {
-            return std::mismatch(&get(0), &get(0) + m_listSize, &rhs.get(0)) == std::pair{&get(0) + m_listSize, &rhs.get(0) + m_listSize};
+            return std::equal(begin(), end(), rhs.begin());
         }
         else
             return false;
@@ -201,7 +202,7 @@ public:
     template<typename U>
     bool operator!=(ArrayList<U> const &rhs) const
     {
-        return !(*this) == rhs;
+        return !((*this) == rhs);
     }
 
     /**
@@ -213,6 +214,10 @@ public:
     template<typename U>
     bool operator<(ArrayList<U> const &rhs) const
     {
+        if (auto [iter1, iter2] = std::mismatch(begin(), end(), rhs.begin()); iter1!=end() && iter2!=rhs.end())
+            return *iter1 < *iter2;
+        else
+            return false;
     }
 
     /**
@@ -429,7 +434,92 @@ public:
             elements[m_listSize++] = std::move(theElement);
         }
     }
-    
+
+    /**
+     * @brief 练习12：把线性表右端的元素删除，不要利用erase方法
+     * 
+     * @details 时间复杂度O(1)
+     */
+    void pop_back()
+    {
+        --m_listSize;
+    }
+
+    /**
+     * @brief 练习13：交换线性表的元素*this和theList，由于这里没有说是用数组描述的线性表，所以用多态的方法
+     * 
+     * @param theList 要交换的右端线性表
+     */
+    void swap(LinearList<T>& theList)
+    {
+        std::swap_ranges(begin(), end(), &theList.get(0));
+    }
+
+    /**
+     * @brief 练习14：把数组容量改变为当前容量和theCapacity的较大者
+     * 
+     * @param theCapacity 新的容量大小
+     */
+    void reserve(int theCapacity)
+    {
+        changeLength(std::max(theCapacity, m_capacity));
+    }
+
+    /**
+     * @brief 练习15：用元素theElement替换索引为theIndex的元素，若索引theIndex超出范围，则抛出异常
+     * 
+     * @param theIndex 
+     * @param theElement 
+     * @returns 返回原来索引为theIndex的元素
+     */
+    T set(int theIndex, T const& theElement)
+    {
+        indexCheck(theIndex);
+        return std::exchange(elements[theIndex], theElement);
+    }
+
+    /**
+     * @brief 练习16：使线性表为空
+     */
+    void clear()
+    {
+        m_listSize = 0;
+    }
+
+    /**
+     * @brief 练习17：删除指定索引范围[from, to]内的所有元素
+     * 
+     * @param from 
+     * @param to 
+     */
+    void removeRange(int from, int to)
+    {
+        if(to < from)
+            throw std::range_error{"to < from"};
+        indexCheck(from);
+        indexCheck(to);
+        std::move_backward(begin() + to + 1, end(), begin() + from);
+        m_listSize -= (to - from + 1);
+    }
+
+    /**
+     * @brief 练习18：返回指定元素最后出现时的索引
+     * 
+     * @param theElement 
+     * @return int 
+     */
+    int lastIndexOf(T const& theElement)
+    {
+        return std::distance(begin(), std::find(std::make_reverse_iterator(end()--), std::make_reverse_iterator(begin()), theElement));
+    }
+
+    /**
+     * @brief 练习22：原地颠倒
+     */
+    void reverse()
+    {
+        std::reverse(begin(), end());
+    }
 };
 
 template <typename T>
