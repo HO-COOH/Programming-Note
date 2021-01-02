@@ -1,25 +1,9 @@
 /*definition of Node*/
 #include "../LinearList.hpp"
+#include "Node.hpp"
+#include <iostream>
 
-template<typename T>
-struct Node
-{
-    /*data members*/
-    T element;
-    Node<T> *next;
 
-    /*Methods*/
-    Node(){}
-    Node(const T& element)
-    {
-        this->element=element;
-    }
-    Node(const T& element, Node<T>* next)
-    {
-        this->element=element;
-        this->next=next;
-    }
-};
 
 template<typename T>
 class SinglyLinkedList :public LinearList<T>

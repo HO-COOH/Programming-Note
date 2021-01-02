@@ -1022,9 +1022,29 @@ cctype函数
             所有与C兼容的类型都是trivial类型
         
         POD是指可以用memcpy()来拷贝的一类数据类型，这些类型使得更容易跨语言使用
-
-继承：
-    公有继承：从base基类公有继承得到derived派生类，声名：
+    成员指针
+        指向成员的指针与普通指针拥有不同的类型
+        指向成员变量的指针
+            定义一个指向成员变量的指针的方法：
+                Type ClassName::*p = &ClassName::member;
+            这个指针的类型是 Type ClassName::*
+            与指向该类的指针一起解除引用时可以得到这个成员的引用，例如
+            class A
+            {
+            public:
+                int i=0;
+            };
+            A a;
+            auto pi=&A::i;  //pi是一个指向A类成员i的指针
+            &a->*pi = 1;    //&a得到一个A类的指针，对pi解除引用得到a.i
+        指向成员函数的指针
+            与定义一个指向成员变量的指针类似：
+                ReturnType (ClassName::*p)(ParameterType) = &ClassName::func;
+            这个指针的类型是
+                ReturnType(ClassName::*)(ParameterType)
+            与指向成员变量的指针类似，与一个指向该类的指针一起解除引用时得到这个成员函数
+继承：  
+    公有继承：从base基类公有继承得到derived派生类，声明：
         class derived:public base {...} 
         派生类需要自己的构造函数：
             由于必须首先创造基类，而派生类又不能直接访问基类的private成员，所以这个构造函数应在成员初始化列表中调用基类的构造函数来构造其�����类的部分
@@ -2021,6 +2041,11 @@ STL
             inplace_merge():
             is_sorted():
             is_sorted_until():
+    比较
+        equal()
+            比较两个容器内的元素是否全部相同，比较使用operator==运算符
+        lexicographical_compare()
+            比较一个容器的元素是否在字典顺序上小于另一个容器的元素，即[first1, last1)的每个元素是否字典顺序上小于[first2, last2)，比较使用operator<运算符
     函数子
         #include <functional>
         定义了一些常用的函数对象，即重载了operator()的struct

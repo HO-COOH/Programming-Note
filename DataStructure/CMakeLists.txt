@@ -17,4 +17,4 @@ include_directories(include)
 
 #add all the subdirectories, which contains the target
 add_subdirectory(LinearList)
-#add_subdirectory(Tree)
+add_subdirectory(Tree)

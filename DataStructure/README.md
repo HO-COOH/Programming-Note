@@ -5,7 +5,6 @@
 ## 线性表
 - **线性表**又称**有序表**，它的每一个实例都是元素的一个有序集合
 - 每个实例的形式为(e0, e1, ..., e(n-1))，其中n为有穷自然数
-- e
 ```cpp
 template<class T>
 class LinearList
@@ -143,19 +142,16 @@ struct BinaryTreeNode
 - 中序  inOrder
 - 后序  postOrder
 ```cpp
-template<class T>
 class BinaryTree
 {
-    T* root;
-    int nodes;
 public:
-    ~BinaryTree();
-    bool empty() const;
-    int size() const;
-    void preOrder(void (*)(T*)) const;//此成员函数接收一个函数作为参数，该函数参数是访问根节点所执行的操作
-    void inOrder(void (*)(T*)) const;
-    void postOrder(void (*)(T*)) const;
-    void levelOrder(void (*)(T*)) const;
+    virtual ~BinaryTree();
+    virtual bool empty() const;
+    virtual int size() const;
+    virtual void preOrder();
+    virtual void inOrder();
+    virtual void postOrder();
+    virtual void levelOrder();
 };
 
 template<class T>
