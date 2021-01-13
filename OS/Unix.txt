@@ -4,6 +4,27 @@
 为了使应用程序可以兼容UNIX和BSD平台，定义了下面两种规范
     POSIX(Portable operating system interface for unix)
     SUS(Single Unix specification)
+目录结构
+    bin     包含了系统内置且必须的可执行文件
+    sbin    系统管理员管理系统所需的可执行文件
+    boot    启动系统所必须的文件
+    cdrom   为了兼容旧版系统所保留的cd驱动器的挂载点
+    dev     系统的硬件的文件（由于linux把所有设备都视为文件）
+    etc     主要存放系统全局的配置文件（针对于特定用户的配置文件存放在
+    lib/lib32/lib64 库（例如bin和sbin中程序所需要的运行时库）
+    mnt     其他存储设备的挂载点，通常为手动挂载
+    media   其他存储设备的挂载点，通常为系统自动挂载，例如U盘
+    opt     通常是软硬件厂商存放软件、驱动的目录
+    proc    进程存放数据的地方，每个进程都有一个对应目录，目录名就是进程id
+    root    是root用户的home目录，与普通home目录的结构不同
+    run     一个ramfs格式的目录，存放在内存中，所以重启/断电后数据会消失
+    srv     存放服务（service）的数据
+    sys     与内核交互的目录，也是存放在内存中，每次重启/断电后数据会消失
+    tmp     临时目录，会话结束后一般就会被系统清除
+    usr     存放用户安装的程序
+    var     存放一些动态的文件
+    home    用户目录，每个用户在home下都有一个以用户名命名的目录
+
 进程的状态
     created     terminated
      |             | 

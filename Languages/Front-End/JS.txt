@@ -1,0 +1,636 @@
+-1.包管理
+    npm是Javascript的包管理软件，在安装node.js时已经自动安装了
+    node.js的更新频率不如npm，可以通过npm install npm@latest -g 命令来手动更新npm
+    在Windows中，默认下npm下载的包的位置在：C:\Users\Peter\AppData\Roaming\npm\node_modules\npm
+    可以通过npm --help来查看
+0.什么是Javascript，什么是ECMAScript
+    ECMA（European computer manufacturers association）是一个国际标准化组织
+    这个标准化组织指定了许多不同领域的标准，这些标准以ECMA-xxx命名，其中xxx是数字
+    其中ECMA-262标准，制定了一个ECMAScript编程语言，换句话说ECMAScript这个编程语言所基于的标准就是ECMA-262
+    目前为止ECMAScript这门语言迭代到了第11版（在2020年6月标准化）
+        ECMAScript 2015 -> 6th edition -> ES6
+    Javascript是ECMAScript的一个变种，在ECMAScript的基础上添加了额外的功能，可以看成这样的关系
+        Javascript = ECMAScript + DOM(Document object model) + Bom (browser object model)
+1.变量
+    定义变量有3个关键字：
+        var，在函数内为函数作用域，在函数外为全局作用域
+        let，块作用域
+        const，块作用域
+    当定义变量却没有赋值时，变量的值为undefined
+    使用var定义变量时，该变量的作用域会被提升到当前作用域的顶部，即使此时没有赋值，所以此时其值为undefined
+        console.log(x); //undefined
+        var x = 3;
+        console.log(x); //3
+    变量的类型有8种：
+        Boolean
+        null
+        undefined
+        Number  整数或浮点
+        BigInt  任意精度的整数，例如很大的整数
+        String
+        Symbol
+        Object （也包括函数）
+        除了Object，其他类型在赋值时都是复制，即拷贝，Object在赋值时是复制引用
+    JS是动态类型语言，意思是可以对变量赋予不同类型的值
+    作用域
+        使用var定义的变量的作用域不受代码块限制，例如：
+            var x = 1;
+            {
+                var x = 2;
+            }
+            console.log(x); // outputs 2
+        使用let和const定义的变量作用域受代码块的限制，应该避免使用var
+2.字面值
+    Array
+        是用方括号[]扩起来的一些值，用逗号,隔开
+        如果有连续的逗号，则被省略的值为undefined，但注意不要在数组字面值的末尾加上逗号
+            let animals = ["Lion", , "Angel"] //animals[1]===undefined
+    Boolean
+        true/false
+        评估为false的值：
+            false
+            undefined
+            null
+            0
+            NaN
+            ""空字符串
+        注意Boolean变量与Boolean字面值不同
+            var b = new Boolean(false);
+            if (b)
+                console.log("b true")       //b true
+            else
+                console.log("b false")
+
+            if (b == true)
+                console.log("b == true") 
+            else if(b == false)
+                console.log("b == false")   //b == false
+
+            if (b === true)
+                console.log("b === true")
+            else if(b === false)
+                console.log("b === false")
+    Floating point
+
+    Numeric
+        0o或0O开头表示八进制
+        0x或0X开头表示十六进制
+        ob或0B开头表示二进制
+    Object
+        是用花括号{}扩起来的一些命名的属性，属性之间用逗号,隔开
+        属性可以是任何字符串，不一定要符合标识符命名规则
+    Regex
+        是用一对斜线/扩起来的正则表达式
+    String
+        普通字符串字面值
+            是用一对单引号或双引号扩起来的字符串
+            JS也使用其他语言中常见的转义字符
+        模板字符串
+            是用一对``括起来的字符串
+            相比普通字符串，模板字符串增加了表达式插入的功能，用${表达式}将表达式的值插入到字符串中
+                var thing = "world"
+                console.log(`Hello, ${thing}`)//输出Hello, world
+操作符
+    delete
+        delete操作符用来删除一个object的属性
+            delete object.property
+            delete object[property]
+            delete object[index]
+        delete操作成功时返回true，否则返回false
+        注意访问一个不存在的属性时返回undefined，但将一个属性赋值为undefined并不会删除这个属性
+    typeof
+        typeof返回一个对象的类型
+            typeof object
+            typeof (object)
+    in
+        in判断一个属性名是否存在于一个对象中，并返回一个布尔值
+            property in object
+            propertyIndex in object
+        例如：
+        // Arrays
+        var trees = ['redwood', 'bay', 'cedar', 'oak', 'maple'];
+        0 in trees;        // returns true
+        3 in trees;        // returns true
+        6 in trees;        // returns false
+        'bay' in trees;    // returns false (you must specify the index number,
+                        // not the value at that index)
+        'length' in trees; // returns true (length is an Array property)
+
+        // built-in objects
+        'PI' in Math;          // returns true
+        var myString = new String('coral');
+        'length' in myString;  // returns true
+
+        // Custom objects
+        var mycar = { make: 'Honda', model: 'Accord', year: 1998 };
+        'make' in mycar;  // returns true
+        'model' in mycar; // returns true
+    instanceof
+        用来判断一个对象是否是属于一个类的实体，并返回布尔值
+            object instanceof type
+        
+语句
+    for in 用来循环一个对象的所有属性
+    for of 用来循环一个可迭代的对象，例如容器
+        for(var object of someArray) {...}
+2.函数
+    与使用var定义变量类似，函数的作用域也会被提升到当前作用域的顶部
+3.注释
+    //单行注释
+
+    /*
+        多行注释
+    */
+Object
+    构造：
+        可以直接用Object字面值的方式，即一个花括号{}来初始化这些属性
+            var myCar = {
+                make = "Ford",
+                year = 1969
+            };
+        也可以先创建一个空Object变量，再赋值，此时相当于向这个Object中添加属性
+            var myCar = new Object();
+            myCar.make = "Ford";
+            myCar.year = 1969;
+        也可以先定义一个构造函数，然后使用new来调用这个构造函数
+        如果构造函数无需参数，可以省略调用new时的圆括号var object = new ClassName;
+            function Car(make, year)
+            {
+                this.make = make;
+                this.year = year;
+            }
+            var myCar = new Car("Ford", 1969);
+        也可以用Object.create(obj)方法利用现有的Object作为prototype来构造新Object，新Object的__pro__将指向obj
+            var Car = {
+                make: "Ford",
+                year: 1969 
+            }
+            var myCar = Object.create(Car)
+            但要注意，此时新Object内没有定义任何属性，即没有自己的属性
+            console.log(myCar)  //输出为空
+            这个机制通常用于实现继承
+    方法：
+        将函数放到Object里，称为方法
+    getter和setter
+        是一种特殊的方法，用于获取和设置某个成员的值
+        定义一个getter：
+            get myGetter()
+            {
+                return thing
+            }
+        定义一个setter:
+            set mySetter(parameter)
+            {
+                this.thing = parameter...
+            }
+        然而与普通方法不同的是调用getter无需加上圆括号，调用setter则直接放在赋值符=的左边
+            console.log(obj.myGetter)    输出obj.thing
+            obj.mySetter = 1            obj.thing = 1
+    访问：
+        符合标识符命名规则的属性名可以用点运算符.来引用
+        如果属性名不符合标识符的命名规则，则需要用方括号来引用
+            var unusualPropertyNames = {
+                '': 'An empty string',
+                '!': 'Bang!'
+            }
+            console.log(unusualPropertyNames.'');   // SyntaxError: Unexpected string
+            console.log(unusualPropertyNames['']);  // An empty string
+            console.log(unusualPropertyNames.!);    // SyntaxError: Unexpected token !
+            console.log(unusualPropertyNames['!']); // Bang!
+        Object可以在定义后随时添加属性
+        对一个Object添加属性时，使用相同构造函数创建的其他Object不会有这个属性，即每个Object都是独立的
+        不存在的属性为undefined，不是null
+        由于函数也是一种Object，所以也可以给函数添加属性，也可以将函数赋值给一个变量
+    this关键字：
+        this指代当前作用域的Object对象，即使当前函数没有直接定义在Object内
+            function myMethod()
+            {
+                return this.val;
+            }
+            var obj1 = {
+                get: myMethod,
+                val: 42
+            }
+            var obj2 = {
+                get: myMethod,
+                val: 3.14
+            }
+            obj1.get()          //42
+            obj2.get()          //3.14
+            myMethod.call(obj1) //42
+        由于this指代当前作用域的Object对象，所以调用已定义的对象的方法时，this指代的是那个对象，而不是本对象，所以可能出现问题
+            var answer = {
+                get: function()
+                {
+                    return this.val
+                }
+                val: 42
+            }
+            var firmAnswer = Object.create(answer)
+            firmAnswer.get = function()
+            {
+                return answer.get() + "!!"  //错误，answer.get()将返回42，而不是下面设置的3.14
+            }
+            firmAnswer.val = 3.14
+            firmAnswer.get()    //"42!!"
+    基于原型的继承:
+        与其他面向对象的编程语言基于类和对象不同，JS的继承机制是直接基于对象的
+        JS中不区分对象、父类、子类等等概念
+            function Base()//基类构造函数
+            {...}   
+
+            function Derived()//派生类构造函数
+            {
+                Base.call(this) //调用基类构造函数
+                //...初始化派生类的其他属性
+            }
+            Derived.prototype = Object.create(Base.prototype)
+            Derived.prototype.constructor = Base;
+        当使用new运算符时，JS先构造一个Object，然后隐式将内部的属性__proto__设置为构造函数的prototype，并将构造函数的this设置为这个对象的引用
+        当需要使用一个属性时，JS先检查这个属性是否直接存在于对象中，如果不存在，再到内部的prototype继承链中向上寻找
+    多态
+        要重写继承而来的成员方法，实质上就是对prototype中的同名属性重新赋值一个新函数，即
+            Derived.prototype.memberFunction = function() {...}
+    性质：
+        Javascript中的Objects都是引用类型，只有当两个变量都为同一个Object的引用时才会相等，两个变量具有相同的属性和相同值并不会相等
+            var fruit = {name: 'apple'};
+            var fruitbear = {name: 'apple'};
+            fruit == fruitbear;     //false
+            fruit === fruitbear;    //false
+
+            var fruit2 = fruit;
+            fruit2 == fruit;    //true
+            fruit2 === fruit;   //true
+class
+    ES6后JS加入了更接近于传统面向对象编程语言的类和对象机制，并引入了class关键字来定义一个类，extends关键字来继承一个类
+    class实质上就是Object的语法糖，基于class的继承实质上就是Object中基于原型继承的语法糖
+    使用new ClassName定义生成的对象仍然是一个Object，可以随时添加其他属性
+        class ClassName
+        {
+            constructor(parameter)  //构造函数
+            {
+                this.member = parameter //定义数据成员
+            }
+            memberFunction()    //成员函数，注意无需function关键字
+            {
+
+            }
+        }
+    定义一个对象
+        依然使用new关键字
+            var object = new ClassName(arguments...)
+    getter和setter
+        定义方式与Object类似
+            get name() {return ...}
+            set name(parameter) {...}
+    继承
+        使用extends关键字加上基类名表示从基类继承
+        在继承一个基类时，派生类的构造函数必须在使用this的成员前先调用基类的构造函数
+            class Derived extends Base
+            {
+                constructor(parameter)
+                {
+                    super() //以及所需的其他参数
+                    this.thing = parameter
+                }
+            }  
+内置Object
+    Number
+    Math
+    Date
+    Intl
+    Array
+        构造
+            构造并初始化
+                let arr = new Array(element...)
+                let arr = Array(element...)
+                let arr = [element...]
+            构造非空Array，但不初始化
+                let arr = new Array(length) //注意这个重载的参数只能是数字，否则将构造只包含一个元素的Array
+                let arr = Array(length)
+                let arr = []; arr.length = length
+            构造只包含单个元素的Array
+                let arr = Array.of(element)
+            .From()
+                从其他类型的数据结构构造一个数组，例如Set
+        赋值
+            可以直接通过给数组没有的索引位置赋值，此时数组的长度会自动增加到要求的索引位置，未填充的元素为undefined
+                let arr = [1, 2, 3]
+                arr[5] = 0  //arr == [1, 2, 3, undefined, undefined, 0]
+        方法
+            .forEach()接收一个函数对象，并应用于对数组中除了undefined之外的每个元素
+            .concat()接受一个数组，与当前数组合并在一起
+            .join(delimiter=',')将数组中的元素与delimiter合成成一个字符串
+            .push()添加一个一个元素到数组末尾
+            .pop()返回并删除一个末尾的元素
+            .shift()返回并删除数组的第一个元素
+            .unshift()添加一个或多个元素到数组的头部，并返回数组的新长度
+            .slice(start, end)返回一个新数组，包含原数组中[start, end)的元素
+            .splice(index, count, elements...)
+                删除原数组中索引从index开始的count个元素，并替换为elements...
+                返回被删除的元素的数组
+            .reverse()颠倒一个数组
+            .sort()
+                sort()方法还提供一个接受一个比较函数的重载版本
+                该比较函数需要接受两个参数并返回一个值，形如：
+                    function(a, b)
+                    {
+                        // return -1 (or any negative number) means a<b
+                        // return 0 means a==b
+                        // return 1 (or any positive number) means a>b
+                    }
+            .indexOf(element, [startIndex])
+                从数组的startIndex开始向后搜索元素element，如果找到则返回该元素的索引，否则返回-1
+            .lastIndexOf(element, [startIndex])
+                从数组的startIndex开始向前搜索元素element
+            .map(callback)  返回一个新数组
+            .filter(callback)
+            .every(callback)如果每个元素都满足callback（callback函数返回一个布尔值）返回true
+            .some(callback)如果部分元素满足callback，返回true
+            .reduce(callback, [initialValue])
+                callback函数应该接受一个参数作为当前的值和另一个数组的元素，形如：
+                    function(accumulator, currentValue)
+                如果未指定initialValue，则第一次调用callback时的参数为数组的第0和第1个元素
+            .reduceRight(callback, [initialValue])与reduce类似，但从数组的最后->最
+    Map
+    Set          
+迭代器
+    任何对象只要定义了一个满足条件的next()方法即可成为一个迭代器
+    next()方法需要返回一个具有以下两个属性的对象
+        value：返回下一个值
+        done：返回代表是否迭代完毕的布尔值
+    一个简单代表数字范围的迭代器：
+        function makeRangeIterator(start = 0, end = Infinity, step = 1) {
+            return {
+                current: start,
+                end,
+                step,
+                next: function () {
+                    if (this.current <= this.end)
+                    {
+                        const tmp = { value: this.current, done: false }
+                        this.current += this.step
+                        return tmp
+                    }
+                    else
+                        return {value: this.end, done:true}
+                }
+            }
+        }
+
+        let it = makeRangeIterator(0, 10)
+        for (let result = it.next(); !result.done; result = it.next())
+            console.log(result.value)
+Generator
+    Generator是一种特殊的函数，在调用这类函数会直接返回一个与其关联的迭代器来简化迭代器的定义
+    声明Generator函数需要在function关键字后加一个星号*
+    这个函数使用yield语句代表迭代器next().value，并自动设置终止条件
+    例如上面的数字范围的迭代器可以改写为
+        function* makeRangeIterator(start = 0, end = 100, step = 1) 
+        {
+            let iterationCount = 0;
+            for (let i = start; i < end; i += step) 
+            {
+                iterationCount++;
+                yield i;    //作为value
+            }
+            return iterationCount;
+        }
+可迭代对象
+    可迭代对象就是一个定义了Symbol.iterator属性的对象
+    
+.异常
+    异常机制由try catch finally语句构成
+    finally语句块无论异常是否发生都会执行
+    try catch可以嵌套，内层的try如果没有对应的catch语句，则必须有一个finally语句块
+模块
+    模块文件名常以.mjs结尾，相比.js能更清楚的表明这是一个模块，然而TypeScript不支持.mjs文件
+    export
+        要导出模块中的功能，在要导出的对象前加export关键字
+        可以export以var，let，const定义的变量、function、class
+        但不能在函数内export
+            export const name = "square"
+            export function draw() {...}
+        还可以在一条export语句内使用花括号{}将所要export的内容括起来，一次性全部export
+            export {name, draw}
+    default export 
+        一个模块文件可以有一个default export的函数
+        该函数使用export default function() {}定义，不能有函数名
+    import
+        要使用一个模块的功能，使用import关键字加上花括号{}括起来的一系列用逗号分隔的名称，加上from关键字加上模块的路径
+            import {name, draw} from "./modules/square.js"
+        所导入的名称就像是在本文件内定义的一样使用
+    import default
+        import一个default export函数时的语法与import普通名称一样，然而由于一个模块只能由一个export default，所以无需花括号
+            import something from "path"
+        import模块中的default export时相当于给这个函数一个名称
+    与普通script文件不同的是，模块文件：
+        自动延迟装载
+        自动使用strict模式
+        只执行一次，即使它被多个<script>标签引用
+    解决命名冲突：
+        如果import了多个模块，其中包含相同的名称则会造成命名冲突
+        可以在export时加上as关键字给所要export的名称一个新名称
+            //module.js
+            export{
+                function1 as newFunctionName,
+                function2 as anotherNewFunctionName
+            }
+            //main.js
+            import {newFunctionName, anotherNewFunctionName} from "module.js"
+        类似的也可以在import时加上as关键字给所要import的名称一个新名称，这是更常见的做法
+            //module.js
+            export {function1, function2}
+            //main.js
+            import{
+                function1 as newFunctionName,
+                function2 as anotherNewFunctionName
+            } from "module.js"
+        更好的做法是将一个模块内的所有export都导入，作为一个模块文件
+            import * as MyModule from "module.js"
+        然后使用MyModule作为module.js模块中导出名称的名称空间
+            MyModule.function1()
+            MyModule.function2()
+    合并模块
+        将多个子模块合成为一个模块集合，并导出为一个名称空间
+        例如新建一个.js模块文件，并声明以下export
+            export { Square } from "./shapes/square.js"
+            export { Circle } from "./shapes/cicrcle.js"
+        然后在main.js中只需从这个模块集合中导入各个子模块
+            import {Square, Circle} from "./shapes.js"
+    动态导入
+        import("path").then((module) => {
+            //Do something with the module
+        })
+异步编程
+    promise
+        promise是一个代表某个异步操作完成的对象
+        对一个promise调用.then(function)方法来设置这个promise执行完成后要执行的操作（应该是一个返回promise的函数），其结果仍然是一个promise
+        所以可以使用.then()方法来连接多个异步操作，形成一个异步操作链
+        使用.catch()来设置异常处理函数，如果异步操作链中哪一个操作发生异常都会直接跳转到异常处理函数
+            doSomething().then
+            (
+                function(result)
+                {
+                    return doSomethingElse(result);
+                }
+            ).then
+            (
+                function(newResult)
+                {
+                    return doThirdThing(newResult)
+                }
+            ).then
+            (
+                function(finalResult)
+                {
+                    console.log(finalResult)
+                }
+            ).catch(failureCallback)    //异常处理函数
+
+TS
+1.变量
+    变量的类型用:写在变量名的右边
+        Boolean
+        null
+        undefined
+        Number  整数或浮点
+        BigInt  任意精度的整数，例如很大的整数
+        String
+        Symbol
+        Object （也包括函数）
+        除了Object，其他类型在赋值时都是复制，即拷贝，Object在赋值时是复制引用
+        let isDone: boolean = false
+        let decimal: number = 6         //十进制字面值
+        let hex: number = 0xf00d        //十六进制字面值
+        let binary: number = 0b1010     //二进制字面值
+        let octal: number = 0o744       //八进制字面值
+        let big: bigint = 100n
+
+    TS中新增的类型
+        数组：
+            let list: number[] = [1,2,3]
+            let list: Array<number> = [1,2,3]\
+        元组：
+            元组的类型声明后就不可改变，不与元组类型兼容的赋值会出错
+            元组的类型写在一对方括号中[]，值也用一对方括号[]括起来
+                let x: [string, number] = ["hello", 3]
+            访问元组的元素的方式与数组类似，都使用方括号加索引的形式
+                x[0]    //"hello"
+        枚举：
+            定义一个枚举类型
+                enum Type{
+                    //values
+                }
+            定义一个枚举类型的变量
+                let myEnum: Type = Type.Value
+            可以在定义枚举类型时给其中的一些或枚举值赋数值，没有赋值的枚举值将从最后一个赋值的枚举值后+1，以此类推
+                enum Color{
+                    Red = 1,
+                    Green,  //自动赋值为2
+                    Blue    //自动赋值为3
+                }
+            枚举值的名称可以作为string使用，引用枚举名使用数组下标语法，索引为需要引用的枚举值
+                let colorName: string = Color[1]    //Red
+        unknown:
+        any:
+            any类型将迫使Typescript编译器停止类型检查，使用any类型与Javascript类似
+            与unknown不同，使用any类型时可以使用其可能存在或不存在的属性、方法等
+                let anyThing: any = 4
+                anyThing.toLower()  //Typescript编译器将不检查此处的toLower()是否合法，虽然其实不合法
+            由于any类型降低了类型安全性，所以应该尽量避免使用
+        void：
+            只有两种用法，一种是用于没有返回值的函数
+                function DoNotReturn() : void {...}
+            或者是undefined和null类型的变量
+                let unusable: void = undefined
+                let unusable: void = null
+        undefined
+        null
+            只能赋值给其对应的undefined和null类型还有void类型
+        never
+            只有一种用法，就是不返回的函数（函数永远抛出异常，或者是死循环）
+                function error(message: string) : never
+                {
+                    throw new Error(message)
+                }
+        object
+            非number, string, boolean, bigint, symbol, null, undefined的类型
+    编译期类型转换：
+        有时可能需要将变量做类型转换，迫使Typescript编译器将其作为另一个类型（如果有充足的理由）
+        此时编译器将不检查其是否真的可以进行这样的类型转换
+        由于Typescript编译成Javascript后类型实际上不存在，所以这样的类型转换并不会产生运行期性能损耗
+        有两种转换的形式：
+            将所要转换的变量加as关键字和所要转换为的类型
+                let someValue: unknown = "this is a string"
+                let strLength: number = (someValue as string).length
+            在一对尖括号<>中加上转换为的类型，后加变量名
+                let someValue: unknown = "this is a string"
+                let strLength: number = (<string>someValue).length
+2.接口
+    接口就是满足一些条件的类型，例如包含某个符合类型的属性、某些符合类型（接收某些类型的参数且返回特定类型）的方法
+    Object接口
+        匿名接口
+            可以直接用类似于定义Object的语法定义一个匿名接口    
+            function PrintLabel(labelObj: { label: string})  //函数接收一个匿名接口类参数，这个接口类需要有一个名叫label且类型为string的属性
+            {
+                console.log(labelObj.label)
+            }
+            let myObj = {size: 10, label: "My Object"}
+            PrintLabel(myObj)
+        命名接口
+            使用interface关键字定义一个接口
+            如上例的匿名函数参数接口可以写为
+                interface LabeledObj
+                {
+                    label: string;
+                }
+                function PrintLabel(labelObj: LabeledObj)
+                {
+                    console.log(labelObj.label)
+                }
+                let myObj = {size: 10, label: "My Object"}
+                PrintLabel(myObj)
+            可选属性
+                命名接口中的某些属性可能是非必要的，在接口定义中这样的属性名后加问号?表示该属性可选
+                    interface LabeledObj
+                    {
+                        label?: string
+                    }
+                在判断传入的参数是否具备这个可选属性时，只需使用一个if语句，条件为可选属性的名称
+                    if(labelObj.label)
+            只读属性
+                只读属性是定义了对象后就不能再修改的属性，类似于const对应于对象的关系
+                在属性名前加readonly关键字声明一个只读属性
+        然而，如果作为实参的Object不存在接口中的任何属性也会发生编译错误，即使接口中声明的属性都是可选属性
+        Object字面值的强化检查:
+            当以Object字面值作为实参时，字面值中不能有接口中未定义的属性
+            即Object字面值的类型检查比Object对象更严格
+            比如
+                PrintLabel({size: 10, label: "My Object"})将无法通过编译，原因是size未在interface LabeledObj中定义
+    函数接口
+        满足一定类型要求的函数也可以定义为接口
+        一个函数的类型由：参数的类型、返回值的类型所决定
+        参数的名称可以随意
+            interface SearchFunction{
+                (source: string, searchString: string) : boolean    //接收两个string参数并返回一个布尔值的函数接口
+            }  
+        声明了函数接口后，即可将一个函数赋值给同样类型接口的变量
+            let mySearch: SearchFunc
+            mySearch = function(source: string, searchString: string)
+            {
+                return source.search(searchString) > -1
+            }
+        由于接口已经描述了函数的参数类型和返回值类型，所以可以在赋值时省略
+            let mySearch: SearchFunc
+            mySearch = function(source, searchString)
+            {
+                return source.search(searchString) > -1
+            }
+    继承接口
+        接口可以相互继承，形成更大的接口，即派生接口中包含所继承的接口中所声明的所有属性
+        继承一个接口使用extends关键字加接口名
+            interface Derived extends Base{...}
+        一个接口可以继承多个接口
+            interface Derived extends Base1 Base2 {...}
+
