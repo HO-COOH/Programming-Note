@@ -209,6 +209,107 @@ atoi()  将nptr所指的字符串的开头部分转化为相应的整数，长�
         struct tm local, utc;
         memcpy(&local, localtime(&current), sizeof(local));
         memcpy(&utc, gmtime(&current), sizeof(utc));
+    tm->字符串
+        #include <time.h>
+        size_t strftime(char* restrict str, size_t count, char const* restrict format, struct tm const* restrict time)
+        将tm结构体指针time所存储的日历时间输出到str字符串中，最多写入count个字符，并返回实际写入的字符数（不包括'\0'）
+        如果count过小，则返回0，写入的内容是未定义的
+        这个函数受locale的影响
+        format格式化字符串：
+            static void PrintTime(char const *format)
+            {
+                char str[100];
+                time_t t = time(NULL);
+                size_t const bytes = strftime(str, sizeof(str), format, localtime(&t));
+                printf("%s \t-> %s\t-> %lu bytes.\n", format, str, bytes);
+            }
+
+            static void Year()
+            {
+                PrintTime("%Y");  //将年份显示为十进制数，例如：2021
+                PrintTime("%EY"); //将年份显示为locale指定的方法，例如日本语环境下显示为：令和03年
+                PrintTime("%y");  //按十进制显示年份的末尾两位数，例如：21
+                PrintTime("%0y"); //将年份的末尾两位数按locale指定的方法显示，例如日本语环境下显示为：21
+                PrintTime("%Ey"); //将年份按与locale指定的方法的偏移值显示，例如日本语环境下显示为：03
+                PrintTime("%C");  //按十进制显示年份的开头两位数，例如：20
+                PrintTime("%EC"); //按locale显示年份的基年，例如日本语环境下显示为：令和
+                PrintTime("%G");  //ISO 8601？？
+                PrintTime("%g");  //ISO 8601？？
+            }
+
+            static void Month()
+            {
+                PrintTime("%b");  //按locale显示月份的缩写
+                PrintTime("%0b"); //按locale的另一方法显示月份的缩写
+                PrintTime("%h");  //同%b
+                PrintTime("%B");  //按locale显示月份全名
+                PrintTime("%0B"); //按locale的另一方法显示月份的全名
+                PrintTime("%m");  //将月份显示为十进制整数[01, 12]
+                PrintTime("%0m"); //按locale显示整数的方式将月份显示为整数
+            }
+
+            static void Week()
+            {
+                PrintTime("%U");  //按十进制显示星期数[00, 53]，其中周日是一个星期的第一天
+                PrintTime("%0U"); //同%U，但按locale显示这个整数
+                PrintTime("%W");  //按十进制显示星期数[00, 53]，其中周一是一个星期的第一天
+                PrintTime("%0W"); //同%W，但按locale显示这个整数
+                PrintTime("%V");  //ISO 8601???
+                PrintTime("%0V"); //ISO 8601???
+            }
+
+            static void DayOfYear()
+            {
+                PrintTime("%j"); //按十进制显示一年中的第几天[001, 366]
+            }
+
+            static void DayOfMonth()
+            {
+                PrintTime("%d");  //按十进制显示一月中的第几天[01, 31]
+                PrintTime("%0d"); //同%d但按locale显示这个整数
+                PrintTime("%e");  //同%d
+                PrintTime("%0e"); //同%0d
+            }
+
+            static void DayOfWeek()
+            {
+                PrintTime("%a");  //按locale显示缩写的星期几，例如日本语环境下显示：土
+                PrintTime("%A");  //按locale显示星期几的全名，例如日本语环境下显示：土曜日
+                PrintTime("%w");  //将星期几按十进制整数显示，星期日为0
+                PrintTime("%0w"); //同%w，但按locale显示
+                PrintTime("%u");  //同%w
+                PrintTime("%0u"); //同%0w
+            }
+
+            static void Clock()
+            {
+                PrintTime("%H");  //按十进制显示第几个小时[00, 23]
+                PrintTime("%0H"); //按locale
+                PrintTime("%I");  //按十进制显示12小时制的第几个小时[01, 12]
+                PrintTime("%0I"); //按locale
+                PrintTime("%M");  //按十进制显示一小时的第几分钟[00, 59]
+                PrintTime("%0M"); //按locale
+                PrintTime("%S");  //按十进制显示一分钟的第几秒[00, 60] (60出现在闰秒)
+                PrintTime("%0S"); //按locale
+            }
+
+            static void Other()
+            {
+                PrintTime("%c");  //按locale显示完整时间，在日本语环境下显示：2021年01月16日 01時19分01秒
+                PrintTime("%Ec"); //按locale的另一方式显示完整时间，在日本语环境下显示：令和03年01月16日 01時19分01秒
+                PrintTime("%x");  //按locale显示日期（年月日），在日本语环境下显示：2021年01月16日
+                PrintTime("%Ex"); //按locale的另一方式显示日期（年月日）
+                PrintTime("%X");  //按locale显示时钟（时分秒）
+                PrintTime("%EX"); //按locale的另一种方式显示时钟
+                PrintTime("%D");  //同"%m/%d/%y"，即十进制方式显示：月/日/年
+                PrintTime("%F");  //同"%Y-%m-%d"，即十进制方式显示：年-月-日
+                PrintTime("%r");  //按locale显示十二小时制时钟，在日本语环境下显示：午前01時19分01秒
+                PrintTime("%R");  //同"%H:%M"，即：小时:分钟
+                PrintTime("%T");  //同"%H:%M:%S"，即：小时:分钟:秒
+                PrintTime("%p");  //按locale显示十二小时制的上午和下午
+                PrintTime("%z");  //显示与UTC的时差
+                PrintTime("%Z");  //按locale显示时区名
+            }
 18. 浮点数原理
     float是32位二进制表示
         1位符号位（0正1负）+8位指数位（指数位也有正负之分）+23位尾数位
@@ -255,7 +356,21 @@ atoi()  将nptr所指的字符串的开头部分转化为相应的整数，长�
             绝对值第二小的规约数：(1+2^-23) * 2^(1-127) = (1+2^-23)*2^-126
             这两个数之间的差为：2^-23 * 2^-126 = 2^-149，这个差值远小于绝对值最小的非规约数与0的差值，所以为了填补规约数到非规约数的空隙，就使用非规约数
             非规约数相当于填补了从0 ~ 2^-126之间的范围
-
+19.signal库
+    #include <signal.h>
+    signal库中定义了6种信号
+        #define SIGTERM 结束程序的请求信号
+        #define SIGSEGV 错误的内存访问信号（segmentation fault）
+        #define SIGINT  外部中断信号，通常是用户发起
+        #define SIGILL  程序代码错误（通常是非法指令）
+        #define SIGABRT 非正常退出信号，例如调用abort()
+        #define SIGFPE  浮点数运算错误，例如除以0
+    使用下面的函数来设置一个信号处理函数
+        void (*signal(int sig, void (*handler)(int)))(int)
+            sig为上面的6种信号之一
+            handler可以是默认信号处理函数SIG_DFL、总是忽略信号的处理函数SIG_IGN、函数指针
+                信号处理函数的原型为void fun(int sig)
+    注意在信号处理函数中不要执行IO操作
 C++
 -1.C++正式标准
     https://en.cppreference.com/w/Cppreference:FAQ 包含了C++最新的标准
@@ -553,8 +668,55 @@ cctype函数
                     ostreambuf_iterator(ostream_type& stream);
             重载的赋值运算符=：向关联的字符流缓冲对象写入一个字符
                 ostreambuf_iterator& operator=(charT c)
+locale：
+    locale决定一些程序根据不同语言和国家的输入输出形式，例如货币、数字、时间日期等等
+    在Linux平台：
+        locale                  显示打印当前的locale设置
+        locale -a               打印所有可用的locale
+        sudo dpkg-reconfigure   locales 来安装一个locale
+        /etc/default/locale     文件记录了全局locale
+
+        通常不要通过上面的命令来修改locale因为修改会全局生效，导致例如其他用户通过ssh登录系统后也使用了全局locale
+        更好的方法是通过修改~/.bashrc，在加入export LANG=<locale>来修改用户的本地locale
 
 
+        示范输出：
+            ➜  ~ locale
+            LANG=C.UTF-8
+            LANGUAGE=
+            LC_CTYPE="C.UTF-8"
+            LC_NUMERIC="C.UTF-8"
+            LC_TIME="C.UTF-8"
+            LC_COLLATE="C.UTF-8"
+            LC_MONETARY="C.UTF-8"
+            LC_MESSAGES="C.UTF-8"
+            LC_PAPER="C.UTF-8"
+            LC_NAME="C.UTF-8"
+            LC_ADDRESS="C.UTF-8"
+            LC_TELEPHONE="C.UTF-8"
+            LC_MEASUREMENT="C.UTF-8"
+            LC_IDENTIFICATION="C.UTF-8"
+            LC_ALL=
+
+            ➜  ~ locale -a
+            C
+            C.UTF-8
+            POSIX
+            en_US.utf8
+    <clocale>
+        char* setlocale(int category, char const* locale)
+            设置或获取一个新locale
+            当locale参数为空指针时，返回当前的locale
+            在程序执行前都需要有一个locale，在不设置的情况下等同于调用setlocale(LC_ALL, "C");
+            由于locale是程序的全局设置，所以在一个线程设置locale而另一个线程调用跟locale有关的函数（例如时间函数）时会产生未定义行为
+            参数category的可选值：
+                LC_ALL      所有locale设置
+                LC_COLLATE  
+                LC_CTYPE
+                LC_MONETARY
+                LC_NUMERIC
+                LC_TIME
+        
 2.String类 string头文件
     string对象的地址到底在哪里？
         #include <stdio.h>

@@ -2,7 +2,7 @@
 - [Generator](#generator)
   - [几个常见的Generator](#几个常见的generator)
     - [Ninja](#ninja)
-    - [Unix](#unix)
+    - [Unix Makefiles](#unix-makefiles)
 - [Project](#project)
 - [add_executable](#add_executable)
 - [Variables](#variables)
@@ -321,8 +321,34 @@ cmake .. -G "Ninja"
 ### Ninja
 在`build`目录使用`ninja`构建
 
-### Unix  
+### Unix Makefiles
 在`build`目录使用`make`构建
+
+`make`读取一个叫`makefile`或`Makefile`（推荐将其命名为`Makefile`因为在使用ls时这个文件会出现在靠前的位置） 的文件，这个文件中定义来一些目标，make根据这些目标所需的文件的修改时间自动判断是否需要重新编译这些文件。
+- 命令`make`将构建第一个目标，通常为默认目标，习惯上命名为`default`或`all`
+- 命令`make <target>`将构建名为`target`的目标
+
+Makefile的语法：
+- 开头通常先定义一些变量，例如编译器、文件名等等，定义的方法是直接使用赋值的语法：变量=值
+  ```
+  CC=gcc
+  CFLAGS=-g -Wall
+  ```
+  引用变量的值使用$(Name)
+- `$(name:string1=string2)`对每个name中的单词，将string1替换为string2
+  ```
+  SRCS = emitter.c error.c init.c lexer.c main.c symbol.c parser.c
+  OBJS = $(SRCS:.c=.o)  #emitter.o error.o init.o ...
+  ```
+- 用`<target>: <rules>`的语法来定义一个目标的构建方法，其中可以通过列出其他目标来调用构造那些目标的方法
+  ```
+  all: count  #调用构造count的目标
+  count: countwords.o counter.o scanner.o #调用构造countwords.o的目标
+      $(CC) $(CFLAGS) -o count countwords.o counter.o scanner.o
+  countwords.o: countwords.c
+      $(CC) $(CFLAGS) -c countwords.c
+  ...
+  ```
 
 # Project
 ```cmake

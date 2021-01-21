@@ -293,7 +293,9 @@ class
                     super() //以及所需的其他参数
                     this.thing = parameter
                 }
-            }  
+            }
+    多态
+        派生类中要修改的基类函数直接重新定义即可  
 内置Object
     Number
     Math
@@ -463,11 +465,15 @@ Generator
             //Do something with the module
         })
 异步编程
+    回调函数
+        在老式异步编程中，需要异步运行的函数通常接收一个回调函数作为参数
+        当异步操作完成后将执行回调函数，例如addEventListener函数
+            button.addEventListener("click", () => {/*回调函数体*/})  
     promise
         promise是一个代表某个异步操作完成的对象
         对一个promise调用.then(function)方法来设置这个promise执行完成后要执行的操作（应该是一个返回promise的函数），其结果仍然是一个promise
         所以可以使用.then()方法来连接多个异步操作，形成一个异步操作链
-        使用.catch()来设置异常处理函数，如果异步操作链中哪一个操作发生异常都会直接跳转到异常处理函数
+        promise有可能执行失败，所以可以使用.catch()来设置异常处理函数，如果异步操作链中哪一个操作发生异常都会直接跳转到异常处理函数
             doSomething().then
             (
                 function(result)
@@ -487,6 +493,99 @@ Generator
                     console.log(finalResult)
                 }
             ).catch(failureCallback)    //异常处理函数
+        使用箭头函数，上面代码可以进一步简化为：
+            doSomething()
+            .then(result => doSomethingElse(result))
+            .then(newResult => doThirdThing(newResult))
+            .then(finalResult => console.log(finalResult))
+            .catch(failureCallback)    //异常处理函数
+        当promise链完成后可能希望运行一些其他的代码，可以使用.finally()方法，这个方法无论promise是否成功都会执行
+            myPromise
+            .then(result => doSomething(result))
+            .catch(e => handleError(e))
+            .finally(runFinalCode)
+        静态成员函数：
+        .all()
+            接收一个promise对象数组并返回一个promise，这个promise在promise对象数组中所有的promise都产生结果时才会执行
+            这个新promise的.then()方法同样接收一个函数参数（应该是一个接收原promise对象数组的结果的函数）
+                Promise.all([a, b, c]).then(values => ...)    
+    等待函数
+        注意这些函数的执行都是异步的，即在主线程空闲时才可能会跳转到这些函数来执行
+        setTimeout(function[args...], [delay], [args...])
+            在等待delay毫秒后执行函数参数function，这个函数可以接收可选的参数args...
+            如果delay未指定，则为0，表示不等待，当主线程空闲时立即执行function
+            函数返回一个对象，可以在delay到达前调用clearTimeout()取消这个任务
+        setInterval(function[args...], [delay], [args...])
+            每delay毫秒内执行一次function，这个函数可以接收可选的参数args...
+            由于delay包含函数执行的时间，所以delay应该大于执行function所需的时间
+            如果需要经过一段确定的时间后执行某个操作，应该使用递归调用setTimeout()的方法，例如
+                setTimeout(function run()
+                {
+                    //...
+                    setTimeout(run, 100);
+                }, 100);//每过100毫秒执行一次run()函数
+            函数返回一个对象，可以调用clearInterval()取消
+        clearTimeout(timeoutID)
+            取消执行timeoutID所指定的定时任务，timeoutID应该是由setTimeout()所返回的对象
+        clearInterval(intervalID)
+            取消执行intervalID所指定的定时任务，intervalID应该是由setInterval()返回的对象
+        requestAnimationFrame(callback[timestamp])
+            类似于setInterval，为优化动画显示而产生
+            这个函数将尽可能以高帧率绘制动画，但是当动画不可见时则停止执行来优化性能
+            callback是一个需要定时执行的回调函数，在绘制前执行，函数可以接受一个可选的参数timeStamp来表示时间信息，例如：
+                function draw()
+                {
+                    //drawing code
+                    requestAnimationFrame(draw);
+                }
+                draw();
+    async/await
+        基于ECMAScript 2017，JS引进了async函数和await关键字
+        async函数和await关键字基于promise机制
+        在函数的function关键字前加async关键字使得函数的返回值变为原先返回值的promise类型
+        在箭头函数中的圆括号()前加async关键字
+            async function sayHello() { return "hello" }
+        在一个async函数中在另一个async的函数调用前使用await关键字，可以使得这个函数调用变为异步，即代码暂停，直到所调用的函数返回的Promise对象完成执行
+        在async函数中要处理异常，使用普通的try catch方法
+        使用async/await机制可以使得异步代码类似于传统非同步代码
+        注意一个常见误区：当希望多个并不互相依赖的函数实际上并发执行时，不要直接对其使用await调用
+            await doSomething()
+            await doSomethingElse()
+            await doThirdThing()
+        会导致其实际上是顺序执行的，因为doSomething()执行完才会继续执行doSomethingElse()
+        应该将他们返回的Promise对象存储到一个变量中，然后对这些变量进行await
+            const promise1 = doSomething()
+            const promise2 = doSomethingElse()
+            const promise3 = doThirdThing()
+            await promise1
+            await promise2
+            await promise3
+        或 await Promise.all([promise1, promise2, promise3])
+严格模式
+    在一个文件的开头加上"use strict";字符串将使得本文件执行在严格模式下
+    在一个函数内加上"use strict";字符串将使得本函数执行在严格模式下
+
+JSON（Javascript object notation）
+    静态成员函数：
+        .parse(text)
+            将字符串text按JSON来解析，并返回一个对象
+            如果字符串text不符合JSON语法，抛出SyntaxError异常
+        .stringify(value)
+            将对象value转换为JSON格式的字符串并返回
+HTTP（Hyper text transfer protocol）
+    服务器<->客户端间的通信协议
+    Http请求是无状态的，意思是每个http请求之间都是互相独立的
+    要记录状态，需要使用本地存储local storage、cookies等技术
+    HTTPS（hyper text transfer protocol secure）
+        数据使用SSL（secure sockets layer）或TLS（transport layer security）技术加密
+    HTTP请求方法：
+        GET
+        POST
+        PUT
+        DELETE
+    状态码
+        
+REST（Representational state transfer）
 
 TS
 1.变量
@@ -530,8 +629,18 @@ TS
                     Green,  //自动赋值为2
                     Blue    //自动赋值为3
                 }
+            然而不带赋值枚举值必须要么放在最前面，要么放在常量枚举值（可以在编译期计算的枚举值）之后
+                enum Thing
+                {
+                    Thing1 = GetValue() //非常量枚举值
+                    Thing2  //错误，需放在非常量枚举值之前
+                }
             枚举值的名称可以作为string使用，引用枚举名使用数组下标语法，索引为需要引用的枚举值
                 let colorName: string = Color[1]    //Red
+            常量枚举值
+                将enum声明为const将禁止非常量枚举值的赋值
+                使用常量枚举值时，编译器会完全抹除这个枚举值的信息，直接使用其值代替
+                    const enum Direction {...}
         unknown:
         any:
             any类型将迫使Typescript编译器停止类型检查，使用any类型与Javascript类似
@@ -556,6 +665,15 @@ TS
                 }
         object
             非number, string, boolean, bigint, symbol, null, undefined的类型
+        字面值类型
+            可以使用type关键字把字符串、数值、布尔值作为类型来使用，得到类似于枚举类型的行为，例如：
+                type Easing = "ease-in" | "ease-out" | "ease-in-out";//声明了一个Easing的字符串字面值类型
+                type Dice = 1 | 2 | 3 | 4 | 5 | 6
+    类型合集：
+        有时需要表达一个对象可能是几种类型之一，使用逻辑或|运算符来表示
+    类型并集：
+        有时需要表达一个对象同时满足多个接口，使用逻辑运算符&来表示
+
     编译期类型转换：
         有时可能需要将变量做类型转换，迫使Typescript编译器将其作为另一个类型（如果有充足的理由）
         此时编译器将不检查其是否真的可以进行这样的类型转换
@@ -567,7 +685,85 @@ TS
             在一对尖括号<>中加上转换为的类型，后加变量名
                 let someValue: unknown = "this is a string"
                 let strLength: number = (<string>someValue).length
-2.接口
+    keyof关键字
+        keyof Type返回Type中所有的属性名的类型合集，例如
+            interface Person 
+            {
+                name: string;
+                age: number;
+                location: string;
+            }
+            type K1 = keyof Person; // "name" | "age" | "location"
+            
+3.函数
+    函数的类型
+        函数的类型由参数的类型和返回值的类型决定
+        形如下面的函数
+            function FunctionName(parameter: ParameterType): ReturnType {...}
+        其类型为：
+            (parameter:ParameterType) => ReturnType
+        其中parameter可以随意，但不能没有
+        例如:
+            function add(x: number, y: number)：number
+            {
+                return x + y
+            }
+        其类型为：(x: number, y: number) => number
+        所以它可以赋值给一个相同类型的变量
+            let myAdd: (x:number, y: number) => number = add
+        Typescript可以根据return语句来自动判断返回值的类型所以无需写返回值的类型，所以上面的add又可以写成
+            function add(x: number, y: number) 
+            {
+                return x + y;    
+            }
+        Typescript还可以根据赋值变量的类型来推断函数的类型，也可以根据函数的类型来推断要赋值的变量的类型
+        所以将一个函数赋值给变量时，两端只需一端明确类型即可
+            let myAdd = function (x: number, y: number): number //由函数推断变量类型
+            {
+                return x + y;
+            };
+
+            // myAdd has the full function type
+            let myAdd2: (baseValue: number, increment: number) => number = function (x, y)  //由变量推断函数类型
+            {
+                return x + y;
+            };
+    可选参数
+        与接口的可选属性类似，在函数参数名后加问号?表明该参数是可选参数
+        可选参数必须位于必须参数的后面
+    默认参数
+        可以用赋值的形式给函数形参加一个默认参数，当实参个数==形参个数时使用实参的值或这对应实参非undefined，否则使用默认参数的值
+        默认参数不要求必须处于必须参数之后，然而如果调用时要使用默认参数的值，需要显式传递一个undefined        
+        默认参数的类型与可选参数相同，即使用默认参数的函数与可选参数的函数类型相同
+        例如下面的FullName和FullName2函数的类型相同
+            function FullName(firstName: string, lastName?: string) {...}
+            function FullName2(firstName: string, lastName:string = "Smith") {...}
+    可变参数
+        用...Parameter: Type[]表示默认可变参数
+        Parameter是一个Type类型的数组
+        可以传0~无穷多个实参给这样的可变参数
+            function add(x: number, ...args: number[])
+            {
+                return x + args.reduce((lhs: number, rhs: number) => lhs + rhs);
+            } 
+            console.log(add(1, 2, 3, 4, 5));    //15
+    重载
+        函数重载的方式是先声明所有要重载的版本的类型
+        然后在定义中将参数和返回值声明为any类型，在函数体内使用typeof来判断参数的真实类型来使用不同的实现
+            function add(x: number, ...args: number[]) : number;
+            function add(x: string, ...args: string[]) : string;
+
+            function add(x: any, ...args: any[]) :any
+            {
+                if (typeof x == "number")
+                {
+                    //...
+                }
+                else if (typeof x == "string")
+                {
+                    //...
+                }
+            }
     接口就是满足一些条件的类型，例如包含某个符合类型的属性、某些符合类型（接收某些类型的参数且返回特定类型）的方法
     Object接口
         匿名接口
@@ -633,4 +829,112 @@ TS
             interface Derived extends Base{...}
         一个接口可以继承多个接口
             interface Derived extends Base1 Base2 {...}
-
+4.类
+    Javascript中的类数据成员只需在构造函数中使用this.赋值即可
+    在Typescript中类的数据成员需要先列出其名称和类型
+        class ClassName
+        {
+            member: Type
+            constructor(data: Type)
+            {
+                this.member = data
+            }
+        }
+    可见性：
+        可以在成员名（无论是数据成员还是成员方法或构造函数）前加public private protected来修改其可见性
+        类成员默认为public
+        private关键字使得成员对外不可见
+        protected关键字使得成员只对派生类可见
+        将构造函数声明为protected使得该类只能由派生类构造，对外不能构造这个类的对象
+    快速声明类成员
+        先声明所有数据成员，再在构造函数中对数据成员赋值，会造成代码重复
+        可以在构造函数的参数中直接将参数加上可见性修饰符，使得该参数即成为数据成员，无需前向声明
+            class Person
+            {
+                constructor(public name: string)    //name即成为Person类的数据成员，可见性为public
+                {}
+            }
+    getter和setter
+        如果一个属性只有getter没有setter将自动成为readonly
+    静态成员
+        在成员名前使用static关键字将成员声明为静态
+        要访问类的静态成员，要在前面加类名.
+            class Point
+            {
+                static origin = { x: 0, y: 0 };
+                constructor(public x: number, public y: number) { }
+                distanceFromOrigin()
+                {
+                    return Math.sqrt(Math.pow(this.x - Point.origin.x, 2) + Math.pow(this.y - Point.origin.y, 2));
+                }
+            }
+    抽象类
+        抽象类只能通过派生类继承，不能定义对象
+        类似于接口，但是可以提供公用的实现
+        可以将方法声明为abstract，派生类必须提供抽象方法的实现
+        没有提供实现的方法必须声明为abstract
+    类也可以作为接口来使用
+        class Point {...}
+        interface 3DPoint extends Point { z: number }
+        let point:3Dpoint = {x:1, y:2, z:3 }    //注意这里不能用new
+5.模板
+    函数模板
+        在函数名后加一对尖括号<T>表示这是一个模板参数并引入了一个模板参数
+        可以引入多个模板参数，用逗号隔开
+        普通函数：
+            function identity(arg: any): any { return arg; }
+        这个函数的类型为：
+            (arg: any) => any
+        这个函数符合这样的函数接口
+            interface identityFunction
+            {
+                (arg: any): any;
+            }
+        模板函数：
+            function identity<T>(arg: T): T { return arg; }
+        这个函数的类型为：
+            <T>(arg: T) => T;
+        这个函数符合这样的函数接口
+            interface identityFunction
+            {
+                <T>(arg: T): T;
+            }
+    类模板
+        在类名后加一对尖括号<T>表示这是一个类模板
+            class ClassName<T>
+            {
+                ...
+            }
+    模板限制
+        函数模板中只能执行模板参数T本身所支持的操作，即所有可能的T所共有的操作
+        在没有对T进行限制的情况下，能执行的操作非常有限
+        所以需要对T进行限制，使得编译器知道T所能支持的操作
+        这通常需要借助定义接口来实现，然后限制T符合这一接口
+            interface HasLength
+            {
+                length: number
+            }
+            function LogLength<T extends HasLength>(arg: T)
+            {
+                console.log(arg.length)
+            }
+DOM
+    Document
+        .getElementById()
+        .getElementByTagName()
+        .querySelector()
+        .querySelectorAll()
+    HTMLElement
+        .style
+        注意在Javascript中style的属性是驼峰命名camelCase，而CSS中是全小写加连字符lower-case
+    <input> 使用.value属性来获取输入的字符串
+Ajax（Asynchronous Javascript and XML）
+    是指用XMLHttpRequest()这样的函数来直接向服务器发起Http请求从而更新网页的部分内容而不必刷新整个页面的获取数据的方式
+    XMLHttpRequest:
+        首先构造一个XMLHttpRequest对象：let request = new XMLHttpRequest()
+        然后使用.open(method: string, url)来创建一个请求
+        最后使用.send()来发送请求
+        请求默认是使用async方式执行的，所以如果需要在收到应答后执行某些操作，可以给.onload属性赋值一个回调函数
+    fetch():
+        fetch(url)返回一个Promise对象
+    blob（binary large object）
