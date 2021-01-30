@@ -928,6 +928,36 @@ DOM
         .style
         注意在Javascript中style的属性是驼峰命名camelCase，而CSS中是全小写加连字符lower-case
     <input> 使用.value属性来获取输入的字符串
+    Canvas
+        首先捕获一个<canvas>的引用
+            const convas = document.querySelector("myCanvas")
+        然后使用.getContext(Mode: string)创建一个绘图的上下文环境，mode可选"2d", "webgl", "webgl2"
+            const context = convas.getContext("2d")
+        坐标转换
+            所有绘制的坐标默认都是从canvas对象的左上角为原点，向右为x轴正方向，向下为y轴正方向计算的
+            如果需要转换坐标，例如将canvas中心点作为原点，使用.translate()函数
+                .translate(x, y)
+                    将原坐标(x,y)作为新的原点
+        绘制矩形
+            .fillRect(x, y, width, height)
+        自定义绘图路径
+            .beginPath()
+            .moveTo(x, y)//绘制直线路径
+            .arc(centerX, centerY, radius, startAngle, endAngle, isCounterClockWise)//绘制弧线
+            .fill()     //填充路径
+            .stroke()   //只绘制边缘，不填充
+        绘制文字
+            注意绘制文字的坐标是从左下角开始而绘制其他图形的坐标都是从左上角开始
+            .fillText(text, bottomLeftX, bottomLeftY)
+            .strokeText(text, bottomLeftX, bottomLeftY)
+        绘制图片：
+            .drawImg(image, x, y)
+            .drawImg(image, x, y, width, height, imageX, imageY, imagePartWidth, imagePartHeight)
+                x, y 定义了所要绘制的原图的
+                imageX, imageY 定义了所要绘制的原图部分在原图的左上角的坐标
+                imagePartWidth, imagePartHeight 定义了所要绘制的原图部分的
+        动画
+
 Ajax（Asynchronous Javascript and XML）
     是指用XMLHttpRequest()这样的函数来直接向服务器发起Http请求从而更新网页的部分内容而不必刷新整个页面的获取数据的方式
     XMLHttpRequest:

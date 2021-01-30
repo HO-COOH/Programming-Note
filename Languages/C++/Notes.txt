@@ -371,6 +371,40 @@ atoi()  将nptr所指的字符串的开头部分转化为相应的整数，长�
             handler可以是默认信号处理函数SIG_DFL、总是忽略信号的处理函数SIG_IGN、函数指针
                 信号处理函数的原型为void fun(int sig)
     注意在信号处理函数中不要执行IO操作
+20.thread库
+    C11中新增了<threads.h>库
+    如果定义了宏__STDC_NO_THREADS__，则该库不可用
+    创建一个线程
+        int thrd_create(thrd_t* thr, thrd_start_t func, void* arg)
+            thr是一个指向thrd_t结构体的指针，用于存放新线程的标识符
+            func是一个线程函数，函数类型为int(void*)，可以用强制类型转换来转换为实际的函数类型
+            arg是func所接收的参数，由于是void*，所以可以传递任何类型的参数的指针
+            成功返回thrd_success，内存不足引起的错误返回thrd_nomem，其他错误返回thrd_error
+    获取当前线程id
+        thrd_t thrd_current()
+    等待一个线程返回
+        int thrd_join(thrd_t thr, int* result)
+            成功返回thrd_success，否则返回thrd_error
+    线程休眠
+        struct timespec
+        {
+            time_t tc_sec;  //整数秒
+            long tc_nsec;   //整数纳秒
+        };
+        int thrd_sleep(const struct timespec* duration, struct timespec* remaining)
+            duration指向一个休眠时间段的结构体
+            有时休眠可能会因为信号提前结束，这时剩下未休眠的时间存入remaining所指向的结构体中，函数返回-1，remaining可以是NULL
+            成功休眠时返回0
+    比较两个thrd_t是否引用同一线程
+        int thrd_equal(thrd_t lhs, thrd_t rhs)
+            若lhs和rhs为同一个线程，则返回非0值
+    分离线程
+        int thrd_detach(thrd_t thr)
+            成功返回thrd_success，否则返回thrd_error
+    互斥量：
+        
+
+
 C++
 -1.C++正式标准
     https://en.cppreference.com/w/Cppreference:FAQ 包含了C++最新的标准
@@ -1388,6 +1422,32 @@ locale：
     throw语句是一个表达式，表达式的类型是void，可以用在三目运算符中，比如
         return d > 1e7 ? throw std::overflow_error{"Too big"} : d;
     
+    函数try块
+        可以将整个函数体都包括进一个try块中，此时try块充当函数定义，例如
+            void func() try
+            {
+                //func()的定义
+            }
+            catch(...)
+            {
+                //...异常处理
+            }
+        函数try块的主要用途是可以捕获构造函数中使用成员初始化列表语法时，初始化成员时可能抛出的异常
+        而一般的try catch块只能捕捉在函数体内的异常，无法捕捉成员初始化中的异常
+            class MyClass
+            {
+                Member member;
+            public:
+                MyClass(ParameterType parameter) try: member{parameter}
+                {
+                    //...
+                }
+                catch(...)
+                {
+
+                }
+            };
+
     没有catch住的异常会沿着函数调用栈向上传播，直到main函数，如果main函数仍然没有接住异常，程序将调用std::terminate()结束
     如果同一个代码块发生异常后，将发生栈解构，此时对象按定义的顺序的相反的顺序析构
     由于这个原因，管理资源的类的析构函数不应该抛出异常，否则同一个代码块中可能出现两个异常，此时程序会立即调用std::terminate()，导致资源泄露
@@ -3992,15 +4052,16 @@ C++11:
             如果对thread对象既不适用join() 又不使用detach() ，则在线程对象因为主线程main退出作用域被销毁时，新线程会调用std::terminate
             如果主线程还没结束，也会被std::terminate() 强行终止
             可以用joinable() 方法检查这个线程是否可以与thread对象结合或分离，已经分离的线程不能再与任�����thread对象结合，称为守护进程，joinable() 函数返回一个布尔值
-            每个线程都有一个独特的id，获取当前线程的id，使用std::this_thread::get_id() 函数
-            获取线程对象的id，使用get_id() 成员方法 2.获取资源即初始化RAII 当thread对象绑定的函数有参数时，需要在thread对象的构造函数内传值调用，这是由于默认情况下创建新线程时，参数是拷贝到新线程的独立内存中
-            如果函数参数是引用，需要将构造函数内的参数用std::ref() 显式转换 void
-            add(int &a) { ++a; }
-        int main() 
-        {
-            int x=0;
-            std::thread t(add,std::ref(x));  //x->1
-        }
+        每个线程都有一个独特的id，获取当前线程的id，使用std::this_thread::get_id() 函数
+        获取线程对象的id，使用get_id() 
+        成员方法 2.获取资源即初始化RAII 当thread对象绑定的函数有参数时，需要在thread对象的构造函数内传值调用，这是由于默认情况下创建新线程时，参数是拷贝到新线程的独立内存中
+            如果函数参数是引用，需要将构造函数内的参数用std::ref() 显式转换 
+            void add(int &a) { ++a; }
+            int main() 
+            {
+                int x=0;
+                std::thread t(add,std::ref(x));  //x->1
+            }
         当然，也可以用指针的方式来实现
         void add(int *a) { ++(*a); }
         int x=0;

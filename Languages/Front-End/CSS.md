@@ -19,12 +19,17 @@ selector {property:value;...}
 ### 复合选择器
 - 包含元素用空格, ``div p`` 选中所有的div下的p，无论p是不是div所直接包含
 - 直接后代用``>``, ``div > p``选中所有div直接包含的p
-- 直接邻居用``+``, ``div + p``选中所有与div(后面)直接相邻的p
-- 泛邻居用``~``, ``div ~ p``选中所有div(后面)的p
+- 直接邻居用``+``, ``div + p``选中所有与div(后面)直接相邻的一个p
+- 泛邻居用``~``, ``div ~ p``选中所有div(后面)的所有p
 ### selector
-- simple selector: select elements based on ``tag-name``, ``id(#)``, ``class(.)``
-- combinator selector
-- universal selector ``*``
+- simple selector: select elements based on ``tag-name``选中一个tag, ``#id``选中id元素（所有元素都应该具有唯一id）, ``.class-name``选中具有相同class-name元素属性的元素
+- combinator selector，多个条件之间不加空格，例如：
+  ```css
+    div.red.green-text {
+
+    }//选中所有div中类名为red green-text的元素
+  ```
+- universal selector ``*`` 选中所有元素
 - grouping selector ``selector1, selector2 {...}``
 
 ## 通用属性
@@ -165,6 +170,12 @@ display: inline-block;  /*将链接显示在一个方框内*/
 - first-child：选中任何是第一个子元素的元素
 - last-child:
 - nth-child(n)
+- only-child：选中任何是唯一子元素的元素
+- first-of-type：选中任何是第一次出现这个类型元素
+- last-of-type
+- nth-of-type
+- only-of-type
+- not(selector)反选selector选中的元素
 - lang(name)：选中``lang=“name”``的tag
 - focus
 
