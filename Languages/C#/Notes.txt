@@ -1,0 +1,927 @@
+0.C#
+    C#程序运行在.NET虚拟运行环境上
+    .NET虚拟运行环境属于公共语言运行时common language runtime(CLR)，是微软的common language infrastructure公共语言基础结构(CLI)的一个商用实现
+    C#源代码编译成一种中间语言.NET intermediate language(IL)，这个中间语言符合CLI标准
+    C#程序执行时，通过CLR及时编译just-in-time(JIT)编译成机器语言来执行
+    入口点
+        Main()函数是一个C#程序的入口点，程序从Main()函数开始执行
+        有且只能在一个类中定义一个Main()函数，如果有多个类定义了Main()函数，需要在命令行中指定将哪一个类的Main()作为入口点
+        Main()函数必须定义在一个class或struct中，且必须为静态static，可见性随意，不一定要public
+        Main()函数的形式可以是以下一种：
+            static void Main() { }
+            static int Main() { }
+            static void Main(string[] args) { }
+            static int Main(string[] args) { }
+            static async Task Main() { }
+            static async Task<int> Main() { }
+            static async Task Main(string[] args) { }
+            static async Task<int> Main(string[] args) { }
+        当使用string[]来接收命令行参数时，程序本身的路径并不保存在args数组中，但是会保存在
+            static string[] System.Environment.GetCommandLineArgs()返回的数组中
+1.类型
+    值类型
+        简单类型
+            整数类型：  sbyte short int long  无符号=> byte  ushort uint ulong
+            字符类型：char(存储一个utf-16的编码单元)
+            浮点类型：float double
+            十进制小数类型：decimal
+            布尔值：true false
+            枚举类型：enum，枚举类型的内部实现类型可以是任何8种整数类型之一
+                定义一个枚举类型使用enum关键字和枚举类型名，并用逗号,分割其中的枚举值
+                    public enum MyEnum
+                    {
+                        Value1,
+                        Value2
+                    }
+            结构体struct
+                与class不同，struct不支持继承，但是可以实现一个interface
+
+            null
+            元组：由圆括号()括起来的一些值类型
+                定义一个元组类型变量时，其类型用一对圆括号()括起来，值也用一对圆括号()括起来
+                    (double, int) t = (4.5, 3);
+                元组中的各个元素的默认命名为Item1, Item2...，用.成员运算来访问
+                可以在定义元组的类型时手动给元组元素命名，手动命名后的元组仍然可以用其默认命名来访问元组的元素
+                    (double Sum, int Count) t = (4.5, 3);
+                    Console.WriteLine(t.Sum, t.Item1);
+                当直接使用现有变量名来初始化一个元组时，元组的元素会被自动命名为变量名
+                    var sum = 4.5;
+                    var count = 3;
+                    var t = (sum, count);   //t.sum t.count
+                解结构化
+                    可以通过解结构化来提取元组中的元素来声明为独立的新变量
+                        var t1 = (17, 3.14)
+                        var (first, second) = t;    //var first = t1.Item1; var second = t1.Item2;
+                    如果是要给当前作用域内的元素重新赋值时，也使用类似的语法
+                        var first = 0;
+                        var second = 0.0;
+                        var t1 = (17, 3.14);
+                        (first, second) = t;
+        引用类型：
+            class
+            interface
+            array
+            delegate
+                定义了函数的参数类型和返回值类型，类似于针对于函数的interface
+        可空类型
+            在任何类型后加一个?即成为对应类型的可空类型，即可以被赋值为null
+    类型自动推断
+        本地变量可以使用var关键字来定义，此时编译器根据初始化的值来自动推断类型
+        类型可以是内建类型、匿名类型、用户定义类型、.NET的类型
+        匿名对象显然只能使用这种方法来定义
+        注意如果在当前作用域内有一个叫做var的类型，则var会引用那个类型而不是作为自动类型推断的关键字
+    常量
+        常量是编译期已知量
+        只有内置类型才能使用const声明为常量，用户定义类型包括class, struct, array需要使用readonly关键字
+        常量需要在定义时初始化
+        常量与静态成员变量使用方法类似，在可见情况下直接使用类名+成员名来访问
+关键字
+    is
+        is关键字用来判断一个对象或者表达式是否为一种类型
+        expr is type varname
+        当expr的不为null且类型与type相同，或者继承于type或者继承了type接口时为真（所以可以用在if语句中），且varname将赋值为expr的引用
+        常用于在多态时将指向基类的引用转换成指向其实际类型的引用
+            if(object is Person p)
+                Console.WriteLine(p.Name);
+            else if(object is Dog d)
+                Console.WriteLine(d.Breed);
+        也用于检查expr是否为null
+            expr is null
+语句
+    switch语句
+        switch语句可以switch常量、字符串、多态对象的类型
+        与C/C++类似，多个case可以共用一个分支代码段
+        与C/C++不同的是，一个case分支代码段必须显式用break，return，goto之一来结束执行，不可以继续执行下一个case分支代码段
+        在switch多态对象的类型时，需要在类型后加变量名，该变量名将赋值为符合的分支类型的引用
+            switch(shape)
+            {
+                case Square s:
+                    return s.Side*s.Side;
+                case Circle c;
+                    return Math.PI * c.Radius * c.Radius;
+                ...
+            }
+        在case分支中可以使用when关键字来进一步约束条件，例如
+            switch(shape)
+            {
+                case Square s when s.Side == 0:
+                    //...
+            }
+        
+2.函数
+    函数的参数有4种
+        值参数
+            在调用时值参数的值会被拷贝
+        引用参数
+            引用参数在函数定义和调用时都要加ref关键字来表明这个参数以引用方式传递
+            引用参数在函数中的修改会影响实参的值
+                static void Swap(ref int x, ref int y)
+                {
+                    int temp = x;
+                    x = y;
+                    y = temp;
+                }
+                public static void Main()
+                {
+                    int i = 1, j = 2;
+                    Swap(ref i, ref j); //i=2, j=1
+                }
+        输出参数
+            在函数定义的参数类型前加out关键字表明这是一个输出参数
+            输出参数必须被函数修改
+            输出参数在调用处无需事先定义
+                static void Divide(int x, int y, out int result, out int remainder)
+                {
+                    result = x / y;
+                    remainder = x % y;
+                }
+                public static void OutUsage()
+                {
+                    Divide(10, 3, out int res, out int rem);
+                    Console.WriteLine($"{res} {rem}");	// "3 1"
+                }
+        输入参数
+            在函数定义的参数类型前加in关键字表明这是一个输入参数
+            输入参数相当于一个const引用
+            输入参数不能被函数修改
+            通常输入参数与值参数用法相同，区别是当参数是一个比较大的struct时，由于值参数需要拷贝这个struct所以使用in可能可以提高性能
+        参数数组
+            参数数组允许不同数量（包含0个）的相同类型的参数传递给调用函数
+            使用params关键字和参数的类型[]来定义一个参数数组
+            参数数组只能放在函数所有参数的末尾
+            Console.Write()和Console.WriteLine()即为一个使用参数数组的例子
+                public class Console
+                {
+                    public static void Write(string fmt, params object[] args) {/*...*/}
+                    public static void WriteLine(string fmt, params pbject[] args) {/*...*/}
+                }
+    默认参数
+        函数的默认参数可以是以下的3种形式
+            常量
+            new ValueType()
+            default(ValueType)
+            ValueType v = default
+
+    重载
+        当所重载的函数中既存在泛型函数又存在普通函数时，不加<>的函数调用会优先选择非泛型
+            static void f(int x);
+            static void f<T>(T x);
+            f<int>(0);  //调用f<T>
+            f(0);   //调用f(int)
+    lambda表达式
+        lambda表达式的形式：
+            (parameters) => expression
+            (parameters) => { statements;}
+        如果lambda表达式只有一个参数，参数的圆括号()可以省略
+        有时编译器无法推断参数的类型，可以显式手动写出
+        参数类型要么全部使用自动推断，要么全部手动写出
+        从C#9开始，如果参数在lambda表达式的函数体内没有使用，可以用一个下划线_代替，尤其是在充当事件处理函数时
+        lambda表达式可以转换为delegate类型，由其参数类型和返回值类型而确定
+            有返回值的lambda表达式可以转换为一个Func<ParameterType..., ReturnType>类型的delegate，例如
+                Func<int, int> square = x => x*x; //或(x) => x*x
+            没有返回值的lambda表达式可以转换为一个Action<ParameterType...>类型的delegate，例如：
+                Action<int> print = x => Console.WriteLine(x);
+        
+
+接口
+    接口可以包含成员函数、属性、事件、索引器，接口不能包含成员变量
+    接口中的成员默认都是public
+    从C#8.0开始，接口可以提供实现，接口的成员函数都是virtual的，所以任何派生类都可以直接override这个实现
+    静态成员函数必须提供实现
+    class和struct可以继承多个接口
+    当两个接口包含相同的成员函数时，在重写时需要显式指定重写的是哪个接口中的函数
+        interface I1 { void f(); }
+        interface I2 { void f(); }
+        class A: I1, I2
+        {
+            void I1.f()
+            {
+                //...
+            }
+
+            void I2.f()
+            {
+                //...
+            }
+        } 
+    继承接口时，类中对接口中的方法并不可见，对外也不可见，所以如需调用接口中的实现，需要对this做强制类型转换转换成接口类型的引用
+        interface I { int A() => 1; }
+        class Derived: I
+        {
+            public void f()
+            {
+                Console.WriteLine(((I)this).A());
+            }
+        }
+        var obj = new Derived();
+        obj.A();    //ERROR, A()不可见
+        (I)obj.A(); //OK
+struct
+    readonly关键字
+        将struct声明为readonly表示这个结构体内的数据一旦初始化后就不可再更改
+        这使得所有成员函数（除了构造函数）、成员变量、属性都隐式成为readonly
+        所以属性只能定义getter和init，不能定义setter
+3.类
+    可见性
+        public
+        private
+        protected
+        internal 只对当前assembly(.exe .dll)可见
+        protected internal 只对所有派生类和当前assembly(.exe .dll)的类可见
+        private protected 只对当前assembly的派生类可见
+    readonly关键字
+        被readonly关键字修饰的变量只能在定义时或构造时赋值
+    构造函数：
+        C#的类有两种构造函数
+            静态构造函数
+                静态构造函数是
+            实体构造函数
+                实体构造函数是构造一个对象实体时调用
+        当一个类没有定义实体构造函数时，编译器自动生成一个空的没有参数的实体构造函数
+    静态成员变量
+        静态变量与一个类的所有实体都关联
+        用static关键字声名一个静态变量
+        readonly静态变量要在定义时赋值，如
+            public class Color
+            {
+                public static readonly Color Black = new Color(0, 0, 0)
+            }
+    成员函数
+        当成员函数只包含一个语句时，可以用箭头函数的形式简化
+            public string ToString() => "Color: ";
+    静态成员函数
+        静态成员函数只能访问静态成员变量和其他静态成员函数
+        调用静态成员函数时只需使用类名加成员运算符加函数名即可
+            ClassName.StaticMemberFunction();
+    属性
+        属性是带getter或setter的成员方法
+        getter和setter定义了这个属性作为返回值或被赋值时的行为
+        在访问属性时使用与访问成员变量相同的语法
+        在setter中隐式定义了一个名为value的变量，value的值就是对这个属性使用赋值时所赋的值
+        public class MyList<T> 
+        {
+            T[] items;
+            int count;
+            public int Capacity
+            {
+                get => items.Length;
+                set
+                {
+                    if(value != items.Length)
+                    {
+                        T[] newItems = new T[value];
+                        Array.copy(items, 0, newItems, 0, count);
+                        items = newItems;
+                    }
+                }
+            }
+        }
+        属性也可以被声明为静态的，与一个类的所有实体关联
+    索引器
+        索引器使得这个类可以像数组一样使用方括号[]访问
+        定义一个索引器的语法与属性类似，但属性名是list，并加上[]和其接受的参数
+        索引器的setter中也有一个隐式的value，为赋值时接收的值
+            public class MyList<T>
+            {
+                public T this[int index]
+                {
+                    get => items[index];
+                    set
+                    {
+                        items[index] = value;
+                    }
+                }
+            }
+    运算符重载
+        运算符重载函数与普通成员函数的定义类似，包含返回值类型、operator关键字和要重载的运算符和参数
+        运算符重载函数必须被声明为public static
+            public class MyList<T>
+            {
+                public static bool operator==(MyList<T> a, MyList<T> b)
+                {
+                    if(Object.ReferenceEquals(a, null)) return Object.ReferenceEquals(b, null); //当a为null时，判断b是否为null，如果b为null则相同，如果b不为null则不同
+                    if(a.count != b.count)
+                        return false;
+                    for(int i = 0; i < a.count; ++i)
+                    {
+                        if(!object.Equals(a.items[i], b.items[i]))
+                            return false;
+                    }
+                    return true;
+                }
+            }
+    事件
+        定义一个事件类似与定义一个成员变量，所不同的是在类型前加event关键字，而且类型必须是一个delegate类型
+            public class MyList<T>
+            {
+                public event EventHandler Changed;
+                protected virtual void OnChanged() => Changed?.Invoke(this, EventArgs.Empty);   //MyList<T>的其他成员函数被调用时，应该在最后调用OnChanged()来调用Changed的事件处理函数
+            }
+        事件处理函数使用+=运算符来添加，使用-=运算符来删除，例如下面给MyList<T>的Changed事件添加一个处理函数
+            static void ListChanged(object sender, EventArgs e)
+            {
+                Console.WriteLine("Changed");
+            }   
+            public static void Main()
+            {
+                var names = new MyList<string>();
+                names.Changed += new EventHandler(ListChanged);
+            }
+    静态类
+        将一个类声明为static使得其成为一个静态类
+        静态类只能包含静态成员，成员的可见性与普通类一样可以修改
+        静态类不可以用来定义一个新对象，即不可以用new运算符创建一个对象
+        静态类通常作为一些无状态函数的容器，例如System.Math静态类
+        静态类在第一次被引用时初始化并调用静态构造函数
+4.面向对象
+    继承
+        继承一个基类并不会继承它的构造函数和finalizer
+    虚函数
+        将一个成员函数声明为virtual将使其变成虚函数
+        虚函数可以在派生类中被override
+        这样可以当使用一个基类的引用指向一个派生类对象时调用的方法是派生类的方法
+    抽象函数
+        使用abstract关键字声明一个函数时将变成纯虚函数
+        纯虚函数就是没有实现的函数
+        只能在抽象类中定义抽象函数
+            public abstract class Expression
+            {
+                public abstract double Evaluate();  //不提供实现，由具体类来实现
+            }
+
+    多态
+5.异常
+6.泛型
+7.名称空间
+    名称空间只能包含类型，不能包含（静态或非静态）变量和（静态或非静态）函数
+        namespace SampleNamespace
+        {
+            class SampleClass { }
+
+            interface ISampleInterface { }
+
+            struct SampleStruct { }
+
+            enum SampleEnum { a, b }
+
+            delegate void SampleDelegate(int i);
+
+            namespace Nested
+            {
+                class SampleClass2 { }
+            }
+        }
+    名称空间内的名称都是隐式默认public且不可更改，例如不能将名称空间内的一个class声明为private
+    名称空间使用.操作符来访问成员
+    使用using关键字+NamesapceName将引入该名称空间，所以使用其中的名称时无需限定
+    在全局范围内存在一个global名称空间 
+    名称空间别名解析运算符::
+        使用名称空间解析运算符::来访问一个名称空间别名的成员
+    using关键字
+        using + 名称空间名 将引入名称空间的所有名称
+        using + NamespaceName.Type 将引入名称空间的一个Type类型，所以再使用这个类型时无需使用完整限定名称
+        using Alias = NamespaceName 将使用Alias作为名称空间NamespaceName的别名
+        using TypeAlias = NamespaceName.Type 将使用Alias作为名称空间NamespaceName内的某个类型Type的别名
+        using static Type.NestedType 将引入某个类型Type内定义的嵌套类型NestedType
+8.字符串
+    string是System.String的一个类型别名
+    空字符串System.String.Empty
+    string类是不可修改的，所以对string类的修改实际上是创建了一个新字符串的引用，赋值给原字符串的引用
+        string s1 = "Hello ";
+        string s2 = s1;
+        s1 += "World";  //此时s2依然是"Hello"
+    同样的原因，字符串的索引器只定义了getter而没有setter，所以不可以通过下标引用来修改字符串中的某个字符
+        public char this[int index] { get; }
+    原始字符串
+        在字符串前加@使得这个字符串字面值成为原始字符串
+        原始字符串免去了使用转义字符的麻烦
+    字符串插入
+        可以在字符串字面值前加一个美元符号$来表明这个字符串中包含要插入的变量
+        字符串插入的语法
+            {<expression>[,<alignment>][:<format>]}
+        其中expression是要插入的值
+        alignment是一个可选的常量值，定义了所要插入的值的最小的字符串宽度，如果为正数则右对齐，负数为左对齐
+        format是可选的格式化字符串
+        如果expression中使用了三目运算符，则需要将整个三目运算符表达式用圆括号()括起来
+        如果字符串中包含花括号{}则需重复一次花括号来转义，即$"{{}}" -> {}
+    复合格式化
+        可以使用{占位符}的方法来起到类似于字符串插入的效果
+            Console.WriteLine("Hello, {0}", name);
+    StringBuilder类
+        StringBuilder类会创建一个缓存区，提高字符串的处理速度，而且是可修改的
+            var sb = new System.Text.StringBuilder("hello world");
+            sb[0] = 'H';
+    字符串->数字
+        要将字符串转化为一个数字类型，可以用所有数字类型定义的静态成员方法TryParse()
+            bool .TryParse(string s, out T value)
+        如果转换成功，返回true，转换失败返回false并且将输出参数value做全0值初始化
+        还可以使用Parse()方法，但是这个方法在转换失败时抛出异常
+            T .Parse(string)
+9.数组
+    使用Type[]来声明一个Type数组的类型
+    定义一个数组时，数值类型的变量做0值初始化，引用类型初始化为null
+    由于数组是一个引用类型，所以作为函数参数时，被调用函数中对数组做的修改对外可见
+    一维数组：
+        使用new运算符来定义一个一维数组
+            int[] arr = new int[5];
+        使用new运算符和初始化器来定义并初始化一个一维数组，此时数组的大小可以省略，由初始化器中元素的个数来推断大小
+            int[] arr = new int[]{1, 2, 3};
+            注意使用初始化器且显式给出数组大小时，初始化器的元素个数应该与显式提供的数组大小一致
+                int[] arr = new int[3]{1, 2};   //ERROR
+        使用初始化器来定义并初始化一个一维数组
+            int[] arr = {1, 2, 3};
+            注意，初始化器只能用于定义时初始化，只声明而不定义一个数组后不能再只用初始化来初始化，必须加上new运算符
+                int[] arr;
+                arr = {1, 2, 3};    //ERROR
+                arr = new int[]{1, 2, 3};   //OK
+    多维数组：
+        使用new运算符来定义一个多维数组，在方括号中使用,来分割各维度的大小
+            int[,] arr = new int[4, 2];    
+        使用new运算符和初始化器来定义并初始化一个多维数组，此时数组的大小可以省略，由初始化器中的元素个数来推断大小
+            int[,] arr2D = new int[,] { { 1, 2 }, { 3, 4 }, { 5, 6 }, { 7, 8 } };
+        与一维数组类似，初始化器只能用于定义时初始化，只声明而不定义一个数组后不能再用初始化器来初始化，必须加上new运算符
+    数组的数组：
+        数组的数组是一个一维数组，其中每个元素又是一个数组
+        这样每个数组的维度可以不同
+        先声明一维数组的维度，再对每个元素赋值一个数组
+            int[][] jagged = new int[3][];
+            jagged[0] = new int[5];
+            jagged[1] = new int[4];
+            jagged[2] = new int[3];
+        也可以对每个元素数组使用带new运算符的初始化器来赋值
+            int[][] jagged = new int[3][];
+            jagged[0] = new int[]{1, 3, 5, 7, 9};
+            jagged[1] = new int[]{0, 2, 4, 6};
+            jagged[2] = new int[]{11, 13, 15};
+        也可以使用初始化器对最外围的一维数组初始化，但内部的数组必须使用带new运算符的初始化器
+            int[][] jagged = {
+                new int[]{1, 3, 5, 7, 9},
+                new int[]{0, 2, 4, 6},
+                new int[]{11, 13, 15},
+            };
+    foreach循环
+        foreach(Type variable in array)
+        对一维数组使用foreach循环
+        对多维数组使用foreach循环依然是每次获取一个单独元素，顺序是以数组最后一个下标递增优先
+            int[,] numbers2D = { { 9, 99 }, { 3, 33 }, { 5, 55 } };
+            foreach (int i in numbers2D)
+            {
+                System.Console.Write("{0} ", i);
+            }
+            // Output: 9 99 3 33 5 55
+        由于数组的数组本质上是一维数组，所以对其使用foreach循环时循环变量是一个数组类型
+            int[][] jagged = {
+                new int[]{1, 3, 5, 7, 9},
+                new int[]{0, 2, 4, 6},
+                new int[]{11, 13, 15},
+            };
+            foreach(int[] i in jagged)
+            {
+                foreach(int j in i)
+                {
+                    Console.WriteLine(j);
+                }
+            }
+    类型推断
+        数组的类型可以根据初始化器来自动推断，与变量一样声明为var
+        匿名对象数组只能用类型推断的方式来声明，例如
+            var contacts = new []
+            {
+                new {
+                    Name = "hello",
+                    Num = 1
+                },
+                new {
+                    Name = "world",
+                    Num = 2
+                }
+            }
+容器
+    容器接口
+        System.Collections.IEnumerator
+            通常一个迭代器在初始化时指向头部的前一个位置，需要先调用.MoveNext()才能开始读取
+            属性：
+                .Current
+            方法：
+                bool .MoveNext()    //成功移动返回true，到达超尾位置返回false
+                void .Reset()       //将迭代器重置到指向头部的前一个位置
+        System.Collections.IEnumerable
+            定义了简单的迭代操作，所有可迭代容器都满足这个接口
+            方法：
+                IEumerator .GetEnumerator()
+        System.Collections.ICollection:
+            System.Collections.IEnumerable
+            定义了大小、迭代器、同步操作方法，所有System.Collections容器都满足这个接口
+            属性：
+                int .Count { get; } //返回元素的个数
+                bool .IsSynchronized {get;} //返回操作是否同步（线程安全安全）
+                object .SyncRoot {get;}     //返回一个对象，可以用于同步多线程对容器的操作
+            方法：
+                void .CopyTo(Array array, int index)//将容器的元素复制到array数组中从第index索引开始的位置
+        System.Collections.IList:
+            System.Collections.ICollection
+            定义了按数组下标访问的方法，所有支持数组下标访问的容器都满足这个接口
+            有3种满足IList的容器：只读容器、固定大小但可以修改元素的容器、可变大小的容器
+            属性：
+                bool .IsFixedSize {get;}    //返回容器是否固定大小
+                bool .IsReadOnly {get;}     //返回容器是否只读，注意只读与固定大小并不重合
+                object? this[int index] {get; set;} 
+            方法：
+                int Add(object? value)  //返回所插入元素的位置索引，失败返回-1，注意这个方法并不要求插入总是在容器尾端
+                void Clear()    //当容器是只读时抛出异常
+                bool Contains(object? value)      //返回容器是否包含对象value
+                int IndexOf(object? value) //返回容器中对象value的索引，如果没找到返回-1
+                void Insert(int index, object? value)//在容器的index索引插入元素value，如果容器是readonly或固定大小则抛出异常
+                void Remove(object? value)  //删除容器中的value对象
+                void RemoveAt(int index)    //删除容器中索引为index的对象，如果容器是readonly或固定大小则抛出异常
+        System.ICloneable
+            支持复制的接口，这个接口并不规定这个复制操作是浅复制还是深复制
+            方法：
+                object Clone()
+        System.Collections.Generic.IReadOnlyCollection<out T>:
+            System.Collections.Generic.IEnumerable<out T>
+            定义了一个只读容器，即容器内的元素不可修改
+            属性：
+                int Count{get;}//返回容器内元素的个数
+    容器适配器
+        System.Collections.ObjectModel.ReadOnlyCollection<T>:
+            System.Collections.Generic.ICollection<T>, 
+            System.Collections.Generic.IEnumerable<T>, 
+            System.Collections.Generic.IList<T>, 
+            System.Collections.Generic.IReadOnlyCollection<T>, 
+            System.Collections.Generic.IReadOnlyList<T>, 
+            System.Collections.IList
+            表示一个只读容器
+            构造函数：
+                ReadOnlyCollection<T>(System.Collections.Generic.IList<T> list)
+            
+    方法接口
+        System.Collections.Generic.IComparer<in T>
+            定义了同一个类型的两个对象的比较方法
+            方法：
+                int Compare(T? x, T? y) //x<y => 负数，x==y => 0，x>y => 正数
+        System.Collections.IEqualityComparer
+        System.Collections.Generic.IEqualityComparer<T>
+            定义了比较两个对象是否相同方法
+            可以对自定义类型提供具体实现来实现自定义类型的比较，例如：
+                class MyComparer: IEqualityComparer<MyType>
+                {
+                    public bool Equals(MyType lhs, MyType rhs) {}
+                    public int GetHashCode(MyType obj) {}
+                } 
+            方法：
+                bool Equals(T? x, T? y)
+                int GetHashCode(T obj)
+                需要保证当Equals(x, y)返回true时，GetHashCode(x)==GetHashCode(y)
+                而且也需要保证Equals()的传递性，即x==y且y==z => x==z
+
+        System.Collections.IStructuralComparable
+            定义了结构化比较的方法接口（例如数组、元组的比较）
+            方法：
+                int CompareTo(object? other, System.Collections.IComparer comparer) 
+                    调用comparer.Compare()来比较元素
+                    this < other => 负数，this==other => 0，this > other => 正数
+        System.Collections.IStructuralEquatable
+            方法：
+                bool Equals(object? other, System.Collections.IEqualityComparer comparer)
+
+    Array:
+        ICloneable, 
+        System.Collections.IList,
+        System.Collections.IStructuralComparable,
+
+
+    System.Collections.ArrayList:
+        ICloneable,
+        System.Collections.IList
+        ArrayList是一个用于存储不同类型的对象的容器
+        由于性能原因，最好改用List<T>来存储同类型对象，用List<object>来存储不同类型的对象
+        构造函数：
+            ArrayList()
+            ArrayList(System.Collections.ICollection c) //如果元素个数可以预先估计，应该先估计元素的个数，然后调用resize()来提高性能
+            ArrayList(int capacity)
+    List<T>
+        与ArrayList类似，可以使用数组下标语法来访问的强类型顺序容器
+        public class List<T> : 
+            System.Collections.Generic.ICollection<T>, 
+            System.Collections.Generic.IEnumerable<T>,
+            System.Collections.Generic.IList<T>,
+            System.Collections.Generic.IReadOnlyCollection<T>, 
+            System.Collections.Generic.IReadOnlyList<T>, 
+            System.Collections.IList
+        构造函数：
+            List<T>()
+            List<T>(System.Collections.Generic.IEnumerable<T> collection)
+            List<T>(int capacity)
+        方法：
+            void AddRange(System.Collections.Generic.IEnumerable<T> collection) //追加到尾部
+            System.Collections.ObjectModel.ReadOnlyCollection<T> AsReadOnly()   //使用当前list构造一个只读的版本
+            int BinarySearch(T item)
+            int BinarySearch(int index, int count, T item, System.Collections.Generic.IComparer<T>? comparer)   
+            int BinarySearch(T ite, System.Collections.Generic.IComparer<T>? comparer)
+                将已经排序的list从index开始搜索count个元素，返回搜索到的元素的索引，否则返回负数，其中如果有比item大的元素，则返回其索引的按位取反，否则返回List的Count的按位取反
+                所以将返回值再按位取反一次，就是可以插入item，使得插入后的item依然是排好序的
+                当comparer为null时，将调用Comparer<T>.Default来检查IComparable<T>和IComparable
+            System.Collections.Generic.List<TOutput> ConvertAll<TOutput>(Converter<T, TOutput> converter)
+                将本List内的所有元素转换为TOutput类的元素并返回转换后的List
+                注意这个函数不改变本List的元素
+            T? Find(Predicate<T> match) //搜索并返回一个符合match谓词的元素
+            System.Collections.Generic.List<T> FindAll(Predicate<T> match) //搜索并返回所有符合match谓词的元素
+    LinkedList<T>
+        LinkedListNode<T>
+            sealed class LinkedListNode<T>
+            代表双向链表LinkedList<T>中的一个节点，这个类不可继承
+            构造函数：
+                LinkedListNode(T value)
+            属性：
+                System.Collections.Generic.LinkedList<T>? List{get;}    //返回这个节点所属的双向链表，否则返回null
+                System.Collections.Generic.LinkedListNode<T>? Next{get;}    //返回当前节点的下一个节点，否则（例如是最后一个节点）返回null
+                System.Collections.Generic.LinkedListNode<T>? Previous{get;}//返回当前节点的前一个节点，否则（例如是第一个节点）返回null
+                T Value{get; set;}
+                ref T ValueRef{get;}    //返回当前节点的元素的引用
+            方法：
+                Equals()
+                GetHashCode()
+                GetType()
+                MemberwiseClone()
+                ToString()
+        双向链表
+            public class LinkedList<T> : 
+                System.Collections.Generic.ICollection<T>, 
+                System.Collections.Generic.IEnumerable<T>, 
+                System.Collections.Generic.IReadOnlyCollection<T>, 
+                System.Collections.ICollection, 
+                System.Runtime.Serialization.IDeserializationCallback, 
+                System.Runtime.Serialization.ISerializable
+        构造函数：
+            LinkedList<T>()
+            LinkedList<T>(System.Collections.Generic.IEnumerable<T> collection)
+            LinkedList<T>(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context)
+        方法：
+            AddFirst()
+            AddLast()
+    Queue<T>
+        实现了一个先进先出的队列
+        线程安全版本ConcurrentQueue<T>
+        class Queue<T>:
+            System.Collections.Generic.IEnumerable<T>,
+            System.Collections.Generic.IReadOnlyCollection<T>,
+            System.Collections.ICollection
+        构造函数：
+            Queue()
+            Queue(System.Collections.Generic.IEnumerable<T> collection)
+            Queue(int capacity)
+        方法：
+            void Enqueue(T item)
+            T Dequeue() //当队已经为空时会抛出异常
+            bool TryDequeue(out T result) //不抛异常的版本，队伍为空时返回false
+            T Peek()    //返回队头的元素，但不出队，当队已经为空时抛出异常
+            bool TryPeek(out T result)  //不抛异常的版本，队伍为空时返回false
+            T[] ToArray()
+            void TrimExcess() //当元素个数对于90%队伍容量时，这个操作不执行任何操作，否则将重新分配内存，并将容量设置为当前元素个数来节约内存
+    Stack<T>
+        实现了一个先进后出的栈
+        public class Stack<T> : 
+            System.Collections.Generic.IEnumerable<T>, 
+            System.Collections.Generic.IReadOnlyCollection<T>, 
+            System.Collections.ICollection
+        构造函数：
+            Stack()
+            Stack(System.Collections.Generic.IEnumerable<T> collection)
+            Stack(int capacity)
+        方法：
+            void Push(T item)
+            Pop()
+            TryPop()
+            Peek
+            TryPeek
+            ToArray
+            TrimExcess()
+    SortedList<TKey, TValue>
+
+    So
+
+    Dictionary<TKey, TValue>
+        Dictionary<TKey, TValue>.KeyCollection
+            代表字典中所有键的集合，这个类不可以继承
+            public sealed class Dictionary<TKey,TValue>.KeyCollection : 
+                System.Collections.Generic.ICollection<TKey>, 
+                System.Collections.Generic.IEnumerable<TKey>, 
+                System.Collections.Generic.IReadOnlyCollection<TKey>, 
+                System.Collections.ICollection
+            构造函数：
+                KeyCollection(System.Collections.Generic.Dictionary<TKey, TValue> dictionary)
+        Dictionary<TKey, TValue>.ValueCollection
+            代表字典中所有值的集合，这个类不可以继承
+            public sealed class Dictionary<TKey,TValue>.ValueCollection : 
+                System.Collections.Generic.ICollection<TValue>, 
+                System.Collections.Generic.IEnumerable<TValue>, 
+                System.Collections.Generic.IReadOnlyCollection<TValue>, 
+                System.Collections.ICollection
+            构造函数：
+                ValueCollection(System.Collections.Generic.Dictionary<TKey, TValue> dictionary)
+        public class Dictionary<TKey,TValue> : 
+            System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<TKey,TValue>>, 
+            System.Collections.Generic.IDictionary<TKey,TValue>, 
+            System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<TKey,TValue>>, 
+            System.Collections.Generic.IReadOnlyCollection<System.Collections.Generic.KeyValuePair<TKey,TValue>>, 
+            System.Collections.Generic.IReadOnlyDictionary<TKey,TValue>, 
+            System.Collections.IDictionary, 
+            System.Runtime.Serialization.IDeserializationCallback, 
+            System.Runtime.Serialization.ISerializable       
+        构造函数：
+            Dictionary()
+            Dictionary(System.Collections.Generic.IDictionary<TKey, TValue> dictionary)
+                复制构造函数
+            Dictionary(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<TKey, TValue>> collection)
+            Dictionary(System.Collections.Generic.IEqualityComparer<TKey>? comparer)
+                使用comparer作为该字典中键的比较器
+            Dictionary(int capacity)
+            Dictionary(System.Collections.Generic.IDictionary<TKey, TValue> dictionary, System.Collections.Generic.IEqualityComparer<TKey>? comparer)
+                复制构造，并使用新的键的比较器
+            Dictionary(
+                System.Collections.Generic.IEnumerable<
+                    System.Collections.Generic.KeyValuePair<
+                        TKey, TValue
+                    >
+                > collection,
+                System.Collections.Generic.IEqualityComparer<TKey>? comparer
+            )
+            Dictionary(int capacity, System.Collections.Generic.IEqualityComparer<TKey>? comparer)
+            Dictionary(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context)
+                使用序列化后的数据来构造一个新字典
+多线程
+    Thread
+        方法：
+            static void Sleep(int millisec)
+            static void Sleep(TimeSpan timeout)
+    async
+        async关键字将一个函数变为async函数，在async函数中可以使用await关键字来表示等待某个结果
+        当执行到await关键字时，控制权返回给调用函数
+        如果一个任务是CPU计算瓶颈，应该将任务放到另一个线程中执行，使用Task.Run()，并对其使用await
+        如果一个任务是IO瓶颈，不需要将其放到另一个线程中执行，直接await其返回结果
+        Task
+            方法：
+                static System.Threading.Tasks.Task WhenAll(System.Collections.Generic.IEnumerable<System.Threading.Tasks.Task> tasks)
+                static System.Threading.Tasks.Task WhenAll(params System.Threading.Tasks.Task[] tasks)
+                    创建一个任务，当tasks数组中的所有任务完成时这个任务才算完成，需要对这个返回的任务使用await关键字来等待并阻塞直到一系列任务完成
+                static System.Threading.Tasks.Task<TResult[]> WhenAll<TResult>(System.Collections.Generic.IEnumerable<System.Threading.Tasks.Task<TResult>> tasks)
+                static System.Threading.Tasks.Task<TResult[]> WhenAll<TResult>(params System.Threading.Tasks.Task<TResult>[] tasks)
+                    带返回值的任务，虽然创建Task不会阻塞，但是对其调用Result属性会阻塞
+
+        Task<T>
+Attribute
+    Attribute提供了程序获取元信息的一种途径
+    每个用户自定义的Attribute都应该继承自System.Attribute类，并同时提供System.AttributeUsage，使得其只对某些实体（例如一个类、一个结构体）有效
+    Attribute也有参数，其中Attribute构造函数的参数作为位置参数，位置参数必须在Attribute列表中的最前面，并按顺序提供，位置参数不需要写出参数名
+    Attribute类中的public成员是命名参数，命名参数的位置可以交换，例如下面两个Attribute的写法等效
+        [DllImport("user32.dll", SetLastError=false, ExactSpelling=false)]
+        [DllImport("user32.dll", ExactSpelling=false, SetLastError=false)]
+    自定义一个Attribute
+        [System.AttributeUsage(System.AttributeTargets.Class | System.AttributeTargets.Struct, AllowMultiple = true)]
+        public class Author : System.Attribute
+        {
+            private string name;
+            public double version;  //命名参数
+            public AuthorAttribute(string name) //位置参数
+            {
+                this.name = name;
+                version = 1.0;
+            }
+        }
+    使用这个Attribute
+        [Author("me"), version = 1.1]
+        class MyClass{}
+    然后使用System.Attribute.GetCustomAttributes(Type)来获取Attribute的信息，这个方法返回一个System.Attribute对象数组，通常需要使用类型转换来转换成自定义的Attribute类型
+        var attrs = System.Attribute.GetCustomAttributes(typeof(MyClass));
+        for(var attr in attrs)
+        {
+            if(attr is Author)
+            {
+                Author author = (Author)attr;
+                //...
+            }
+        }
+
+文件IO
+    文件路径是一个字符串，可以表示一个文件或目录的路径，路径可是绝对路径或相对路径，或使用Universal Naming Convention(UNC)表示的服务器路径或共享文件的路径
+        注意使用普通字符串时，通常要使用\来转义\\字符
+    FileAttributes
+        是一个表示文件或文件夹相关属性的枚举类型，枚举值通过按位运算来合并多个flag
+        [System.Flags]
+        public enum FileAttributes
+        {
+            Archive,    //表示文件用于增量备份，在该文件被修改时，Windows会设置这个属性，备份软件应当在处理了该增量备份后清除这个属性
+            Compressed,
+            Device,     //保留
+            Directory,
+            Encrypted,  //对于文件，表示这个文件加密，对于文件夹，表示这个文件夹以后新建的文件需要被加密
+            Hidden,
+            IntegrityStream, //表示该文件或文件夹带数据完整性保护
+            Normal,     //只当这个属性单独使用时有效
+            NoScrubData
+            NotContentIndexed,  //表示该文件不被系统索引
+            Offline,
+            ReadOnly,
+            ReparsePoint,   //表示用户定义的数据，与某个文件或文件夹关联
+            SparseFile,     //通常是很大的文件，其中大多数数据都为0
+            System,     //表示系统文件
+            Temporary       //临时文件，文件系统通常试图将这个文件载入到内存中来提高性能
+        }
+    FileSystemInfo
+        作为FileInfo和DirectoryInfo的抽象基类，可以代表一个文件或者一个目录
+        public abstract class FileSystemInfo
+        属性：
+            System.IO.FileAttributes Attributes{get; set}
+            DataTime CreationTime{get; set;}
+            DataTime CreationTimeUtc{get; set;}
+            abstract bool Exists{get;}
+            string Extension{get;}   //文件扩展名
+            virtual string FullName{get;} 文件的完整路径和全名
+            DateTime LastAccessTime{get; set;}
+            LastAccessTimeUtc
+            LastWriteTime
+            LastWriteTimeUtc
+            abstract string Name{get;} //文件名或文件夹名
+        方法：
+            void Delete()
+            void Refresh() 刷新当前文件或文件夹的信息
+    FileInfo
+        定义了几个枚举类型
+        [System.Flags] public enum System.IO.FileAccess
+        {
+            Read, ReadWrite, Write
+        }
+        [System.Flags] public enum System.IO.FileShare
+        {
+            Delete,
+            Inheritable,
+            None,
+            Read,
+            ReadWrite,
+            Write
+        }
+        public enum System.IO.FileMode //定义文件打开的模式
+        {
+            Append, 
+            Create,     //当文件已经存在时，直接覆盖进行写入
+            CreateNew,  //当文件已经存在时，抛出IOException
+            Open,       //当文件不存在时，抛出FileNotFoundException
+            OpenOrCreate,
+            Truncate    //当文件已经存在时，清空内容
+        }
+        public sealed class FileInfo: System.IO.FileSystemInfo
+        属性：
+            System.IO.DirectoryInfo? Directory{get;}
+            string? DirectoryName{get;}
+            bool IsReadOnly{get; set;}
+            long Length{get;} 返回该文件的大小，单位为字节
+    DirectoryInfo
+        public sealed class DirectoryInfo: System.IO.FileSystemInfo
+        构造函数：
+            DirectoryInfo(string path)  当path包含非法字符时会抛出ArgumentException，当权限不足时抛出SecurityException
+        属性：
+            public System.IO.DirectoryInfo? Parent{get;}返回父文件夹，如果当前文件夹已经是根目录（例如\, C:\, \\server\share）时返回null
+            public System.IO.DirectoryInfo Root{get;}
+        方法：
+            void Create()
+            System.IO.DirectoryInfo CreateSubdirectory(string path) path可以是相对于当前DirectoryInfo所表示的文件夹的相对路径
+            void Delete()   如果该文件夹为空则删除，否则抛出IOException
+            void Delete(bool recursive) 递归删除，如果recursive为false且这个目录包含一个或多个子目录则抛出IOException
+            System.Collections.Generic.IEnumerable<System.IO.DirectoryInfo> EnumerateDirectories() 返回该目录下的所有子目录
+            System.Collections.Generic.IEnumerable<System.IO.DirectoryInfo> EnumerateDirectories(string searchPattern) 
+                返回该目录下所有名称符合pattern字符串的子目录，pattern可以使用的模式字符只有*和?，不支持正则表达式
+            System.Collections.Generic.IEnumerable<System.IO.DirectoryInfo> EnumerateDirectories(string searchPattern, System.IO.EnumerationOptions enumerationOptions)
+            System.Collections.Generic.IEnumerable<System.IO.DirectoryInfo> EnumerateDirectories (string searchPattern, System.IO.SearchOption searchOption)
+            System.Collections.Generic.IEnumerable<System.IO.FileInfo> EnumerateFiles()
+                EnumerateFiles()可以在还没访问玩所有文件前就开始迭代，使得访问大量文件时比使用.GetFiles()更高效，而且无需await
+            System.Collections.Generic.IEnumerable<System.IO.FileInfo> EnumerateFiles(string searchPattern)
+            System.Collections.Generic.IEnumerable<System.IO.FileInfo> EnumerateFiles(string searchPattern, System.IO.EnumerationOptions enumerationOptions)
+            System.Collections.Generic.IEnumerable<System.IO.FileInfo> EnumerateFiles(string searchPattern, System.IO.SearchOption searchOption)
+
+
+    Directory
+        一个全静态的类，提供了创建、移动、迭代文件夹中的文件及其子文件夹的功能
+        public static class System.IO.Directory
+        静态方法：
+            System.IO.DirectoryInfo CreateDirectory(string path)
+系统状态
+    PowerStatus电池状态
+        System.Windows.Forms.PowerStatus
+        属性：
+            System.Windows.Forms.BatteryChargeStatus BatteryChargeStatus{get;}
+                这是一个表示电池状态枚举类型
+                [System.Flags]
+                enum BatteryChargeStatus
+                {
+                    Charging, Critical, High, Low, NoSystemBattery, Unknown
+                }
+            int BatteryFullLifetime{get;} 返回充满电的续航时间，单位为秒
+            int BatteryLifeRemaining{get;} 返回剩余点亮的续航时间，单位为秒
+            float BetteryLifePercent{get;} 返回剩余电量的百分比，从0.0->1.0
+            System.Windows.Forms.PowerLineStatus PowerLineStatus{get;}
+                enum PowerLineStatus
+                {
+                    Offline, Online, Unknown
+                }
+

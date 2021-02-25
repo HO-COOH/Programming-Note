@@ -2441,27 +2441,35 @@ STL
             uninitialized_copy()
             uninitialized_move()
         值修改：
-        remove()：需要2个迭代器参数，第3参数为需要remove的值，容器中等于第3参数的值被remove，容器中多余的空间是未定义的值
-            返回一个指向最后一个有效值的迭代器，所以应该用erase()方法删掉后面的值
-        distance()：
-            template< class InputIt >
-            typename std::iterator_traits<InputIt>::difference_type distance( InputIt first, InputIt last );
-            返回从first迭代器到last迭代器需要++（向前迭代）的次数
-            从C++11开始，如果迭代器是随机访问迭代器，则当可以从first通过--（向后迭代）到达last迭代器时（此时last在位置上比first前）返回--操作的次数
-        unique()方法需要两个迭代器参数，分别是容器的第一个元素和指向超尾的迭代器，返回的迭代器指向最后一个不重复的元素的下一个元素（超尾元素）
-            所以包含的不重复元素的个数是容器起始位置的迭代器-unique返回的超尾元素
-            应当在使用unique方法用resize()函数后对容器重新调整大小，所以这个容器包含的都是�������重复的元素
-            resize(distance(容器.begin,unique返回的迭代器))
-            使用unique方法前需要保证数组有序，所以无序容器需要先sort()
-            如：1 2 99 99 99 -1 -2 99 0 1
-                1 2 99 -1 -2 99 0 1 X X 最后两个X是未定义的值，与remove()相同也应该对容器使用erase()方法
-        merge()方法需要五个迭代器参数，第一和第二个是第一个容器的头尾迭代器，第三和第四个是第二个容器的头尾迭代器，最后一个迭代器指向合并后输出的迭代器
-        fill()：需要两个迭代器参数，将[first,last)的范围用value填满
-            template< class ForwardIt, class T >
-            void fill(ForwardIt first, ForwardIt last, const T& value)
-        fill_n()：需要1个迭代器参数，从first开始的连续n个元素填充为value
-            template< class OutputIt, class Size, class T >
-            void fill_n( OutputIt first, Size count, const T& value );
+            remove()：
+                template<typename ForwardIt, typename T>
+                ForwardIt remove(ForwardIt first, ForwardIt last, T const& value)
+                需要2个迭代器参数，第3参数为需要remove的值，容器中等于第3参数的值被remove，容器中多余的空间是未定义的值
+                返回一个指向最后一个有效值的迭代器，所以应该用容器的.erase()方法删掉后面的值
+                例如：
+                    vec.erase(std::remove(vec.begin(), vec.end(), 10), vec.end());  //删除vec中等于10的元素
+
+                template<typename ForwardIt, typename Predicate>
+                ForwardIt remove_if(ForwardIt first, ForwardIt last, UnaryPredicate p)
+            distance()：
+                template< class InputIt >
+                typename std::iterator_traits<InputIt>::difference_type distance( InputIt first, InputIt last );
+                返回从first迭代器到last迭代器需要++（向前迭代）的次数
+                从C++11开始，如果迭代器是随机访问迭代器，则当可以从first通过--（向后迭代）到达last迭代器时（此时last在位置上比first前）返回--操作的次数
+            unique()方法需要两个迭代器参数，分别是容器的第一个元素和指向超尾的迭代器，返回的迭代器指向最后一个不重复的元素的下一个元素（超尾元素）
+                所以包含的不重复元素的个数是容器起始位置的迭代器-unique返回的超尾元素
+                应当在使用unique方法用resize()函数后对容器重新调整大小，所以这个容器包含的都是�������重复的元素
+                resize(distance(容器.begin,unique返回的迭代器))
+                使用unique方法前需要保证数组有序，所以无序容器需要先sort()
+                如：1 2 99 99 99 -1 -2 99 0 1
+                    1 2 99 -1 -2 99 0 1 X X 最后两个X是未定义的值，与remove()相同也应该对容器使用erase()方法
+            merge()方法需要五个迭代器参数，第一和第二个是第一个容器的头尾迭代器，第三和第四个是第二个容器的头尾迭代器，最后一个迭代器指向合并后输出的迭代器
+            fill()：需要两个迭代器参数，将[first,last)的范围用value填满
+                template< class ForwardIt, class T >
+                void fill(ForwardIt first, ForwardIt last, const T& value)
+            fill_n()：需要1个迭代器参数，从first开始的连续n个元素填充为value
+                template< class OutputIt, class Size, class T >
+                void fill_n( OutputIt first, Size count, const T& value );
     for_each()循环:
     transform():
         template <class InputIterator, class OutputIterator, class UnaryOperation>
@@ -2793,7 +2801,28 @@ string类：C++标准类
         由于string的构造在大多数情况下需要分配堆区内存，而且在使用string的大多数情况下只是需要获取其中的内容，所以大多数情况下可以避免新创建一个string，C++17以前可以通过char数组来解决，但是损失了string的灵活接口
         string_view是这样的一个类，他只包括一个指向所需string部分内容的起始的指针，和一个大小，所以他无需构造新string
         string_view���所有的string只读的常用方法
-
+<ratio>
+    一个编译期用于表示有理数的库
+    template<std::intmax_t Num, std::intmax_t Denom = 1>
+    class ratio
+    {
+        static constexpr intmax_t num = signOf(Num * Denom) * abs(Num) / gcd(Num, Denom); //约分之后的值
+        static constexpr intmax_t den = abs(Denom) / gcd(Num, Denom);   //也是约分之后的
+        using type = std::ratio<num, den>;
+    }
+    定义了几个作用类似于函数的类型别名，
+        using ratio_add = 
+        using ratio_subtract = 
+        using ratio_multiply = 
+        using ratio_divice = 
+        
+        using ratio_equal = bool_constant<...>
+        using ratio_no_equal = bool_contant<...
+        using ratio_less
+        using ratio_less_equal
+        using ratio_greater
+        using ratio_greater_equal
+    
 <chrono> C++11:
     所有的chrono函数都在std::chrono名称空间内
     1.时间段：
@@ -3855,7 +3884,7 @@ C++11:
             源代码顺序：源代码中的语句的顺序
             程序顺序：源代码经过编译生成的机器指令的顺序
             执行顺序：现代处理器使用乱序执行策略，机器指令读进cpu时，cpu会对机器指令重新排序，成为执行顺序
-            实际（观察到的）顺序：由于多线程和缓存的存在，内存中的变量的值的改变顺序又会与执行顺序不同，成为实际顺序
+            �����际（观察到的）顺序：由于多线程和缓存的存在，内存中的变量的值的改变顺序又会与执行顺序不同，成为实际顺序
         C++标准所规定的C++抽象机器只规定了在同一线程中，实际顺序与源代码顺序在产生任何副作用的前提下要相同，但对于多线程程序没有任何顺序的保证
         当一个线程从内存中读取时，它可能读取到原始值、在同一线程中写入的值、在另一个线程中写入的值
         在#include <atomic>中定义的函数和操作默认都是确保以原程序的顺序执行，同时提供了6种执行顺序供选择
@@ -4481,6 +4510,27 @@ C++11 正则表达式
         捕获组
             捕获组是用圆括号()括起来的分组，捕获的内容是分组内与待匹配字符串的匹配部分
             第0组总是整个表达式所匹配字符串，也就是原待匹配字符串
+        匹配C++注释块的正则表达式
+            /*****************************************************************//**
+            * \file   
+            * \brief  
+            * 
+            * \author Peter
+            * \date   February 2021
+            *********************************************************************/
+
+
+            /* **
+                whatever
+            */
+
+            int main()
+            {
+                int a;//somehting
+                // other thing*/ /** more thing */
+            int /*what ever **  */b;
+            }
+             (\/\*(.|\n)+?\*\/)|(\/\/.*)
 
     正则表达式对象：
         template<typename CharT, typename Traits = std::regex_traits<CharT>>
