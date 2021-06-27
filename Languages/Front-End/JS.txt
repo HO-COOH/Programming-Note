@@ -90,6 +90,11 @@
             相比普通字符串，模板字符串增加了表达式插入的功能，用${表达式}将表达式的值插入到字符串中
                 var thing = "world"
                 console.log(`Hello, ${thing}`)//输出Hello, world
+        原始字符串
+            用String.raw和一对``构造一个原始字符串，原始字符串不转义反斜线\构成的转义字符，同时也支持表达式插入
+                const filePath = String.raw`C:\Development\profile\aboutme.html`;
+                console.log(`The file was uploaded from: ${filePath}`);
+                // expected output: "The file was uploaded from: C:\Development\profile\aboutme.html"
 操作符
     delete
         delete操作符用来删除一个object的属性
@@ -297,9 +302,109 @@ class
     多态
         派生类中要修改的基类函数直接重新定义即可  
 内置Object
+    String
+        可以使用字符串字面值，或者字符串构造函数来创建一个字符串对象
+        构造函数：
+            String(thing?: any) //参数为任何可以转化为字符串的类型
+        属性：
+            length //只读属性
+        方法：
+            string charAt(index: number)        //返回指定索引的以UTF-16编码的字符，当索引超出时返回空字符串
+            number charCodeAt(index: number)    //返回指定索引的以UTF-16编码的字符的编码点，当索引超出时返回NaN，当字符不能使用一个UTF-16编码点编码时，返回其第一个编码点
+            number codePointAt(index: number)   //返回指定索引的以UTF-16编码的字符的编码值，解决了charCodeAt()当不能使用一个UTF-16编码点编码的问题
+            string concat(...strings: string[]) //拼接字符串，返回拼接后的字符串，最好使用+=运算符代替
+            boolean endsWith(searchString[, length])//如果提供了length参数，则只从本字符串的前面length字符查找，length的默认值为str.length
+            boolean includes(searchString[, position]) //如果提供了position参数，则只从本字符串的position开始查找，默认值为0
+            number indexOf(searchString[, fromIndex])  //如果fromIndex小于0则设置为0，大于str.length则设置为str.length（此时肯定找不到），找不到返回-1
+            number lastIndexOf(searchString[, fromIndex]) //与indexOf()类似，但从后往前找
+            string toLowerCase()
+            string toUpperCase()
+            string[] split([seperator, limit])
+                当seperator为空字符串时，返回每个UTF-16的编码单元（字符）
+                limit表示返回的分割后子字符串的最大数量
+            string substring(start[, end]) //返回[start, end)子字符串
+            string trim() //移除字符串中多余的空白字符（例如空格、制表符、 换行符），单词之间的空格只保留1个，返回新字符串
+            string replace(searchValue: string | RegExp, replaceValue: string)
     Number
+        是一个双精度浮点数的wrapper
+        JS中的所有数字字面值都是浮点数
+        构造函数：
+            注意使用new Number()和Number()的不同
+            new Number()是构造了一个Number对象
+            Number()是一个转换函数，将参数转换为一个number原始类型
+        静态成员函数：
+            boolean isNan(value)    //当value的类型是Number且值为NaN时才返回true
+            boolean isInteger(value)//当value可以表示为一个整型数时为true
+                Number.isInteger(999999999999); //true
+                Number.isInteger(5.000000000000001); // false
+                Number.isInteger(5.0000000000000001); // true
+            boolean isFinite(value)
+            boolean isSafeInteger(value) //返回value是否在[-(2^53 - 1), 2^53 - 1]之间
+        方法：
+
+
     Math
+        静态属性：
+            E       自然对数的底
+            LN2     ln(2)
+            LN10    ln(10)
+            LOG2E   log2(e)
+            PI
+            SQRT1_2 sqrt(1/2)
+            SQRT2   sqrt(2)
     Date
+        Date实质上是存储了一个Number，表示从1970-1-1以来所经历的毫秒数
+        然而这个Number并不是IEEE754的标准，而是ECMA-262的标准
+        构造函数：
+            Date()  //返回一个表示当前的时间和日期的字符串，等同于new Date().toString()
+            Date(value: number) //value表示从1970-1-1以来的毫秒数
+            Date(dateString: string) 
+            Date(year, monthIndex[, day, hours, minutes, seconds, milliseconds])
+                当year为0-99时表示1900年-1999年，其他范围的数值为其实际字面值年份
+                monthIndex为[0, 11]
+                day表示日期，为[1, 31]
+        静态成员函数：
+            number now()    //返回当前时间，即从1970-1-1以来所经历的毫秒数
+            number UTC(year[, monthIndex, day, hour, minute, second, millisecond])  //同构造函数，但表示从UTC计算时间
+        方法：
+            number getFullYear()//返回用4位数表示的年份
+            number getDate() //返回一个月内的日期值[1, 31]
+            number getMonth()   //返回一年的月份[0, 11]
+            number getDay() //返回一个星期的星期值[0, 6]，星期日为0
+            number getHours()   //返回一天的小时值[0, 23]
+            number getMinutes() //返回一小时的分钟值[0, 59]
+            number getSeconds() //[0, 59]
+            number getMilliseconds() //[0, 999]
+            
+            number getTime() //返回从1970-1-1 按UTC开始计算的时间的毫秒数，负数表示在此日期之前的时间
+            
+            number getUTCFullYear()
+            number getUTCDate()
+            number getUTCMonth()
+            number getUTCDay()
+            number getUTCHours()
+            number getUTCMinutes()
+            number getUTCSeconds()
+            number getUTCMilliseconds()
+
+            number getTimezoneOffset() //返回UTC-当前系统时区分钟的差值，负数表示正时区，负数表示负时区，例如北京时间为UTC+8，所以返回-480
+
+            number setFullYear(yearValue[, monthValue, dayValue])
+            number setDate(dayValue)
+                将dayValue[1, 31]设置为月份的日期值，如果dayValue超过这个月份的日期数，则依次设置到下个月后的相应日期
+                如果dayValue为负数，则设置为之前月份的相应日期
+                返回从1970-1-1以来到重新设置后的新日期的毫秒数
+            number setMonth(monthValue[, dayValue])
+            number setHours(hoursValue[, minututesValue, secondsValue, msValue])
+            number setMinutes(minutesValue[, secondsValue, msValue])
+            number setSeconds(secondsValue[, msValue])
+            number setMilliseconds(msValue)
+
+            string toISOString()
+                返回一个ISO 8601标准的字符串：YYYY-MM-DDTHH:mm:ss.sssZ
+                console.log(new Date('05 October 2011 14:48 UTC').toISOString()); // -> "2011-10-05T14:48:00.000Z"
+            string toString()
+
     Intl
     Array
         构造
@@ -320,20 +425,44 @@ class
                 let arr = [1, 2, 3]
                 arr[5] = 0  //arr == [1, 2, 3, undefined, undefined, 0]
         方法
-            .forEach()接收一个函数对象，并应用于对数组中除了undefined之外的每个元素
-            .concat()接受一个数组，与当前数组合并在一起
-            .join(delimiter=',')将数组中的元素与delimiter合成成一个字符串
-            .push()添加一个一个元素到数组末尾
-            .pop()返回并删除一个末尾的元素
-            .shift()返回并删除数组的第一个元素
-            .unshift()添加一个或多个元素到数组的头部，并返回数组的新长度
-            .slice(start, end)返回一个新数组，包含原数组中[start, end)的元素
-            .splice(index, count, elements...)
+            .forEach(callback(currentValue[, index, array]))
+                接收一个函数对象，并应用于对数组中除了undefined之外的每个元素
+                currentValue为当前元素的引用
+                index为可选的当前元素的索引号
+                array为可选的当前数组的引用
+            T[] .concat([value1, values...])
+                接受一些值或数组，与当前数组合并在一起返回合并后的数组
+            string .join(delimiter=',')
+                将数组中的元素与delimiter合成成一个字符串
+            number push([element1, elements...])
+                添加元素到数组末尾，返回添加后的数组的大小
+            T pop()
+                返回并删除一个末尾的元素
+                如果数组为空，返回undefined
+            T shift()
+                返回并删除数组的第一个元素
+                如果数组为空返回undefined
+            number unshift(value[, values...])
+                添加一个或多个元素到数组的头部，并返回数组的新长度
+            T[] slice()
+            T[] slice(start)
+            T[] slice(start, end)
+                当不提供start时，start为0
+                当不提供end时，end为arr.length
+                当end超过arr.length时，实际使用arr.length
+                返回一个新数组，包含原数组中[start, end)的元素
+                start和end可以使用负数作为索引，负数的绝对值表示倒数第几个元素（-1为最后一个元素）
+            T[] splice(index[, count, elements...])
                 删除原数组中索引从index开始的count个元素，并替换为elements...
+                当不提供count时，count为(array.length - start)，即删除从index开始后面的所有元素
+                当count为0时，相当于将elements...插入到index索引的位置
+                当不提供elements时，相当于删除从index开始的count个元素
                 返回被删除的元素的数组
-            .reverse()颠倒一个数组
-            .sort()
-                sort()方法还提供一个接受一个比较函数的重载版本
+            T[] reverse()
+                颠倒一个数组，返回颠倒后的数组
+            T[] sort([compareFunction])
+                对数组元素排序，返回排序后的数组
+                这个方法接受一个可选的比较函数
                 该比较函数需要接受两个参数并返回一个值，形如：
                     function(a, b)
                     {
@@ -341,21 +470,44 @@ class
                         // return 0 means a==b
                         // return 1 (or any positive number) means a>b
                     }
-            .indexOf(element, [startIndex])
+            number indexOf(element[, startIndex])
                 从数组的startIndex开始向后搜索元素element，如果找到则返回该元素的索引，否则返回-1
-            .lastIndexOf(element, [startIndex])
-                从数组的startIndex开始向前搜索元素element
-            .map(callback)  返回一个新数组
-            .filter(callback)
-            .every(callback)如果每个元素都满足callback（callback函数返回一个布尔值）返回true
-            .some(callback)如果部分元素满足callback，返回true
-            .reduce(callback, [initialValue])
+            number lastIndexOf(element[, startIndex])
+                从数组的startIndex开始向前搜索元素element，如果找到则返回该元素的索引，否则返回-1
+            T[] map(callback(currentValue[, index, array]))
+                将callback函数作用于数组的每一个元素，并将返回的结果存储到一个新数组
+            T[] filter(callback(currentValue[, index, array]))
+                将谓词函数callback作用于数组的每一个元素，返回一个新数组，其中的每个元素满足谓词函数
+            boolean every(callback(currentValue[, index, array]))
+                如果每个元素都满足谓词函数callback（callback函数返回一个布尔值）返回true
+            boolean some(callback)
+                如果部分元素满足callback，返回true
+            T reduce(callback(previousValue, currentValue[, index, array])[, initialValue: T])
                 callback函数应该接受一个参数作为当前的值和另一个数组的元素，形如：
                     function(accumulator, currentValue)
                 如果未指定initialValue，则第一次调用callback时的参数为数组的第0和第1个元素
-            .reduceRight(callback, [initialValue])与reduce类似，但从数组的最后->最
+            T reduceRight(callback(previousValue, currentValue[, index, array])[, initialValue])
+                与reduce类似，但从数组的最后->最前
+    BigInt
+        代表任意大小的整数，尤其是用于大于Number.MAX_SAFE_INTEGER的整数
+        构造函数：
+            可以使用在数值后加n的字面值来构造，也可以使用BigInt()作为转换函数来构造（注意BigInt()没有构造函数，所以不适用new关键字）
+            const previouslyMaxSafeInteger = 9007199254740991n;
+            const myVar = BigInt(123);
+        注意通常不要将BigInt直接和Number类做运算，会导致BigInt隐式类型转换为Number，导致精度损失
     Map
-    Set          
+    Set
+        用于存储独一无二的元素
+        构造函数：
+            Set([iterable]) //使用可选的可迭代容器来初始化Set
+        方法：
+            Set add(value) //返回添加后的原Set的引用
+            clear()
+            boolean delete(value) //删除Set中value的元素，删除成功返回true
+            boolean has(value)
+            IterableIterator values() //返回一个用来迭代Set中元素的迭代器
+    WeakMap
+    WeakSet    
 迭代器
     任何对象只要定义了一个满足条件的next()方法即可成为一个迭代器
     next()方法需要返回一个具有以下两个属性的对象
@@ -401,10 +553,54 @@ Generator
 可迭代对象
     可迭代对象就是一个定义了Symbol.iterator属性的对象
     
-.异常
+异常
     异常机制由try catch finally语句构成
     finally语句块无论异常是否发生都会执行
     try catch可以嵌套，内层的try如果没有对应的catch语句，则必须有一个finally语句块
+    标准异常
+        Error
+            通常作为用户自定义异常类型的基类
+            构造函数：
+                Error(message?: string)
+            属性
+                message
+                name
+                    默认为"Error"
+        AggregateError
+            通常用作一些Error的集合
+            构造函数：
+                AggregateError(errors[, message])
+                    errors为一个异常数组
+            属性：
+                message
+                name
+                    默认为"AggregateError"
+        EvalError
+            在全局的eval()中遇到异常时抛出，现在JS标准库已经不再抛出这个异常，只用作向后兼容
+        RangeError
+            表示一个值不在允许的范围内，例如数组越界
+            构造函数：
+                RangeError(message)
+        ReferenceError
+            表示一个引用一个不存在（已销毁）的对象
+            构造函数：
+                ReferenceError(message)
+            
+        SyntaxError
+            在JS引擎执行代码时遇到非法语法时抛出
+            构造函数：
+                SyntaxError(message)
+        TypeError
+            在类型不符时抛出，通常为以下的情况
+                函数实参与所期望的类型不兼容
+                运算符的操作数类型不兼容
+                修改一个不可修改的值
+            构造函数：
+                TypeError(message)
+            
+        URIError
+            构造函数：
+                URIError(message)
 模块
     模块文件名常以.mjs结尾，相比.js能更清楚的表明这是一个模块，然而TypeScript不支持.mjs文件
     export
@@ -586,6 +782,10 @@ HTTP（Hyper text transfer protocol）
     状态码
         
 REST（Representational state transfer）
+
+文件IO
+    FileReader
+    
 
 TS
 1.变量

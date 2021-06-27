@@ -113,8 +113,14 @@ wait()族函数
         int setuid(uid_t uid)
 
 文件
-    一个典型的ls -al的输出
-    -rwxrw-r--    1    root   root 2048    Jan 13 07:11 afile.exe
+    ls - list directory contents 常用选项
+        -a 输出所有文件信息，包括文件名用.开头的隐藏文件和当前文件夹.和父文件夹..
+        -A 输出所有文件信息，除了.和..
+        -r 反序输出
+        -s 输出文件大小信息
+        -S 按文件大小排序，大者在前（常与-r连用）
+        一个典型的ls -al的输出
+            -rwxrw-r--    1    root   root 2048    Jan 13 07:11 afile.exe
         文件类型：
             - : regular file
             d : directory
@@ -123,13 +129,41 @@ wait()族函数
             s : local socket file
             p : named pipe
             l : symbolic link
-        file permissions (-rwxrw-r--),
-        number of (hard) links (1),
-        owner name (root),
-        owner group (root),
-        file size in bytes (2048),
-        time of last modification (Jan 13 07:11)
-        file/directory name (afile.exe)
+            file permissions (-rwxrw-r--),
+            number of (hard) links (1),
+            owner name (root),
+            owner group (root),
+            file size in bytes (2048),
+            time of last modification (Jan 13 07:11)
+            file/directory name (afile.exe)
+    ln - make links between files
+        ln <target> <link_name> 创建一个指向<target>的链接，名为<link_name>，命令默认创建硬链接
+        常用选项
+            -s 创建符号链接
+    mv - move (rename) files
+        move [option] <source> <dest>
+    硬链接和符号链接（软链接）
+        先创建两个文件，分别为foo和bar
+            printf Cat > foo
+            printf Dog > bar
+        然后分别创建硬链接和符号链接
+            ln foo foo-hard
+            ln -s bar bar-soft
+        此时ls -Al输出文件信息，得到
+            total 12
+            -rw-r--r-- 1 peter peter 3 Apr  5 12:19 bar             普通文件，1个链接
+            lrwxrwxrwx 1 peter peter 3 Apr  5 12:38 bar-soft -> bar 符号链接文件，1个链接
+            -rw-r--r-- 2 peter peter 3 Apr  5 12:18 foo             普通文件，2个链接
+            -rw-r--r-- 2 peter peter 3 Apr  5 12:18 foo-hard        普通文件，2个链接
+        修改源文件foo的文件名并不影响硬链接
+            mv foo foo-new
+            cat foo-hard  //输出Cat
+        修改源文件foo的内容，硬链接同样受影响
+            printf Dog >> foo-new
+            cat foo-hard //输出CatDog
+        而修改源文件bar的文件名或者删除bar会使得符号链接bar-soft失效
+            mv bar bar-new
+            cat bar-soft //输出cat: bar-soft: No such file or directory
 
     #include <sys/types.h>
     #include <sys/stat.h>
@@ -170,7 +204,7 @@ wait()族函数
     mmap()函数
         memory mapped file
 
-        munmap()
+    munmap()
 信号
     SIGSEGV
     SIGFPE 浮点数计算异常，例如除以0

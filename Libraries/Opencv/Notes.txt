@@ -328,7 +328,8 @@
         int left, 
         int right,
         int borderType,     //像素填充的方式
-        const Scalar& value=Scalar())
+        const Scalar& value=Scalar()
+    )
         参数borderType的取值：
             cv::BORDER_CONSTANT
             cv::BORDER_WRAP         复制对边的像素扩展边界
@@ -352,7 +353,8 @@
         int adaptiveMethod,     //cv::ADAPTIVE_THRESH_MEAN_C 或 cv::GAUSSIAN_C
         int thresholdType,      //与threshold()的第五参数相同
         int blocksize,
-        double C)
+        double C
+    )
         函数计算每个像素周围b*b区域内的加权平均值然后减去常熟C，如果第四参数是mean，则权值是相等的，如果是gaussian，则权值根据其到中心点的距离通过高斯方程得到
     void blur(InputArray src, OutputArray dst, Size ksize, Point anchor=Point(-1,-1), int borderType=BORDER_DEFAULT);
         目标图像的每个像素都是源图像中相应位置的一个窗口（核）中像素的平均值，窗口的尺寸由kszie指定，anchor指定计算时核与源图像的对齐方式，缺省值(-1,-1)表示核相对于滤波器居中

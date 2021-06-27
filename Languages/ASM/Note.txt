@@ -1,0 +1,93 @@
+1. Intel 8086架构
+    寄存器
+        通用/主寄存器
+            AX: AH + AL primary accumulator
+            BX: BH + BL base accumulator
+            CX: CH + CL counter, accumulator
+            DX: DH + DL accumulator
+        变址寄存器
+            SI source index
+            DI destination index
+            SP stack pointer
+            BP base pointer
+        IP instruction pointer
+        段寄存器
+            CS code segment
+            DS data segment
+            SS stack segment
+            ES extra segment
+    386架构后，各个寄存器拓宽为32位，并在原寄存器的名称前加子母E
+        EAX
+        EBX
+        ECX
+        EDX
+        ESI
+        EDI
+        ESP
+        EBP
+        EIP
+    奔腾4和64位架构出现后，各个寄存器拓宽为64位，并在原寄存器的名称前加字母R，并新增了通用寄存器R8-R15
+        RAX
+        RBX
+        RCX
+        RDX
+        RSI
+        RDI
+        RSP
+        RBP
+        RIP
+        R8
+        R9
+        R10
+        R11
+        R12
+        R13
+        R14
+        R15
+2.基本指令
+    数据转移指令
+        mov dest, src
+            接受两个参数，其中一个参数可以是内存地址，src可以是一个立即数
+        lea dest, src
+            将src的地址存入寄存器dest中，例如：
+                .data 
+                myByte db 7
+                .code
+                lea rax, myByte
+                mov byte ptr[rax], 10 ;myByte的值为10
+    基本运算指令
+        add reg/mem, reg/mem/imm
+        sub reg/mem, reg/mem/imm
+            add和sub均会将32位数的符号位作用于64位宽寄存器的高32位，例如
+                xor rax, rax ; 将rax清零
+                add rax, 2147483647 ; rax的值为ffff ffff 8000 0000
+        inc reg/mem
+            加一指令
+            与add reg/mem, 1不同的是inc指令不改变进位标志
+        dec reg/mem
+            减一指令
+            类似inc，与sub reg/mem, 1不同的是dec指令不改变进位标志
+    布尔运算指令
+        and reg/mem, reg/mem/imm
+        or reg/mem, reg/mem/imm
+        not reg/mem
+        xor reg/mem, reg/mem/imm
+    位运算指令
+        shl 左移
+        shr 右移
+        rol 循环左移
+        ror 循环右移
+        rcl 带进位标志的循环左移
+        rcr 带进位标志的循环右移
+    条件跳转指令
+        jmp label 无条件跳转到label处
+        je label  相等时跳转
+        jne label 不相等时跳转
+        jz label 结果为零时跳转
+        jg label 左操作数>右操作数时跳转
+        jge label 左操作数>=右操作数时跳转
+        jl label 左操作数<右操作数时跳转
+        jle label 左操作数<=右操作数时跳转
+    比较指令
+        cmp reg/mem, reg/mem
+        

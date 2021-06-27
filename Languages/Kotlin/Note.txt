@@ -75,6 +75,83 @@
     也可以通过${}将表达式的值替代到字符串中
         var s="abc"
         var str="The length of s is ${s.length()}"  //str="The length of s is 3"
+    is运算符
+        is运算符用来在运行时检查一个对象是否具有某个类型并返回一个布尔值，语法：obj is Type
+            if(obj is String)
+                print(obj.length)
+        !is运算符则检查一个对象是否不具有某个类型
+        is运算符还适用于继承多态，用is检查派生类对象是否为基类时将返回true
+            open class A {}
+            class B : A() {}
+            val b = B()
+            if(b is A)
+                print("b is A")
+        由于kotlin中的泛型在运行时并不存在，例如List<Int>在运行时被类型消除为List<*>，所以不可以直接使用is来判断容器的类型
+            if(ints is List<Int>) //错误
+            if(ints is List<*>) //OK
+    可空类型
+        可空类型在类型后加问号?，表明可以为null
+        可以使用传统语法来检测一个可空类型对象是否为null
+            val l = if(b != null) b.length else -1
+        也可以使用?:运算符来简化，?:运算符在左操作数非空时返回左操作数，否则返回右操作数
+            val l = b.length ?: -1
+        也可以使用?.运算符，当操作数为空时返回null，否则与普通非空运算符相同
+            val l = b?.length // l: Int?
+        ?.运算符可以连接使用，形成调用链
+            bob?.department?.head?.name
+        !!操作符将可空类型强制类型转换为对应的非可空类型，如果此时值为null则抛出异常
+            val l = b!!.length
+
+    智能类型转换
+        多数情况下不需要做显式类型转换
+        编译器会自动根据is运算符在作用域内将操作数转换成相应类型
+            fun demo(x: Any) {
+                if (x is String) {
+                    print(x.length) // x is automatically cast to String
+                }
+
+                if (x is String && x.length > 0) {
+                    print(x.length) // x is automatically cast to String
+                }
+
+                when (x) {
+                    is Int -> print(x + 1)
+                    is String -> print(x.length + 1)
+                    is IntArray -> print(x.sum())
+                }
+            }
+    强制（不安全）的类型转换
+        使用as关键字
+            var x = y as Type //将对象y强制转换为Type类型
+        当被转换的对象为null时，这个转换将抛出异常，所以对于可空类型，应当强制转换成相应的可空类型
+            var x = y as Type?
+    强制安全的类型转换
+        为了避免抛出异常，可以使用as?关键字
+        当不可转换时，对象被赋值为null
+            var x = y as? Type
+    枚举类型
+        类型安全的枚举类型 enum class
+            enum class的枚举值使用逗号,分隔
+            枚举值是该枚举类型的一个对象，所以可以使用类似于构造函数的语法来定义枚举值的内部类型
+            枚举类型可以有成员函数，需要在枚举值后加分号;与成员函数隔开
+                enum class Color(val rgb: Int) {
+                    RED(0xFF0000),
+                    GREEN(0x00FF00),
+                    BLUE(0x0000FF)
+
+                    fun containsRed() =  (this.rgb and 0xFF00000 != 0)
+                }
+                val red = Color.RED
+                val redValue = Color.RED.rgb //red = 0xFF0000
+            相关函数：
+                .valueOf(value: String) : EnumClass         //返回以字符串value为枚举名的枚举值，若不存在抛出IllegalArgumentException异常
+                .values() : Array<EnumClass>                //返回包含EnumClass枚举类型的所有枚举值的数组
+                enumValues<EnumClass>() : Array<EnumClass>  //返回包含EnumClass枚举类型的所有枚举值的数组
+                enumValueOf<EnumClass>(value: String) : EnumClass //返回以字符串value为枚举名的枚举值，若不存在抛出IllegalArgumentException异常        
+    类型别名
+        用typealias <Name> = <Type>定义一个类型别名，例如
+            typealias ClickHandler = (Button, ClickEvent) -> Unit
+
 二、语句
     1.if
         kotlin中的if语句可以作为语句，也可以作为一个表达式，有返回值
@@ -131,7 +208,6 @@
         return
         break
         continue
-    
 
 二、数组 Array
 
@@ -154,11 +230,26 @@
             fun isHot(temperature: Int) = temperature > 30
             
     5. 主函数的完全版
-    fun main(agrs: Array<String>){ }
+        fun main(agrs: Array<String>){ }
+    6.可变参数
+        可变参数实际上是一个同类型的参数数组，在函数头中将要作为可变参数接受的形参前加vararg关键字
+        由于kotlin支持命名实参调用，所以vararg不一定要成为函的最后一个参数
+            fun <T> asList(vararg ts: T): List<T> {
+                val result = ArrayList<T>()
+                for (t in ts) // ts is an Array
+                    result.add(t)
+                return result
+            }
+    7.没有返回值的函数的返回类型是Unit
 四、类
     类的声明由类的类名、类的主构造函数和类的结构组成
     一个类的结构可以为空，这样的类为空类，花括号可以省略
         class Empty
+    在kotlin中，所有类都继承一个共同的基类Any
+    Any类包含3个方法
+        .equals(other: Any?) : Boolean
+        .hashCode() : Int
+        .toString() : String
     1.主要构造函数和init代码块
         一个Kotlin类包含一个主要构造函数和若干个次要构造函数组成，主要构造函数是类声明头的一部分，紧跟在类名之后
             class Person constructor(firstName: String) { }
@@ -180,21 +271,31 @@
         一个类中可以有多个init代码块，按他们被声明的顺序来执行，所有init代码块都在构造时被执行一次
     2.次要构造函数
         次要构造函数调用前，一定要先执行主要构造函数和init语句块（如果有的话）
-        次要构造函数通过关键字constructor()定义
+        次要构造函数通过关键字constructor定义
         当一个类定义了主要构造函数时，必须通过在constructor()之后加冒号通过this()调用主要构造函数并提供主要构造函数所需的参数完成构造
             constructor(arg: argType):this(args) { }
         所以一个类的构造函数的执行顺序是：主要构造函数->所有init代码块->次要构造函数
-    继承：
-        一个类要被继承，显示指明它允许被继承，在基类前加open关键字
-            open class Base{ }
-        类似的，要继承基类的成员、方法，在相应的成员方法前加open关键字
-        指定派生类从基类继承而来，需要在派生类的声明头部后用冒号:加基类名，并调用基类的一个构造函数(如果基类没有定义构造函数，编译器会隐式产生一个，所以依然需要用一对圆括号调用它)
-            class Derived: Base() {}
+
     3.可见性
         private：类内可见
         protected：类内和派生类内可见
         public：默认
         internal：同样被声明成internal的同模块的类内可见
+    4.属性
+        一个用var定于的成员属性可以自定义getter和setter，一个用val定义的成员属性只能自定义getter
+        getter和setter紧跟在成员属性后定义
+            val isEmpty: Boolean
+                get() = this.size == 0
+        可以只写出get和set关键字来使用编译器提供的默认实现
+        在getter和setter中，对自身的引用使用关键字field
+            var counter = 0 // the initializer assigns the backing field directly
+                set(value) {
+                    if (value >= 0)
+                        field = value
+                        // counter = value // ERROR StackOverflow: Using actual name 'counter' would make setter recursive
+                }
+    
+
     4.接口类
         接口类使用关键字interface声明，接口类可以定义具体方法或抽象方法，与抽象类不同的是，接口类不能存储非抽象的数据成员，或者需要用get()方法来赋初值
         接口类的方法如果没有定义，默认为abstract修饰的抽象方法
@@ -227,15 +328,182 @@
             }
     5.数据类
         数据类是主要用来存储数据的类，用data class关键字声明
-五、继承
+        编译期给数据类自动生成
+            .equals(other: Any?)
+            .hashCode()
+            .toString()
+            .componentN() //N为自然数，从1开始，以成员变量声明的顺序
+            .copy() //执行深复制
+        可以通过添加override对自动生成的函数重写
+    6.密封类
+        在class关键字前加sealed关键字成为密封类，在interface前加sealed关键字成为密封接口
+            seal interface Expr
+            sealed class MathExpr() : Expr
+        密封类是特殊的抽象类，且只在本文件可见
+        所以必须在本文件内派生使用
+        使用密封类的一个好处是在when语句使用is关键字判别类型时中可以枚举出全部类型，因为编译器已知所有的派生类型
+    6.拓展函数
+        可以使用拓展函数来给一个类添加成员函数，从而允许使用类似于调用成员函数的语法来调用这个添加的拓展函数，而避免使用继承
+        拓展函数中，使用this关键字来指代自身对象
+        定义：
+            fun Type.FunctionName()
+        例如：
+            fun<T> MutableList<T>.swap(index1: Int, index2: Int)
+            {
+                val temp = this[index1]
+                this[index1] = this[index2]
+                this[index2] = temp
+            }
+            val list = mutableListOf(1, 2, 3)
+            list.swap(0, 2)
+        注意拓展函数是编译期实现的，不适用于多态
+            open class Shape
+            class Rectangle: Shape()
+            fun Shape.getName() = "Shape"           //Shape拓展函数
+            fun Rectangle.getName() = "Rectangle"   //Rectangle拓展函数
+            
+            fun printName(s: Shape) = println(s.getName())
 
-六、Set
-    判重过程：
-        1.比较hash code，如果没有找到相同hash code的引用，则没有重复
-        2.当找到相同hash code的引用时，使用===运算符来比较两个引用是否指向相同对象，如果===返回相同，则是重复，如果===返回不相同，则使用操作符==来比较两个引用所指向的对象是否“等同”
-    所以Set中的两个引用相同的条件是：
-        两个引用指向同一对象（所以此时hash code相同，===返回相同）
-        hash code相同的不同一个对象（所以===返回不同），但是==返回相同
+            printName(Rectangle())
+    中置函数
+        只接收一个参数（必须不带默认参数）的成员函数和扩展函数可以写成中置函数
+        在函数定义前加关键字infix即可成为中置函数
+            infix fun Int.shl(x: Int): Int {/*...*/}
+            val r = 1 shl 2 //等同于val r = 1.shl(2)
+        中置函数的优先级低于算术运算符，高于逻辑运算符
+    运算符重载
+        在需要重载的成员运算符函数前加operator关键字
+        如果派生类需要重写继承的运算符函数，可以只加override关键字省略operator关键字
+        +a a.unaryPlus()
+        -a a.unaryMinus()
+        !a a.not()
+
+        a++ ++a a.inc()
+        a-- --a a.dec()
+
+        a+b a.plus(b)
+        a-b a.minus(b)
+        a*b a.times(b)
+        a/b a.div(b)
+        a%b a.rem(b)
+        a..b a.rangeTo(b)
+
+        a+=b a.plusAssign(b)
+        a-=b a.miusAssign(b)
+        a*=b a.timesAssign(b)
+        a/=b a.divAssign(b)
+        a%=b a.remAssign(b)
+
+        a==b a!=b a?.equals(b) ?: (b===null)  需要改写.equals(other:Any?)
+
+        a in b b.contains(a)   a !in b !b.contains(a)
+
+        a[i] a.get(i)
+        a[i, j] a.get(i, j)
+        a[i_1, ..., i_n] a.get(i_1, ..., i_n)
+        a[i]=b a.set(i, b)
+        a[i,j]=b a.set(i, j, b)
+        a[i_1,...,i_n]=b a.set(i_1,...,i_n, b)
+
+        a(i_1,...,i_n) a.invoke(i_1,...,i_n)
+
+    6.创建对象
+        var object = MyClass()
+五、继承
+    1.构造
+        一个类要被继承，显示指明它允许被继承，在基类前加open关键字
+            open class Base{ }
+        类似的，要继承基类的成员、方法，在相应的成员方法前加open关键字
+        指定派生类从基类继承而来，需要在派生类的声明头部后用冒号:加基类名
+        如果基类有主要构造函数，必须在基类名后这个基类的主要构造函数
+            class Derived: Base() {}
+        如果基类没有主要构造函数，需要在派生类的每个次要构造函数中使用super(参数)来调用基类的次要构造函数
+            class MyView : View
+            {
+                constructor(ctx: Content) : super(ctx)
+                constructor(ctx: Context, attrs: AttributeSet) : super(ctx, attrs)
+            }
+    2.重写
+        重写方法
+            基类要被重写的成员方法需要显式加上open关键字
+            派生类中所重写的成员方法需要显式加上override关键字
+                class Base
+                {
+                    open fun doThing()
+                    {
+                        //...
+                    }
+                }
+                class Derived : Base()
+                {
+                    override fun doThing()
+                    {
+                        //...
+                    }
+                }
+        重写属性
+            可以在派生类中重写基类的属性，类似的，也需要使用相应的open和override关键字
+                open class Shape {
+                    open val vertexCount: Int = 0
+                }
+
+                class Rectangle : Shape() {
+                    override val vertexCount = 4
+                }
+            派生类中可以用var重写基类的val属性，反之不成立，即派生类中不能用val重写基类的var属性
+        3.调用基类方法
+            派生类可以使用super关键字调用基类的方法
+            如果一个派生类继承了一个基类和一个或多个接口类，而且他们包含了同名函数需要调用时，用super<类名>来区分是哪一个同名函数
+                open class Rectangle
+                {
+                    open fun draw() {...}
+                }
+                interface Polygon
+                {
+                    fun draw() {...}
+                }
+                class Square() : Rectangle(), Polygon
+                {
+                    override fun draw()
+                    {
+                        super<Rectangle>.draw()
+                        super<Polygon>.draw()
+                    }
+                }
+            派生类中的嵌套类可以使用super@<OuterClassName>来调用外层类的基类的方法
+泛型
+
+六、stdlib
+    stdlib中的容器分为可修改容器和不可修改容器，继承层次
+                                                    MutableList
+                                                    /
+                MutableIterable -- MutableCollection
+                /                                   \
+        Iterable                                    MutableSet
+                \ 
+                Collection
+                /       \
+                List    Set
+    通用：
+        创建容器
+            listOf()
+            meptyList<T>()
+            mutableListOf()
+            setOf()
+            emptySet<T>()
+            mutableSetOf()
+            mapOf()
+            mutableMapOf()
+                Map的构造函数需要使用键值对Pair类型来构造，构造一个Pair使用<key> to <value>的语法
+                val numbersMap = MapOf("key1" to 1, "key2" to 2, "key3" to 3)
+            
+    Set
+        判重过程：
+            1.比较hash code，如果没有找到相同hash code的引用，则没有重复
+            2.当找到相同hash code的引用时，使用===运算符来比较两个引用是否指向相同对象，如果===返回相同，则是重复，如果===返回不相同，则使用操作符==来比较两个引用所指向的对象是否“等同”
+        所以Set中的两个引用相同的条件是：
+            两个引用指向同一对象（所以此时hash code相同，===返回相同）
+            hash code相同的不同一个对象（所以===返回不同），但是==返回相同
         
 七、Lambda表达式
     1.形式
@@ -257,4 +525,39 @@
         如果lambda表达式只有一个形参，可以省略形参名，并在函数体中用it指代这个形参
             val myLambda:(Int) -> Int = { it+5 }    //注意这里myLambda的类型不能省略，因为省略了之后编译器无法知道形参的类型
         如果一个lambda表达式没有返回值，或者不需要其返回值时，将returnType声明为Unit
-        
+    4.lambda表达式参数后置
+        当传递一个lambda表达式作为函数形参时，最好将lambda表达式移出函数调用的圆括号()外
+            fun calculate(x: Int, y: Int, operation: (Int, Int) -> Int): Int 
+            {  
+                return operation(x, y)                                          
+            }
+            val r = calculate(4, 5, {a, b -> a * b}) //不建议
+            val r = calculate(4, 5) {a, b -> a * b}
+        当一个函数只有lamba表达式作参数时，可以省略函数调用的圆括号()
+            fun doThing(thing: () -> Unit)
+            {
+                a()
+            }
+            doThing {println("Doing things")}
+八、异常
+    所有的异常类都继承自Throwable
+    异常机制由try catch finally语句构成
+        try {
+            //some code
+        }
+        catch(e: ExceptionType) {
+            //exception handler
+        }...
+        finally {
+            //optional finally block
+        }
+    可以有0或多个catch块，可选的finally块在try块抛出异常或时会最后执行
+    至少要有一个catch或finally块
+    try也可以作为一个表达式使用，表达式的返回值是try块或catch块（如果有的话）的最后一个语句，finally块不影响返回值
+    throw也可以作为一个表达式使用，throw的返回值类型为Nothing，可以用在三目运算符中
+        val s = person.name ?: throw IllegalArgumentException("Name required")
+        fun willFail(message: String) : Nothing
+        {
+            throw ...
+        }
+    

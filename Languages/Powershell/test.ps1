@@ -1,12 +1,13 @@
-class std
+using namespace System;
+$list = [Collections.Generic.List[int]]::new();
+
+for ($i = 0; $i -lt 5; $i++) 
 {
-    static cout($arg)
-    {
-        Write-Host($arg)
-    }
+    $list.Add($i);
 }
 
-foreach ($item in Get-Content -Path ./test.ps1) 
-{
-    Write-Host($item)
-}
+# $list.ForEach({param ($v) 
+#     [Console]::WriteLine($v);
+# });
+
+"Hello World".Split(' ').ForEach({[Console]::WriteLine($_)});

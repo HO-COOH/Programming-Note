@@ -1649,16 +1649,28 @@ locale：
         检测类型别名
             比如要检测一个类型T是否定义了value_type
                 template<typename T, typename = void>                                   
-                struct HasValueType : std::false_type                                  
-                {                                                                        
-                };                                                                       
+                struct HasValueType : std::false_type { };                                                                       
                 template <typename T>                                                    
-                struct HasValueType<T, std::void_t<typename T::value_type>> : std::true_type 
-                {                                                                        
-                };
+                struct HasValueType<T, std::void_t<typename T::value_type>> : std::true_type { };
             使用C++20 concepts可以写成
                 template<typename T>
                 concept HasValueType = requires {typename T::value_type;};
+        检测模板类型别名
+            比如要检测一个类型T是否定义了一个模板using
+                struct A 
+                {
+                    template<typename T>
+                    using add = T;
+                };
+            
+                template<template<typename> typename>
+                using void_tt = void;
+
+                template<typename T, typename = void>
+                struct HasTemplateUsing : std::false_type { };
+                template<typename T>
+                struct HasTemplateUsing<T, void_tt<T::template add>> : std::true_type {};
+                
     表达式模板
         表达式模板是一种使用模板来代表一个表达式的计算过程，并且只在需要其结果的时候才执行所要求的计算从而提高程序运行效率的技巧
         例如有一个Vec类需要支持加法运算，通常的做法是
@@ -2056,7 +2068,7 @@ STL
         容器适配器：
             stack：template <class T, class Container = deque<T> > class stack;
                 实现栈操作，后入先出，底层实现通常是deque
-                成员函数函数：
+                成员函数：
                     empty();    //返回栈是否为空的布尔值
                     size();
                     top();      //注意这个函数不删除栈顶元素，只是返回栈顶元素的引用
@@ -2066,7 +2078,26 @@ STL
                     swap();
 
             queue：
+                template<typename T, typename Container = std::deque<T>> class queue;
+                成员函数：
+                    empty()
+                    size()
+                    front()
+                    back()
+                    push()
+                    emplace()
+                    pop()
+                    swap()
             priority_queue：
+                template<typename T, typename Container = std::vector<T>, typename Compare = std::less<typename Container::value_type>> class priority_queue;
+                成员函数：
+                    top()
+                    empty()
+                    size()
+                    push()
+                    emplace()
+                    pop()
+                    swap()
         其他：
             pair：
                 #include <utility>
@@ -3697,7 +3728,43 @@ C++11:
             auto mod_3=[](int a ){return a % 3 == 0;};
             或：[](int)->bool mod_3=[](int a){return a % 3 == 0;};
         调用时就像正常函数调用的形式那样调用lambda函数���mod_3(6);
-        lambda函数可以捕获定义它的作用域内的变量，在中括号内指定变量名可以按按值传递，在中括号内指定变量名+引用可以按引用访问，只填一个&符号可以按引用访问所有变量，只填一个=号可以按值传递所有变量，还可以混合使用&指定变量和按值传递的方式
+        lambda函数可以捕获定义它的作用域内的变量
+            在中括号内指定变量名可以按按值传递
+            在中括号内指定变量名+引用可以按引用访问
+            只填一个&符号可以按引用访问所有本地变量
+            只填一个=号可以按值拷贝所有本地变量，注意只有在lambda表达式的函数体中用到的变量才会拷贝，例如
+                int x, y, a, b;
+                auto f = [=]{ return x+y;};
+                f();
+                在cppinsight上被编译为：
+                int x;
+                int y;
+                int a;
+                int b;
+                    
+                class __lambda_6_13
+                {
+                    public: 
+                    inline /*constexpr */ int operator()() const
+                    {
+                    return x + y;
+                    }
+                    
+                    private: 
+                    int x;
+                    int y;
+                    
+                    public:
+                    __lambda_6_13(int & _x, int & _y)
+                    : x{_x}
+                    , y{_y}
+                    {}
+                    
+                };
+                
+                __lambda_6_13 f = __lambda_6_13{x, y};
+                f.operator()();
+            还可以混合使用&指定变量和按值传递的方式
         lambda表达式对象本身的类型是一个由编译器生成的特定id为类型的一个重载了()运算符的结构体，所以可以将其视为一个类，既然是类，就可以使用类的特性，比如继承
         lambda表达式的继承：
             继承lambda表达式，就是继承它的operator()成员方法，所以多继承，就相当于重载了多个lambda的结构体中的operator()，而且这些lambda的函数签名可以不同，这就提供了一种合并多个函数的方法
@@ -4082,7 +4149,6 @@ C++11:
             如果主线程还没结束，也会被std::terminate() 强行终止
             可以用joinable() 方法检查这个线程是否可以与thread对象结合或分离，已经分离的线程不能再与任�����thread对象结合，称为守护进程，joinable() 函数返回一个布尔值
         每个线程都有一个独特的id，获取当前线程的id，使用std::this_thread::get_id() 函数
-        获取线程对象的id，使用get_id() 
         成员方法 2.获取资源即初始化RAII 当thread对象绑定的函数有参数时，需要在thread对象的构造函数内传值调用，这是由于默认情况下创建新线程时，参数是拷贝到新线程的独立内存中
             如果函数参数是引用，需要将构造函数内的参数用std::ref() 显式转换 
             void add(int &a) { ++a; }
@@ -4531,6 +4597,7 @@ C++11 正则表达式
             int /*what ever **  */b;
             }
              (\/\*(.|\n)+?\*\/)|(\/\/.*)
+             [_A-Za-z0-9]+\(.*\)
 
     正则表达式对象：
         template<typename CharT, typename Traits = std::regex_traits<CharT>>

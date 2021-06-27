@@ -911,6 +911,9 @@ foreach(item ${CMAKE_CXX_COMPILE_FEATURES})
 endforeach()
 ```
 
+`CMAKE_EXPORT_COMPILE_COMMANDS`可以输出一个`compile_commands.json`文件
+包含了所有target生成所需的指令，这个选项仅在使用`Makefile Generator`或`Ninja`生效
+
 ## FindBoost
 是一个Cmake模块，当调用
 ```cmake
@@ -920,7 +923,7 @@ find_package(Boost
   [COMPONENTS <libs>...] # Boost libraries by their canonical name
                          # e.g. "date_time" for "libboost_date_time"
   [OPTIONAL_COMPONENTS <libs>...]
-                         # Optional Boost libraries by their canonical name)
+                         # Optional Boost libraries by their canonical name
 )                      # e.g. "date_time" for "libboost_date_time"
 ```
 时会搜索boost库的位置，并定义了几个变量

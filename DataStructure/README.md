@@ -84,6 +84,40 @@ protected:
 
 ## 队列
 
+## 哈希表（散列）
+```cpp
+template<>
+class hash<string>
+{
+public:
+    size_t operator()(string const& theKey) const
+    {
+        size_t hashValue{};
+        for(int i = 0; i < theKey.length; ++i)
+            hashValue = 5 * hashValue + theKey[i];
+        return hashValue;
+    }
+};
+```
+
+```cpp
+template<typename K, typename E>
+class HashTable
+{
+    pair<const K, E>** table;
+    hash<K> hash;   //把类型K映射到一个非负整数
+    int dSize = 0;      //数对的个数
+    int divisor;    //散列函数除数
+public:
+    HashTable(int theDivisor): divisor(theDivisor)
+    {
+        table = new pair<const K, E>*[divisor];
+        std::fill_n(table, divisor, nullptr);
+    }
+
+
+};
+```
 ## 树
 - 一棵树t是一个非空的有限元素的集合，其中的一个元素称为**根**，其余的元素（如果有的话）组成t的**子树**
 - 树中没有孩子的元素称为**叶子**
@@ -167,11 +201,82 @@ using LinkedBinaryTree = BinaryTree<BinaryTreeNode<T>>;
 - 一棵**大根树（小根数）**是完全二叉树
 - 
 
-### 竞赛树
+## 竞赛树
+### 赢者树 
+- 有n个选手的一颗赢者树是一棵完全二叉树，它有n个外部节点和n-1个内部节点，每个内部节点记录的是在该节点比赛的赢者
+
+```
+class WinnerTree
+{
+method:
+    initialize(a)   //为数组a的参赛者初始化赢者树
+    winner()        //返回赢者
+    rePlay(i)       //在参赛者i改变之后重赛
+}
+```
+
+```cpp
+template<typename T>
+class WinnerTree
+{
+public:
+    virtual ~WinnerTree();
+    virtual void initialize(T* players, int numberOfPlayers) = 0;
+    virtual int winner() const = 0; //赢者索引
+    virtual void rePlay(int thePlayer) = 0;
+};
+```
 
 ### 搜索树
+- 是一棵二叉树，可能为空
+- 一棵非空的二叉搜索树满足：每个元素有一个关键字，并且任意两个元素的关键字都不同，因此所有的关键字都是唯一的
+- 在根节点的左子树中，元素的关键字（如果有的话）都小于根节点的关键字
+- 在根节点的右子树中，元素的关键字（如果有的话）都大于根节点的关键字
+- 根节点的左右子树都是二叉搜索树
+
+
+
+```
+class BSTree
+{
+method:
+    find(k)     //返回关键字为k的数对
+    insert(p)   //插入数对p
+    erase(k)    //删除关键字为k的数对
+    ascend()    //按关键字升序输出所有数对
+}
+
+class IndexedBSTree
+{
+method:
+    find(k)     //返回关键字为k的数对
+    get(index)  //返回第index个数对
+    insert(p)   //插入数对p
+    erase(k)    //删除关键字为k的数对
+    ascend()    //按关键字升序输出所有数对
+}
+```
+
+```cpp
+template<typename K, typename E>
+class BSTree : public Dictionary<K, E>
+{
+public:
+    virtual void ascend() = 0;
+};
+
+template<typename K, typename E>
+class IndexedBSTree : public BSTree<K, E>
+{
+public:
+    virtual pair<const K, E>* get(int i) const = 0;
+};
+```
 
 ### AVL树
+- 一棵空的二叉树是AVL树
+- 如果T是一棵非空的二叉树，Tl和Tr分别是其左右子树，则当：Tl和Tr都是AVL树、|h(Tl)-h(Tr)| <= 1时，T是AVL树
+- 一棵AVL索引树既是索引二叉搜索树，也是AVL树
 
 ### 红黑树
 
