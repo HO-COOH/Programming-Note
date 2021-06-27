@@ -402,9 +402,26 @@ atoi()  将nptr所指的字符串的开头部分转化为相应的整数，长�
         int thrd_detach(thrd_t thr)
             成功返回thrd_success，否则返回thrd_error
     互斥量：
-        
-
-
+21.错误处理
+    在<errno.h>中定义了一个thread_local的int类型全局静态变量errno，记录发生过的错误
+    程序运行时，errno赋值为0
+    出错时，errno为非零值
+    #include <stdio.h>
+        void perror(const char* s);
+            在stderr打印当前errno错误的错误信息描述，s为可选补充性信息的字符串指针，打印在预定义错误信息的后面，用":"分开，例如：
+                FILE* f = fopen("whatever", "r");
+                if(f == nullptr)
+                    perror(nullptr);
+                else
+                    fclose(f);
+                将打印：No such file or directory
+    #include <string.h>
+        char* strerror(int errnum)
+            返回errnum所表示的错误代码的错误信息的字符串指针，这个字符串的内容与perror()相同
+        errno_t strerror_s(char* buf, rsize_t bufsz, errno_t errnum)
+            把errnum表示的错误信息字符串存到buf所指的内存区域中，最多存入不超过bufsz-1个字符
+        size_t strerrorlen_s(errno_t errnum)
+            返回errnum表示的错误信息字符串的长度（不包括\0字符串结束符）
 C++
 -1.C++正式标准
     https://en.cppreference.com/w/Cppreference:FAQ 包含了C++最新的标准
