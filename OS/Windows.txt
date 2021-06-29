@@ -201,3 +201,198 @@
             再将其传给相应的创建内核对象的函数，例如
                 HANDLE hMutex = CreateMutex(&sa, FALSE, NULL);
             
+COM
+    每个使用COM库的线程（注意是线程）都必须分别调用一次初始化函数
+        HRESULT CoInitializeEx(LPVOID pvReserved, DWORD dwCoInit)
+            pvReserved必须设置为NULL
+            dwCoInit必须为以下值：
+                COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE 表明该线程必须不与其他线程共享同一个COM指针，且包含一个message loop
+                COINIT_MULTITHREADED | COINIT_DISABLE_OLE1DDE 不满足上面条件之一时使用这个参数
+    每个使用COM库的线程在退出前都必须调用一次释放COM库的函数
+        void CoUninitialize()
+    大多数COM函数返回一个HRESULT类型的值，该类型实际上是一个32为整数，其最高位为0时表示成功，为1时表示错误，即
+        0x0 - 0x7FFFFFFF 为成功结果
+        0x80000000 - 0xFFFFFFFF 为错误结果
+    所以为了判断是否成功，可以使用最高位与1<<15按位与，或者直接判断其是否大于0，因为负数的最高位就是1
+    windows还提供了SUCCEEDED()和FAILED()宏，可以直接将结果作为布尔值
+    使用一个GUID类型的结构体来标识COM借口或这COM类，GUID实际上是一个128位的整数
+    习惯上，将COM接口以IID_I开头命名，COM类以CLSID_开头命名
+        HRESULT CoCreateInstance(
+            REFCLSID rclsid,        //类的GUID
+            LPUNKNOWN pUnkOuter,    //取NULL
+            DWORD dwClsContext,     
+            REFIID riid,            //类所实现的COM接口的GUID
+            LPVOID* ppv             //通常将需要赋值给的指针做reinterpret_cast<void**>(&pt)
+        )
+        第三参数的取值为：
+            CLSCTX_INPROC_SERVER    Same process
+            CLSCTX_LOCAL_SERVER     Different process, same computer
+            CLSCTS_REMOTE_SERVER    Differnet computer
+            CLSCTX_ALL              使用这个对象支持的最高效的选项
+    注意，任何指向COM接口的指针，都必须在复制前调用AddRef()方法，在结束使用后调用Release()方法
+    要查询一个COM接口指针所指向的COM对象是否实际上支持另一个接口，使用
+        HRESULT QueryInterface(REFIID riid, void** ppvObject)
+            riid为接口的GUID
+            ppvObject为所要修改的指针，通常要reinterpret_cast<void**>(pt)
+    有一些COM函数需要在内部分配内存，此时需要显式的调用CoTaskMemFree()函数释放内存，例如
+        PWSTR pszFilePath;
+        auto hr = pShellItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath); //这个函数会分配一个字符串的内存空间，并将指针pszFilePath设置为新分配的空间
+        if(SUCCEEDED(hr))
+        {
+            //...
+            CoTaskMemFree(pszFilePath);
+        }
+    由于要显式的对COM接口指针调用Release()方法十分繁琐，在<atlbase.h>中定义了一种智能指针类CComPtr<>
+    这种智能指针类在析构时自动释放，在复制时自动调用AddRef()方法 
+    CComPtr<T>定义了.CoCreateInstance()方法，只需传入__uuidof(COMClassName)即可创建一个指向COMClassName对象，且类型为T（某个接口类型）的指针
+
+UI相关
+    HWND CreateWindowEx(
+        DWORD dwExStyle,
+        LPCWSTR lpClassName,    //必须为之前调用过RegisterClass()注册过的窗口类的类名，否则ShowWindow()将无效
+        LPCWSTR lpWindowName,   //窗口标题栏显式的字符串
+        DWORD dwStyle,
+        int X,                  //窗口左上角的水平位置，如果窗口是一个子窗口，则为相对于父窗口的水平位置，如果使用overlapped窗口样式，则可以使用CW_USEDEFAULT来自动分配位置
+        int Y,                  //窗口左上角的垂直位置，如果X值使用CW_USEDEFAULT，则Y被忽略
+        int nWidth,             //
+        int nHeight,
+        HWND hWndParent,
+        HMENU hMenu,            //创建一个子窗口时需要一个有效的HWND窗口句柄
+        HINSTANCE hInstance,    //
+        LPVOID lpParam
+    );
+
+    #define CreateWindowW(lpClassName, lpWindowName, dwStyle, x, y, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam)\
+    CreateWindowExW(0L, lpClassName, lpWindowName, dwStyle, x, y, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam)
+进程通信
+    SendMessage方式
+        typedef struct tagCOPYDATASTRUCT {
+            ULONG_PTR dwData;   //发送数据的类型，用户自己定义
+            DWORD cbData;       //发送数据的字节数
+            PVOID lpData;       //发送数据的指针
+        };
+
+        LRESULT SendMessage(
+            HWND hWnd,      //接收消息的窗口的句柄
+            UINT Msg,       //
+            WPARAM wParam,  
+            LPARAM lpParam  //与wParam一样都是与具体消息类型有关的额外参数
+        )
+
+        发送程序
+            #include <windows.h>
+
+            int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow)
+            {
+                wchar_t str[] = L"Hello world";     //发送这个字符串
+
+                auto receiveWindow = FindWindow(nullptr, L"Receiver");
+                if (receiveWindow == nullptr)
+                    return 1;
+
+                COPYDATASTRUCT copyData{};
+                copyData.lpData = str;
+                copyData.cbData = sizeof(str);
+
+                HWND hwnd = CreateWindowEx(
+                    0,                              // Optional window styles.
+                    L"Sender",                      // Window class
+                    L"Sender Title",                // Window text
+                    WS_OVERLAPPEDWINDOW,            // Window style
+
+                    // Size and position
+                    CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+
+                    NULL,       // Parent window    
+                    NULL,       // Menu
+                    hInstance,  // Instance handle
+                    NULL        // Additional application data
+                );  //产生一个隐藏的窗口，只用来发送信息，所以无需注册窗口类
+
+                SendMessage(receiveWindow, WM_COPYDATA, (WPARAM)hwnd, (LPARAM)&copyData);
+            }
+
+        接收程序
+            #include <windows.h>
+
+            LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+
+            int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
+            {
+                // Register the window class.
+                const wchar_t CLASS_NAME[] = L"Sample Window Class";
+
+                WNDCLASS wc = { };
+
+                wc.lpfnWndProc = WindowProc;
+                wc.hInstance = hInstance;
+                wc.lpszClassName = CLASS_NAME;
+
+                RegisterClass(&wc);
+
+                // Create the window.
+
+                HWND hwnd = CreateWindowEx(
+                    0,                              // Optional window styles.
+                    CLASS_NAME,                     // Window class
+                    L"Receiver",                        // Window text
+                    WS_OVERLAPPEDWINDOW,            // Window style
+
+                    // Size and position
+                    CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+
+                    NULL,       // Parent window    
+                    NULL,       // Menu
+                    hInstance,  // Instance handle
+                    NULL        // Additional application data
+                );
+
+                if (hwnd == NULL)
+                {
+                    return 0;
+                }
+
+                ShowWindow(hwnd, nCmdShow);
+
+                // Run the message loop.
+
+                MSG msg = { };
+                while (GetMessage(&msg, NULL, 0, 0))
+                {
+                    TranslateMessage(&msg);
+                    DispatchMessage(&msg);
+                }
+
+                return 0;
+            }
+
+            LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+            {
+                switch (uMsg)
+                {
+                case WM_DESTROY:
+                    PostQuitMessage(0);
+                    return 0;
+
+                case WM_PAINT:
+                {
+                    PAINTSTRUCT ps;
+                    HDC hdc = BeginPaint(hwnd, &ps);
+
+                    FillRect(hdc, &ps.rcPaint, (HBRUSH)(COLOR_WINDOW + 1));
+
+                    EndPaint(hwnd, &ps);
+                    break;
+                }
+                case WM_COPYDATA:
+                {
+                    auto pData = reinterpret_cast<COPYDATASTRUCT*>(lParam);
+                    MessageBox(nullptr, (LPCWSTR)pData->lpData, L"Get Message", MB_OK); //将接收到的字符串显示到一个消息框中
+                    break;
+                }
+                return 0;
+
+                }
+                return DefWindowProc(hwnd, uMsg, wParam, lParam);
+            }
+    
