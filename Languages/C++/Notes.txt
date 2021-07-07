@@ -5648,4 +5648,28 @@ More Effective C++
         Y - (C & (Y - X))
     因为当C==true==-1时，-1 & 任何整数都等于这个整数本身，所以Y-(Y-X)=X，而当C==false==0时，Y-0=Y
 
-    
+命名参数
+    template<typename T, int Order = 0> //第2参数是为了当T相同时区分顺序用
+    class NamedType
+    {
+        T value;
+    public:
+        explicit NamedType(T const& v) :value{ v } {}
+        explicit NamedType(T&& v) : std::move{ v } {}
+        T& get() { return value; }
+        T const& get() const { return value; }
+        operator T() const { return value; }
+    };
+
+    using Width = NamedType<double, 0>;
+    using Height = NamedType<double, 1>;
+
+    struct Good
+    {
+        Good(Width width, Height height) {}
+    };
+
+    struct Bad
+    {
+        Bad(double a, double b) {}
+    };

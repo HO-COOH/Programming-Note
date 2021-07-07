@@ -1,3 +1,64 @@
+0.MSVC C++扩展
+    __interface
+        定义一个__interface如同定义一个只包含纯虚函数的抽象基类
+        需要满足以下条件：
+            不从一个基类继承
+            只能包含public的纯虚函数
+            不能包含构造函数、析构函数、运算符函数
+            不能包含静态方法
+            不能包含成员变量，但是可以包含属性
+        __interface中的纯虚函数可以简写省略virtual和=0
+            __interface Animal
+            {
+                virtual void MakeSound() = 0; //可以直接写成void MakeSound();
+            }
+    __declspec()
+        与static和extern类似，是一个存储类说明符
+        https://docs.microsoft.com/en-us/cpp/cpp/declspec?view=msvc-160
+        括号中可以填入
+            align(<number>)
+            allocate("<segname>")
+            allocator
+            appdomain
+            code_seg("<segname>")
+            deprecated
+            dllimport
+            dllexport
+            jitintrinsic
+            naked
+            noalias
+            noinline
+            noreturn
+            nothrow
+            novatable
+            no_sanitize_address
+            process
+            property({get=<get_func_name> |, put=<put_func_name>})
+            restrict
+            safebuffers
+            selectanu
+            spectre(nomitigation)
+            thread
+            uuid("<ComObjectGUID>")
+    UNREFERENCED_PARAMETETER(parameter)
+        定义在<winnt.h>中，用来消除函数未使用参数时编译器警告
+    调用约定
+        __cdecl 
+        __clrcall
+        __stdcall
+        __fastcall
+        __thiscall
+        __vectorcall
+        在需要指定调用约定的函数声明的返回类型后加上面关键字之一，而函数定义不加，例如
+            /*MyFunc.h*/
+            void __cdecl MyFunc(int a, int b);
+
+            /*MyFunc.cpp*/
+            void MyFunc(int a, int b)
+            {
+                //...
+            }
+    
 1.高级数据类型
     为了统一成大写，VC++给很多类型取了大写的typedef
     INT->int
@@ -200,7 +261,152 @@
                 SECURITY_ATTRIBUTES sa{sizeof(sa), NULL, TRUE};
             再将其传给相应的创建内核对象的函数，例如
                 HANDLE hMutex = CreateMutex(&sa, FALSE, NULL);
+            有时可能父进程创建了两个子进程，并且希望只有其中一个子进程继承句柄，即需要在更改继承标志位后才能创建另一个进程
+            更改进程标志位函数
+                BOOL SetHandleInformation(
+                    HANDLE hObject,     一个需要修改继承标志位的句柄
+                    DWORD dwMask,       修改哪个进程标志位
+                    DWORD dwFlags       修改为什么
+                )
+            所以需要调用
+                SetHandleInformation(handle, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT) 启用handle的继承
+                SetHandleInformation(handle, HANDLE_FLAG_INHERIT, 0)    禁用handle的继承
+5.进程
+    Windows应用程序必须要有一个入口点函数
+        当链接可执行文件时，连接器将按子系统开关来寻找入口点函数，如果找不到将返回unresolved external symbol
+        /SUBSYSTEM:WINDOWS -> int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow) wWinMainCRTStartup
+        /SUBSYSTEM:CONSOLE -> int _tmain(int argc, TCHAR* argv[], TCHAR* envp[]); wmainCRTStartup
+        /NotSet -> 编译期自动查找入口点函数，并选择正确的启动函数
+    hPrevInstance已经废弃不用
+    加载到进程地址空间的每个dll或exe都有一个独一无二的实例句柄HINSTANCE
+    有些函数需要一个HMODULE类型参数，HMODULE与HINSTANCE是完全混用的，因为在<minwindef.h>中有
+        typedef HINSTANCE HMODULE; 
+    进程的创建
+        BOOL CreateProcess(
+            PCTSTR pszApplicationName,          //可执行文件名
+            PTSTR pszCommandLine,               //注意这个字符串指针是非常量指针，意味着函数可能修改字符串中的内容，所以不能直接传入一个字符串字面值，但是函数返回时会复原
+            PSECURITY_ATTRIBUTES psaProcess,    //进程内核对象的安全属性
+            PSECURITY_ATTRIBUTES psaThread,     //线程内核对象的安全属性
+            BOOL bInheritHandle,
+            DWORD fdwCreate,
+            PVOID pvEnvironment,
+            PCTSTR pszCurDir,
+            PSTARTUPINFO psiStartInfo,
+            PROCESS_INFORMATION ppiProcInfo
+        )
+        fdwCreate参数可以由下面的值按位或：
+            DEBUG_PROCESS
             
+    获取一个exe或dll的句柄
+        使用函数
+            HMODULE GetModuleHandle(PCTSTR pszModule)
+                pszModule参数为一个可执行文件或dll的文件的名称，可以为NULL，此时系统返回主调进程的可执行文件的句柄
+        使用函数
+            BOOL GetModuleHandleEx(
+                DWORD dwFlags,          //使用GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS
+                LPCSTR lpModuleName,    //使用当前函数的地址
+                HMODULE* phModule       //指向存储HMODULE变量的指针
+            )
+        使用链接器定义的伪变量__ImageBase，对其进行取地址
+            extern "C" const IMAGE_DOS_HEADER __ImageBase;
+        
+        HMODULE hModule = GetModuleHandle(nullptr);
+        _tprintf(TEXT("With GetModuleHandle(nullptr) = 0x%x\n"), hModule);
+        _tprintf(TEXT("With __ImageBase = 0x%x\n"),__ImageBase);
+        输出：
+            With GetModuleHandle(nullptr) = 0xd3920000
+            With __ImageBase = 0xd3920000
+    命令行
+        程序运行时会忽略可执行文件名称，把剩下的命令行参数传递给pCmdLine参数
+        要获取包括可执行文件名称的命令行参数，使用函数
+            LPWSTR GetCommandLine()
+        可以将命令行参数拆分成一个字符串数组
+            PWSTR* CommandLineToArgvW(PWSTR pszCmdLine, int* pNumArgs)
+            pNumArgs存储字符串数组的大小
+    环境变量
+        在GUI程序中
+            函数GetEnvironmentStrings()会将所有环境变量放到一个字符串中，以\n分割
+        在CUI程序中可以直接使用main函数的TCHAR* env[]参数，数组的最后一个指针是NULL
+            该字符串数组的每个字符串都是以"<varName>=<value>"的格式
+        DWORD GetEnvironmentVariable(
+            PCTSTR pszName, //变量名
+            PTSTR pszValue, //存储变量值的缓冲区的指针
+            DWORD cchValue  //存储变量值缓冲区大小的字符数，当为0时函数返回所需缓冲区的字符数，所以要乘以一个sizeof(TCHAR)
+        )
+        经常使用环境变量的一个场景是带有环境变量的字符串，例如路径%USERPROFILE%\Document，可以使用下面的函数来将一个字符串中的环境变量展开
+            DWORD ExpandEnvironmentStrings(
+                PTCSTR pszSrc,  //包含可替换环境变量的字符串
+                PTSTR pszDst,   //接受替换后字符串的缓冲区
+                DWORD chSize    //缓冲区大小，当为0时函数返回缓冲区需要的字符数，所以要乘以一个sizeof
+            )
+        使用下面函数来添加、删除、修改一个环境变量
+            BOOL SetEnvironmentVariable(
+                PCTSTR pszName,
+                PCTSTR pszValue
+            )
+            将pszName所表示的一个变量设为pszValue参数的值，如果pszValue为NULL则删除
+    进程的错误模式
+        每个进程都关联了一组标志，这些标志的作用是让系统知道进程如何响应严重错误，包括磁盘介质错误、未处理的异常、文件查找错误、数据对齐错误
+        子进程会继承父进程的错误模式标记
+            UINT SetErrorMode(UINT fuErrorMode) 告诉系统如何处理错误
+                fuErrorMode是下面参数按位或的结果
+                    SEM_FAILCRITICALERRORS
+                    SEM_NOGPFAULTERRORBOX
+                    SEM_NOOPENFILEERRORBOX
+                    SEM_NOALIGNMENTFAULTEXCEPT
+    进程目录
+        windows为进程记录当前目录，如果程序中不使用完整路径，windows会在当前目录查找，例如CreateFile()函数
+            DWORD GetCurrentDirectory(
+                DWORD cchCurDir,    //当缓冲区不够大时，函数返回需要的字符数且不会写入缓冲区，由于有260的MAX_PATH限制，所以可以直接传入一个260字符的数组
+                PTSTR pszCurDir 
+            )
+            BOOL SetCurrentDirectory(PCTSTR pszCurDir) 设置当前目录
+        进程可以在不同驱动器下各有一个当前目录
+    为GUI程序创建终端以方便调试
+        if (!AllocConsole()) {
+            // Add some error handling here.
+            // You can call GetLastError() to get more info about the error.
+            return -1;
+        }
+        // std::cout, std::clog, std::cerr, std::cin
+        FILE* fDummy;
+        freopen_s(&fDummy, "CONOUT$", "w", stdout);
+        freopen_s(&fDummy, "CONOUT$", "w", stderr);
+        freopen_s(&fDummy, "CONIN$", "r", stdin);
+        std::cout.clear();
+        std::clog.clear();
+        std::cerr.clear();
+        std::cin.clear();
+
+        // std::wcout, std::wclog, std::wcerr, std::wcin
+        HANDLE hConOut = CreateFile(_T("CONOUT$"), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        HANDLE hConIn = CreateFile(_T("CONIN$"), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        SetStdHandle(STD_OUTPUT_HANDLE, hConOut);
+        SetStdHandle(STD_ERROR_HANDLE, hConOut);
+        SetStdHandle(STD_INPUT_HANDLE, hConIn);
+        std::wcout.clear();
+        std::wclog.clear();
+        std::wcerr.clear();
+        std::wcin.clear();
+    Windows版本
+        typedef struct
+        {
+            DWORD dwOSVersionInfoSize;  //设置为sizeof(OSVERSIONINFOEX)
+            DWORD dwMajorVersion;
+            DWORD dwMinorVersion;
+            DWORD dwBuildNumber;
+            DWORD dwPlatformId;         //VER_PLATFORM_WIN32s(Win32s), VER_PLATFORM_WIN32_WINDOWS(Windows95/98), VERSION_PLATFORM_WIN32_NT(NT/2000/XP/2003/Vista)
+            TCHAR szCSDVersionm[128];   //与操作系统有关的额外信息
+            WORD wServicePackMajor;
+            WORD wServicePackMinor;
+            WORD wSuiteMask;
+            BYTE wProductType;
+            BYTE wReserved;
+        } OSVERSIONINFOEX, *POSVERSIONINFOEX;
+
+        BOOL GetVersionEx(POSVERSIONINFOEX pVersionInformation)
+
+
 COM
     每个使用COM库的线程（注意是线程）都必须分别调用一次初始化函数
         HRESULT CoInitializeEx(LPVOID pvReserved, DWORD dwCoInit)
@@ -247,6 +453,83 @@ COM
     CComPtr<T>定义了.CoCreateInstance()方法，只需传入__uuidof(COMClassName)即可创建一个指向COMClassName对象，且类型为T（某个接口类型）的指针
 
 UI相关
+    一个窗口实际上就是一个矩形区域，窗口接受用户的交互，并与其他窗口共享屏幕面积
+    启动系统时，系统会创建一个桌面，桌面也是一个窗口，可以使用下面函数来获取桌面窗口的窗口句柄
+        HWND GetDesktopWindow()
+    一个窗口包含
+        一个客户界面，客户界面是接收用户输入并渲染输出的区域，每一个产生窗口的GUI应用都必须定义一个window过程
+        一个非客户界面，包括标题栏，菜单栏、最大化最小化关闭按钮、滚动条
+    一个窗口的属性
+        类名：每个窗口都属于一个窗口类，应用程序必须在创建窗口前注册一个窗口类，窗口类通常使用窗口过程定义窗口的行为
+        窗口名：窗口名是标识一个窗口的字符串，通常显示在标题栏上，有些特殊窗口不显示窗口名，例如复选框列表
+        窗口样式：是一些预定义的常量以WS_开头，定义了窗口除了窗口类之外的显示方法和行为，应用程序通常在创建窗口时就指定窗口样式，但也可以在创建之后再修改，使用SetWindowLong()函数
+        拓展窗口样式：定义除了窗口类和窗口样式之外的窗口的显示和行为
+        位置：窗口的位置是相对于屏幕左上角为原点坐标的位置，对于子窗口则是相对于父窗口客户界面的左上角为坐标
+            WindowFromPoint()返回占据屏幕上某个点的窗口的窗口句柄
+        大小：以宽高来定义，单位为像素，一个窗口的大小可以是0*0，此时系统将为其设置系统的最小窗口大小
+            GetSystemMetrics()
+            可以通过AdjustWindowRect()函数和期望的客户界面的大小来获取期望的整个窗口的大小作为CreateWindow()函数的参数
+        父窗口或窗口句柄的所有者：当窗口有父窗口时行为会发生改变，例如可以使得子窗口只允许在父窗口的范围内移动。当一个窗口没有父窗口，或者父窗口是桌面窗口时，称为“最上层窗口”
+            EnumWindows()
+        菜单句柄或子窗口标识符:
+        应用程序句柄：由于同一个程序可能运行多个实例，所以需要用不同的应用程序句柄来唯一标识
+        创建窗口相关的数据
+        窗口句柄
+    可以通过CreateMutex()函数来创建一个系统范围的全局锁，当函数失败时即表明该程序有另一个实例正在运行，此时可以退出，来保证程序只能运行一个实例
+    窗口类
+        一个程序必须先注册一个窗口类
+            下面结构体中只有打*的成员是必须填入的项
+            typedef struct tagWNDCLASSEXW
+            {
+                UINT cbSize;
+                UINT style;
+                WNDPROC lpfnWndProc;    //*窗口过程函数的指针
+                int cbClsExtra;         //这个窗口类所有窗口所需共享的额外的内存
+                int cbWndExtra;         //这个窗口类所有窗口各自所需的额外的内存
+                HINSTANCE hInstance;    //*
+                HICON hIcon;
+                HCURSOR hCursor;
+                HBRUSH hbrBackground;   //定义窗口的客户区域的背景
+                LPCWSTR lpszMenuName;
+                LPCWSTR lpszClassName;  //*
+                HICON hIconSm;
+            } WNDCLASSEXW, *PWNDCLASSEXW, *NPWNDCLASSEXW, *LPWNDCLASSEXW; 
+            
+            ATOM RegisterClassEx(const WNDCLASSEXW* unnamedParam1)
+                函数成功时返回一个标识这个窗口类的id，否则返回0
+                
+        一个窗口类具有一个窗口过程，而且可以创建多个窗口，这个窗口过程控制所有由这个窗口类创建的窗口
+        有3种窗口类
+            系统类
+                系统类是由系统注册的窗口类，一部分系统类可以给用户程序使用
+                    Button
+                    ComboBox
+                    Edit
+                    ListBox
+                    MDIClient
+                    ScrollBar
+                    Static
+            
+            程序全局类
+                全局窗口类可以由一个exe或dll来注册，并被所有其他模块使用（即在所有其他模块创建这个窗口类的窗口）
+            程序本地类
+                只能由当前注册窗口类的exe或dll来创建这个窗口类的窗口
+        当dll从内存中卸载时，系统不会自动删除其注册的窗口类，所以需要手动取消注册，否则会导致访问出错
+            BOOL UnregisterClass(LPCWSTR lpClassName, HINSTANCE hInstance)
+                函数失败时返回0
+    窗口类型
+        重叠窗口 WS_OVERLAPPED WS_OVERLAPPEDWINDOW
+            通常用作程序的主窗口
+        弹出窗口 
+            通常用作临时窗口，例如对话框、消息框
+            弹出窗口的标题栏是可选的
+            WS_POPUP 
+            WS_POPUPWINDOW 包含窗口边框和菜单栏
+            WS_CAPTION | WS_POPUPWINDOW 包含标题栏、窗口边框和菜单栏
+        子窗口 WS_CHILD
+            子窗口不能创建菜单栏
+        
+
     HWND CreateWindowEx(
         DWORD dwExStyle,
         LPCWSTR lpClassName,    //必须为之前调用过RegisterClass()注册过的窗口类的类名，否则ShowWindow()将无效
@@ -261,9 +544,38 @@ UI相关
         HINSTANCE hInstance,    //
         LPVOID lpParam
     );
+    CreateWindow()函数其实是CreateWindowEx()函数的简化版，使用了默认的dxExStyle
+        #define CreateWindowW(lpClassName, lpWindowName, dwStyle, x, y, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam)\
+        CreateWindowExW(0L, lpClassName, lpWindowName, dwStyle, x, y, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam)
+    创建窗口后，系统会在窗口实际显示出来之前发送下面两个信息给窗口过程函数
+        创建完窗口的非客户界面后 -> WM_NCCREATE 
+        创建完窗口的客户界面后 -> WM_CREATE
 
-    #define CreateWindowW(lpClassName, lpWindowName, dwStyle, x, y, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam)\
-    CreateWindowExW(0L, lpClassName, lpWindowName, dwStyle, x, y, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam)
+    BOOL ShowWindow(HWND hWnd, int nCmdShow)
+        当用来显示应用程序的主窗口时，参数nCmdShow必须为SW_SHOWDEFAULT
+        当第一次调用这个函数时，nCmdShow参数的值应该为WinMain函数的参数
+        再次调用这个函数时，第二参数的值可以是
+            SW_HIDE
+            SW_SHOWNORMAL SW_NORMAL
+            SW_SHOWMINIMIZED
+            SW_SHOWMAXIMIZED SW_MAXIMIZE
+            SW_SHOWNOACTIVE
+            SW_SHOW
+            SW_MINIMIZE
+            SW_SHOWMINNOACTIVE
+            SW_SHOWNA
+            SW_RESTORE
+            SW_SHOWDEFAULT
+            SW_FORCEMINIMIZE
+    
+    BOOL IsWindow(HWND hWnd)
+        函数返回hWnd所代表的窗口句柄是否是一个存在的窗口
+        不要对非本线程创建的窗口调用这个函数来检测，因为窗口句柄的值可能被循环使用，即这个窗口句柄可能已经指向另一个窗口
+    BOOL IsWindowVisible(HWND hWnd)
+        函数返回hWnd所代表的窗口是否可见
+    HWND GetWindow(HWND hWnd, UINT uCmd)
+
+    
 进程通信
     SendMessage方式
         typedef struct tagCOPYDATASTRUCT {
