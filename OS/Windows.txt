@@ -517,7 +517,63 @@ UI相关
         当dll从内存中卸载时，系统不会自动删除其注册的窗口类，所以需要手动取消注册，否则会导致访问出错
             BOOL UnregisterClass(LPCWSTR lpClassName, HINSTANCE hInstance)
                 函数失败时返回0
-    窗口类型
+    窗口过程
+        一个窗口过程函数具有4个参数：窗口句柄、UINT类型的信息标识符、WPARAM和LPARAM类型的两个信息的数据，函数返回一个有符号整数，整数的值根据特定的信息应具有特定意义
+        有一个默认提供的窗口过程函数DefWindowProc()，它提供了所有窗口过程都必须具备的一些代码，直接将窗口过程函数的参数传给这个函数做剩下的处理
+            LRESULT LRESULT DefWindowProc(
+                HWND   hWnd,
+                UINT   Msg,
+                WPARAM wParam,
+                LPARAM lParam
+            );
+        子类
+            可以对窗口过程使用子类的方法来干预窗口过程，使得可以在子类窗口过程中修改预处理窗口信息，再调用原来的窗口过程
+            有两种子类的构造方法
+                实例子类：只对窗口类的某一个窗口实例的窗口过程子类化
+                    需要使用下面的函数来修改这个窗口的窗口过程，并将nIndex设置为GWL_WNDPROC
+                        LONG SetWindowLong(HWND hWnd, int nIndex, LONG dwNewLong)
+                            nIndex的值可以是：
+                                GWL_EXSTYLE
+                                GWL_HINSTANCE
+                                GWL_ID
+                                GWL_STYLE
+                                GWL_USERDATA
+                                GWL_WNDPROC
+                            函数成功时返回nIndex的值所对应的之前的值，例如返回之前的窗口过程函数指针
+                    修改了窗口过程之后，如果需要调用原来的窗口过程函数做进一步处理，需要将上面函数的返回值保存，并使用下面函数调用原窗口过程
+                        LRESULT CallWindowProc(
+                            WNDProc lpPrevWndFunc,
+                            HWND hWnd,
+                            UINT Msg,
+                            WPARAM wParam,
+                            LPARAM lParam
+                        )
+                    有时也需要还原窗口过程，也需要用到SetWindowLong()函数返回的原窗口过程指针
+                全局子类：对一个窗口类的所有窗口实例的窗口过程子类化
+                    需要调用下面的函数来修改这个类的窗口过程，并将nIndex设置为GCL_WNDPROC
+                        DWORD SetClassLong(HWND hWnd, int nIndex, LONG dwNewLong)
+                            nIndex的值可以是
+                                GCL_CBCLSEXTRA
+                                GCL_CBWNDEXTRA
+                                GCL_HBRBACKGROUND
+                                GCL_HCURSOR
+                                GCL_HICON
+                                GCL_HICONSM
+                                GCL_HMODULE
+                                GCL_HMENUNAME
+                                GCL_STYLE
+                                GCL_WNDPROC
+                            函数成功时返回nIndex的值所对应的之前的值
+        超类
+            可以在程序中对现有的窗口类进行功能拓展，成为超类
+            超类拥有自己的窗口过程
+            与子类化不同的是，超类在处理窗口创建消息（WM_NCCREATE WM_CREATE）时必须调用原本类的窗口过程函数
+            先调用下面函数来获得窗口类的信息
+                BOOL GetClassInfo(HINSTANCE hInstance, LPCSTR lpClassName, LPWNDCLASS lpWndClass)
+            然后修改lpWndClass中的lpszClassName成员为超类的类名，把hInstance成员设置为自己的句柄
+            然后调用RegisterClass()函数来注册超类
+            同时注意需要保存lpfnWndProc成员，以备后面还原
+    窗口样式
         重叠窗口 WS_OVERLAPPED WS_OVERLAPPEDWINDOW
             通常用作程序的主窗口
         弹出窗口 
