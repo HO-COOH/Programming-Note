@@ -282,6 +282,50 @@
     有些函数需要一个HMODULE类型参数，HMODULE与HINSTANCE是完全混用的，因为在<minwindef.h>中有
         typedef HINSTANCE HMODULE; 
     进程的创建
+        typedef struct _STARTUPINFO
+        {
+            DWORD cb;           //sizeof(STARTUPINFO)
+            PSTR lpReserved;    //NULL
+            PSTR lpDesktop;     //表明在哪个桌面上启动，如果不存在则新创建一个桌面，如果为NULL则在当前桌面启动
+            PSTR lpTitle;       //控制台窗口的标题，如果为NULL则使用当前程序的名称
+            DWORD dwX;          //如果是CUI程序，则指定控制台左上角的坐标，如果是GUI程序且在进程新建重叠窗口时使用了CW_USEDEFAULT参数，则指定新重叠窗口左上角的坐标
+            DWORD dwY;
+            DWORD dwXSize;
+            DWORD dwYSize;
+            DWORD dwXCountChars;//指定用字符数来表示的控制台的宽度和高度
+            DWORD dwYCountChars;
+            DWROD dwFillAttribute;//指定控制台窗口的文本和背景色
+            DWORD dwFlags;
+            WORD wShowWindow;
+            WORD cbReserved2; //0
+            PBYTE lpReserved2;//NULL
+            HANDLE hStdInput;
+            HANDLE hStdOutput;
+            HANDLE hStdError;
+        } STARTUPINFO, *LPSTARTUPINFO;
+            dwFlagg的值：
+                STARTF_USESIZE          使用dwXSize和dwYSize成员
+                STARTF_USESHOWWINDOW    使用wShowWindow成员
+                STARTF_USEPOSITION      使用dwX dwY
+                STARTF_USECOUNTCHARS    使用dwXCountChars dwYCountChars
+                STARTF_USEFILLATTRIBUTE 使用dwFillAttribute
+                STARTF_USESTDHANDLES    使用hStdInput hStdOutput hStdError
+                STARTF_RUNFULLSCREEN    控制台程序以全屏模式启动
+
+        typedef struct _STARTUPINFOEX
+        {
+            STARTUPINFO StartupInfo;
+            struct _PROC_THREAD_ATTRIBUTE_LIST *lpAttributeList;
+        } STARTUPINFOEX, *LPSTARTUPINFOEX;
+
+        typedef struct _PROCESS_INFORMATION
+        {
+            HANDLE hProcess;
+            HANDLE hThread;
+            DWORD dwProcessId;
+            DWORD dwThreadId;
+        } PROCESS_INFORMATION;
+
         BOOL CreateProcess(
             PCTSTR pszApplicationName,          //可执行文件名
             PTSTR pszCommandLine,               //注意这个字符串指针是非常量指针，意味着函数可能修改字符串中的内容，所以不能直接传入一个字符串字面值，但是函数返回时会复原
@@ -291,12 +335,66 @@
             DWORD fdwCreate,
             PVOID pvEnvironment,
             PCTSTR pszCurDir,
-            PSTARTUPINFO psiStartInfo,
+            PSTARTUPINFO psiStartInfo,          //可以是一个STARTUPINFO的指针，也可以是STARTUPINFOEX的指针（都让fdwCreate使用了EXTENDED_STARTUPINFO_PRESENT时）
             PROCESS_INFORMATION ppiProcInfo
         )
         fdwCreate参数可以由下面的值按位或：
             DEBUG_PROCESS
+            DEBUG_ONLY_THIS_PROCESS
+            CREATE_SUSPENDED 系统在创建新进程时挂起其主线程，使得父进程可以修改子进程地址空间的内存、更改优先级等操作，结束后需要调用下面函数恢复子进程的执行
+                DWORD ResumeThread(HANDLE hThread)
+            DETACH_PROCESS 阻止CUI子进程使用父进程的控制台窗口，例如在控制台执行命令时输出是直接输出到控制台的，新进程如果需要控制台窗口，需要使用AllocConsole()函数
+            CREATE_NEW_CONSOLE 不能与DETACH_PROCESS连用
+            CREATE_NO_WINDOW 不要创建任何窗口（包括控制台）
+            CREATE_DEFAULT_ERROR_MODE 不继承父进程的错误模式
+            CREATE_UNICODE_ENVIRONMENT 子进程的环境快使用Unicode字符（默认是ANSI字符）
+            EXTENDED_STARTUPINFO_PRESENT 表明psiStartInfo是一个指向STARTUPINFOEX结构体的指针
+            还可以在fdwCreate参数设置优先级
+                IDLE_PRIORITY_CLASS
+                BELOW_NORMAL_PRIORITY_CLASS
+                NORMAL_PRIORITY_CLASS
+                ABOVE_NORMAL_PRIORITY_CLASS
+                HIGH_PRIORITY_CLASS
+                REALTIME_PRIORITY_CLASS
+        pvEnvironment指向新进程所使用的环境字符串，多数情况下传入NULL，使得子进程继承父进程的环境字符串，可以在创建进程时使用函数
+            PVOID GetEnvironmentStrings()
+        pszCurDir为子进程的工作目录，如果为NULL则工作目录为程序所在的当前目录
+    进程id
+        GetCurrentProcessId()
+        GetCurrentThreadId()
+        GetProcessId()
+        GetThreadId()
+        GetProcessIdByThread()
+    进程的退出
+        进程的退出的4种方式
+            主线程的入口点函数返回
+            进程的一个线程调用ExitProcess()
+                VOID ExitProcess(UINT fuExitCode)
+                实际上，主线程的入口点函数返回时就是返回到C运行库的启动代码，清理资源后显示调用ExitProcess()，并将入口点函数的返回值作为fuExitCode参数的
+            另一个进程种的线程调用TerminateProcess()
+                BOOL TerminateProcess(HANDLE hProcess, UINT fuExitCode)
+                    注意这个函数是非阻塞的，会立即返回
+            进程中的所有线程都自然死亡
+        获取进程的退出代码
+            BOOL GetExitCodeProcess(HANDLE hProcess, PDWORD pdwExitCode)
+            当hProcess所标识的进程还在运行时，会向pdwExitCode指向的变量写入STILL_ACTIVE
             
+    进程的权限
+        在某些程序的manifest文件中会有这样的字段
+            <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
+                <security>
+                    <requestPrivileges>
+                        <requestedExecutionLevel level="requireAdministrator"/>
+                    </requestPrivileges>
+                </security>
+            </trustInfo>
+            level有3个值：requireAdministrator highestAvailable asInvoker
+            OpenProcessToken(HANDLE hHandle, token, PHANDLE pHandle)
+            GetTokenInformation()
+                TokenElevationTypeDefault
+                TokenElevationTypeFull
+                TokenElevationTypeLimited
+                
     获取一个exe或dll的句柄
         使用函数
             HMODULE GetModuleHandle(PCTSTR pszModule)
