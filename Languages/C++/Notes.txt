@@ -1483,19 +1483,126 @@ locale：
     标准中定义了所有其他异常的基类
         #include <exception>
         class exception;
-        成员函数：
-            virtual const char* what() const noexcpet   //返回一个错误信息的字符串
+            成员函数：
+                virtual const char* what() const noexcpet   //返回一个错误信息的字符串
+        typedef /*?*/ exception_ptr
+            是一个可以为空的指针，由函数current_exception()返回
+            这个指针可以（同时也最好在传递时直接复制）
+            这个类型只能转化为布尔值，当为空时转化为false，否则为true
+            默认构造的exception_ptr是空的，所以转化为布尔值为false
+            exception_ptr本身类似于一个智能指针shared_ptr，被exception_ptr指向的异常对象的生存期至少与最后一个指向它的exception_ptr一样长
+                void HandleException(std::exception_ptr ptr);
+                int main()
+                {
+                    std::exception_ptr eptr;
+                    try
+                    {
+                        std::string().at(1); //throw std::out_of_range
+                    }
+                    catch(...)
+                    {
+                        eptr = current_exception();
+                    }
+                    HandleException(eptr); 
+                }//std::out_of_range destructor called here
+            辅助函数：
+                template<typename E>
+                std::exception_ptr make_exception_ptr(E e) noexcept
+                    返回一个指向e的exception_ptr，等同于
+                    try
+                {
+                    throw e;
+                        } 
+                        catch(...)
+                        {
+                            return std::current_exception();
+                        }
+        std::exception_ptr current_exception()
+            通常在catch块中使用，返回一个指向当前抛出异常的对象的指针，这个指针可能直接引用异常对象，也可能引用复制后的异常对象
+                如果标准库的实现在函数中使用了new，而且new抛出了异常，则指向一个std::bad_alloc对象
+                如果标准库的实现在函数中复制原异常对象，而且这个复制构造函数抛出了异常，则指针指向这个由异常对象的复制构造函数抛出的异常
+                如果标准库的实现在函数中复制原异常对象，而且这个复制构造函数抛出了异常，而且这个新的异常的复制构造函数又配出了异常，则指针指向一个std::bad_exception对象
+        [[noreturn]] void std::rethrow_exception(std::exception_ptr eptr)
+            重新抛出由eptr所指向的异常对象
+        class nested_exception
+            可以存储多个任何类型的嵌套的异常对象的类
+            通常要在try块中配合std::rethrow_if_nested和在catch块中配合std::throw_with_nested()函数来使用
+            成员函数：
+                [[noreturn]] void rethrow_nested() 重新抛出所存储的异常对象，如果没有则调用std::terminate()
+                std::exception_ptr nested_ptr() const noexcept 返回存储的异常对象的指针，如果没有，返回空的指针
+            非成员函数：
+                template<typename T>
+                [[noreturn]] void throw_with_nested(T&& t)
+                    将异常对象t包裹在一个std::nested_exception中并抛出
+
+                template<typename E>
+                void rethrow_if_nested(E const& e)
+                    如果e实际上是一个std::nested_exception，则调用其rethrow_nested()成员函数，所以实际效果是减少一层嵌套的深度
+            利用这套机制，可以实现类似于调用堆栈纪录的效果
+                #include <iostream>
+                #include <stdexcept>
+                #include <exception>
+                #include <string>
+                #include <fstream>
+                
+                // prints the explanatory string of an exception. If the exception is nested,
+                // recurses to print the explanatory of the exception it holds
+                void print_exception(const std::exception& e, int level =  0)
+                {
+                    std::cerr << std::string(level, ' ') << "exception: " << e.what() << '\n';
+                    try {
+                        std::rethrow_if_nested(e);
+                    } catch(const std::exception& e) {
+                        print_exception(e, level+1);
+                    } catch(...) 
+                    {  
+                    }
+                }
+                
+                // sample function that catches an exception and wraps it in a nested exception
+                void open_file(const std::string& s)
+                {
+                    try {
+                        std::ifstream file(s);
+                        file.exceptions(std::ios_base::failbit);
+                    } catch(...) {
+                        std::throw_with_nested( std::runtime_error("Couldn't open " + s) );
+                    }
+                }
+                
+                // sample function that catches an exception and wraps it in a nested exception
+                void run()
+                {
+                    try {
+                        open_file("nonexistent.file");
+                    } catch(...) {
+                        std::throw_with_nested( std::runtime_error("run() failed") );
+                    }
+                }
+                
+                // runs the sample function above and prints the caught exception
+                int main()
+                {
+                    try {
+                        run();
+                    } catch(const std::exception& e) {
+                        print_exception(e);
+                    }
+                }
+            输出：
+                exception: run() failed
+                exception: Couldnt open nonexistent.file
+                exception: basic_ios::clear
+            
     标准中还额外定义了以下几类异常：
         #include <stdexcept>
             class logic_error: public exception
             class runtime_error: public exception
-            
             class invalid_argument: public logic_error
             class domain_error: public logic_error
             class length_error: public logic_error
             class out_of_range: public logic_error
                 数组访问超过数组长度，例如std::vector::at()
-
             class range_error: public runtime_error
             class overflow_error: public runtime_error
             class underflow_error: public runtime_error
@@ -1506,11 +1613,14 @@ locale：
                 数组新长度为负数
                 数组新长度超过具体实现所允许的最大值
                 用于初始化的元素的个数超过数组的新长度
-    std::terminate()会调用std::terminate_handler，这是一个函数指针的类型别名：
+    std::terminate()
+        会调用std::terminate_handler，这是一个函数指针的类型别名：
         typedef void (*terminate_handler)()，即一个没有参数并返回空的函数
         C++标准提供了一个默认的std::terminate_handler，即std::abort()，这个函数被调用时，栈区对象、thread_local对象、静态对象的析构函数将不会被调用，所以应该确保资源已经被释放
-        std::terminate_handler get_terminate() noexcept函数返回当前的terminate_handler
-        std::terminate_handler set_terminate(std::terminate_handler f) noexcept函数设置一个新的terminate_handler（可以是nullptr），并返回之前的terminate_handler
+    std::terminate_handler get_terminate() noexcept
+        函数返回当前的terminate_handler
+    std::terminate_handler set_terminate(std::terminate_handler f) noexcept
+        函数设置一个新的terminate_handler（可以是nullptr），并返回之前的terminate_handler
 
 类模板：
     声明一个类模板，在通常类的定义上一行加：template <class Type>或template <typename Type>
@@ -3298,8 +3408,8 @@ C++11:
             ::tie()
                 template<class... Type>
                 constexpr tuple<Types&...> tie(Types&... args) noexcept;
-                生成一个元素全是左值引用的tuple
-                常用于多个变量一次性赋值，如：
+                生成一全是左值引用的tuple
+      用于多个变量一次性赋值，如：
                     int a; double c; std::string c;
                     std::tie(a,b,c)=std::tuple{1,2.0,"helloworld"};
         辅助函数
@@ -3327,12 +3437,11 @@ C++11:
             template<typename T>
             typename std::enable_if<std::is_integral<T>::value, TYPE>::type func(T a) {...}
             根据enable_if的模板定义，当形参T的类型是整数时，is_integral<T>的value为true，所以type的值就是TYPE，如果不指定TYPE，则根据定义，type的值是void
-            当形参T的类型不是整数时，is_integral<T>的value为false，所以与enable_if的第一个通用模板匹配，此时这个结构体中没有定义type，所以编译出错，函数不会实例化
-        std::integral_constant：
+            当形参T的类型不是整数时，is_integral<T>的value为false，所以与enable_if的第一个通用模板匹配，此时这个结构体中没有定义type，所以编译出错，函数不              std::integral_constant：
             是一个类模板，定义了一个编译期静态常量，同时也是整个<type_traits>库的基础
             可能的实现：
                 template<class T, T v>
-                struct integral_constant
+          ruct integral_constant
                 {
                     static constexpr T value = v;
                     using value_type = T;
@@ -4292,10 +4401,71 @@ C++11:
                     默认值为std::launch::async|std::launch::deferred，表示新线程的创建与否取决于实现，也可能不创建新线程
                     如果确实要创建新线程，用std::launch::async
                     std::launch::deferred 表示不创建新线程，而且延迟执行，直到调用了所返回的future对象的get()方法，才执行函数Fn
-                template <class T> future
-                template <class R&> future<R&>
-                template <> future<void>
-                future表示一个可以在未来获取其内容的对象
+            future表示一个可以在未来获取其内容的对象
+                template <class T>
+                class future    //一般通用模板
+                {
+                public:
+                    T get();
+                }
+
+                template <class R&> 
+                class future<R&> //内容是引用的模板
+                {
+                public:
+                    T& get();
+                }
+
+                template <> 
+                class future<void> //无内容仅用于同步
+                {
+                public:
+                    void get();
+                }
+
+                enum class future_status
+                {
+                    ready,      //future执行完毕
+                    timeout,    //future在规定的时间内尚未执行完毕
+                    deferred    //future被使用推迟的方式创建，而且尚未开始执行
+                } 由wait_for() 和 wait_until()函数返回，表示future的执行状态
+                方法：
+                    .get()方法内部会调用wait()方法阻塞等待执行完毕
+                    .valid()方法表明这个future是不是一个可分享的状态，当一个future是valid时调用.get()，它将不再是可分享的，所以再次调用.valid()将返回false
+                    .wait() 阻塞，直到执行完毕
+                    future_status .wait_for(std::chrono::duration)  等待一段时间
+                    future_status.wait_until(std::chrono::time_point) 等待直到某个时间点
+            promise表示一个承诺在将来设置内容的对象
+                需要这个内容的主体（通常是另一个线程）从这个promise获取一个future，并用这个future获取promise中由别人设置的值
+                template<typename R> 
+                class promise   //一般通用模板
+                {
+                public:
+                    void set_value(const R& value);
+                    void set_value(R&& value);
+                    void set_value_at_thread_exit(const R& value);
+                    void set_value_at_thread_exit(R&& value);
+                };
+
+                template<typename R> 
+                class primise<R&> //值内容是个引用的模板
+                {
+                public:
+                    void set_value(R& value);
+                    void set_value(R& vlaue);
+                }
+
+                template<> 
+                class promise<void>//仅用于同步
+                {
+                public:
+                    void set_value(); 
+                    void set_value_at_thread_exit();
+                }
+                方法：
+                    .get_future()
+                    
+
             主线程->子线程传递信息
                 假设需要在主线程中传递信息给子线程，除了通过在创建新线程时直接将参数传递给函数，还可以在创建新线程之后先让新线程做别的事情，然后主线程继续执行，准备新线程所需的数据，完成后子线程从需要这个数据的地方开始继续执行
                 将子线程函数定义为接收std::future参数
@@ -4381,6 +4551,8 @@ C++11:
                         //clean up
                     }
                 }
+        boost::asio
+        
     8.SIMD（single instruction, multiple data）
         内存对齐
             size_t alignof(Type)
@@ -4905,9 +5077,9 @@ C++20：
         另一个部分是view，view决定了对容器的访问和操作
         可以使用重载的|运算符来对多个view进行复合，就可以实现algorithm的复合
         将view作用于range时相当于是一个声明，只有当真正需要访问作用后的元素时才执行真正的计算
-        view类都定义在名称空间std::ranges::views中，然而标准提供了一个名称空间别名来简化，所以只需使用std::views
+        view类都定义在名称            std::ranges::views中，然而标准提供了一个名称空间别名来简化，所以只需使用std::views
             namespace std
-            {
+                {
                 namespace views = ranges::views;
             }
         ranges的用法：
@@ -4930,7 +5102,7 @@ C++20：
             }
         concept习惯上不写is，这样配合require表达式时更可读
             template<typename T>
-            concept floating_point=std::is_floating_point_v<T>;
+            concep        oint=std::is_floating_point_v<T>;
 
             template<typename T>
             auto f(T l, T r) requires floating_point<T>
@@ -4969,12 +5141,67 @@ C++20：
         
 
     4.协程 Coroutines
+
+        coroutine_traits 
+            决定携程返回的promise的类型，要求R中必须定义了一个类型别名promise_type
+                template<typename, typename...>
+                struct coroutine_traits {};
+
+                template<typename R, typename... Args>
+                requires requires { typename R::promise_type; }
+                struct coroutine_traits<R, Args...>
+                {
+                    using primise_type = typename R::promise_type
+                }
+            所以某种协程的返回值必须包含promise_type类型别名，可以直接定义，也可以通过对std::coroutine_traits具体化实现，例如对std::future具体化
+        coroutine_handle
+            用来引用一个被挂起或正在执行的协程
+                template<typename Promise = void>
+                struct coroutine_handle;
+
+                template
+            静态成员函数：
+                static coroutine_handle<Promise> from_promise(Promise& p)
+            方法：
+                bool done() const 当引用的协程已经到达其最后的挂起点时返回true，否则返回false
+                void resume() const  恢复协程执行
+                void operator()() const 恢复协程执行
+                constexpr void* address() const noexcept 返回这个协程句柄的地址
+                void destory() 析构协程的状态
+        
+        struct suspend_never
+        {
+            constexpr bool await_ready() const noexcept { return true; }
+            constexpr void await_suspend(std::coroutine_handle<>) const noexcept {}
+            constexpr void await_resume() const noexcept {}
+        };
+        
+        struct suspend_always
+        {
+            constexpr bool await_ready() const noexcept { return false; }
+            constexpr void await_suspend(std::coroutine_handle<>) const noexcept {}
+            constexpr void await_resume() const noexcept {}
+        };
+
     5.is_constant_evaluated
     6.<version>
         C++20加入了标准的编译器功能测试宏，来测试编译器是否支持标准的某些功能
         https://en.cppreference.com/w/cpp/feature_test#Library_features
         可以结合#ifdef来为不同的C++标准编译不同的代码
-
+    7.安全的整数大小比较
+        在有符号整形与无符号整型之间比较时，如不注意就容易出问题
+            int a = -1; 
+            unsigned int b = 1;
+            bool aIsGreaterThanB = a > b; //true, -1 > 1
+        C++20新加入了整数符号安全的比较函数
+            #include <utility>
+            template<typename T, typename U> constexpr bool cmp_equal(T t, U u) noexcept;
+            template<typename T, typename U> constexpr bool cmp_not_equal(T t, U u) noexcept;
+            template<typename T, typename U> constexpr bool cmp_less(T t, U u) noexcept;
+            template<typename T, typename U> constexpr bool cmp_greater(T t, U u) noexcept;
+            template<typename T, typename U> constexpr bool cmp_greater_equal(T t, U u) noexcept;
+            template<typename T, typename U> constexpr bool cmp_less(T t, U u) noexcept;
+            template<typename T, typename U> constexpr bool cmp_less_equal(T t, U u) noexcept;
 
 Effective C++
     1.C++的四个子语言

@@ -58,6 +58,11 @@
             {
                 //...
             }
+    VC++运行库
+        /MT -> LibCMt.lib  静态链接发行版本
+        /MTd -> LibCMtD.lib 静态链接调试版本
+        /MD -> MSVCRt.lib 导入库，用于动态链接MSVCR80.dll库的发行版本（默认）
+        /MDd -> MSVCRtD.lib 导入库，用于动态链接MSVCR80D.dll库的调试版本
     
 1.高级数据类型
     为了统一成大写，VC++给很多类型取了大写的typedef
@@ -98,8 +103,37 @@
         DWORD nSize,
         va_list* Arguments
     );
+    可以通过FormatMessage()函数来获得一个描述性字符串
+        using String = std::basic_string<TCHAR>;
+        auto GetErrorMessage(DWORD dwErrorCode)
+        {
+            LPTSTR psz{ nullptr };
+            const DWORD cchMsg = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM
+                | FORMAT_MESSAGE_IGNORE_INSERTS
+                | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+                NULL, // (not used with FORMAT_MESSAGE_FROM_SYSTEM)
+                dwErrorCode,
+                MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                reinterpret_cast<LPTSTR>(&psz),
+                0,
+                NULL);
+            if (cchMsg > 0)
+            {
+                auto deleter = [](void* p) { ::LocalFree(p); };
+                std::unique_ptr<TCHAR, decltype(deleter)> ptrBuffer(psz, deleter);
+                return String(ptrBuffer.get(), cchMsg);
+            }
+            else
+            {
+                auto error_code{ ::GetLastError() };
+                throw std::system_error(error_code, std::system_category(),
+                    "Failed to retrieve error message string.");
+            }
+        }
 
     VOID SetLastError(DWORD dwErrCode) 设置Error值
+
+    
 3.字符串
     在<winnt.h>中定义了这些宏
 
@@ -394,7 +428,31 @@
                 TokenElevationTypeDefault
                 TokenElevationTypeFull
                 TokenElevationTypeLimited
-                
+        要用提升的权限创建进程，需要下面函数
+            typedef struct _SHELLEXECUTEINFO
+            {
+                DWORD cbSize;
+                ULONG fMask;
+                HWND hwnd;
+                PCTSTR lpVerb;      //TEXT("runas")
+                PCTSTR lpFile;      //可执行文件的路径
+                PCTSTR lpParameters;
+                PCTSTR lpDirectory;
+                int nShow;
+                HINSTANCE hInstApp;
+                PVOID lpIDList;
+                PCTSTR lpClass;
+                HKEY hkeyClass;
+                DWORD dwHotKey;
+                union 
+                {
+                    HANDLE hIcon;
+                    HANDLE hMonitor;
+                } DUMMYUNIONNAME;
+                HANDLE hProcess;
+            } SHELLEXECUTEINFO, *LPSHELLEXECUTEINFO;
+        BOOL ShellExecuteEx(LPSHELLEXECUTEINFO pExecInfo);
+            如果用户拒绝提升权限，返回FALSE
     获取一个exe或dll的句柄
         使用函数
             HMODULE GetModuleHandle(PCTSTR pszModule)
@@ -414,6 +472,16 @@
         输出：
             With GetModuleHandle(nullptr) = 0xd3920000
             With __ImageBase = 0xd3920000
+    把进程的伪句柄转换为真正的进程句柄
+        HANDLOE hProcess;
+        DuplicateHandle(
+            GetCurrentProcess(),
+            GetCurrentProcess(),
+            &hProcess,
+            0,
+            FALSE,
+            DUPLICATE_SAME_ACCESS
+        )
     命令行
         程序运行时会忽略可执行文件名称，把剩下的命令行参数传递给pCmdLine参数
         要获取包括可执行文件名称的命令行参数，使用函数
@@ -460,6 +528,10 @@
             )
             BOOL SetCurrentDirectory(PCTSTR pszCurDir) 设置当前目录
         进程可以在不同驱动器下各有一个当前目录
+    进程优先级
+        BOOL SetPriorityClass(HANDLE hProcess, DWORD fdwPriority)
+            要改变自己的优先级，直接SetPriorityClass(GetCurrentProcess(), priority)即可
+        DWORD GetPriorityClass(HANDLE hProcess)
     为GUI程序创建终端以方便调试
         if (!AllocConsole()) {
             // Add some error handling here.
@@ -503,8 +575,277 @@
         } OSVERSIONINFOEX, *POSVERSIONINFOEX;
 
         BOOL GetVersionEx(POSVERSIONINFOEX pVersionInformation)
+    获取所有线程
+        #include <Tlhelp32.h>
+        HANDLE CreateToolhelp32Snapshot(DWORD dwFlags, DWORD th32ProcessID)
+            dwFlags:
+                TH32CS_SNAPPROCESS 获取所有进程的信息，第二参数应为0，此时应该使用Process32First()和Process32Next()函数来进行枚举
+            成功返回所要求的句柄，否则返回INVALID_HANDLE_VALUE
+        下面结构体定义了使用Snapshot时的进程信息
+            typedef struct tagPROCESSENTRY32 
+            {
+                DWORD     dwSize;
+                DWORD     cntUsage;
+                DWORD     th32ProcessID;
+                ULONG_PTR th32DefaultHeapID;
+                DWORD     th32ModuleID;
+                DWORD     cntThreads;
+                DWORD     th32ParentProcessID;
+                LONG      pcPriClassBase;
+                DWORD     dwFlags;
+                CHAR      szExeFile[MAX_PATH];
+            } PROCESSENTRY32;
+        BOOL Process32First(HANDLE hSnapshot, LPPROCESSENTRY32 lppe)
+        BOOL Process32Next(HANDLE hSnapshot, LPPROCESSENTRY32 lppe)
+            当枚举当前值成功时返回TRUE，否则返回FALSE
+        正确使用这两个函数枚举信息的方法是
+            if(Process32First(...))
+            {
+                do
+                {
+                    //使用PROCESSENTRY32对象
+                }while(Process32Next(...))
+            }
+    异步IO
+        父进程可以在CreateProcess()之后继续执行，并等待子进程初始化完毕窗口
+            DWORD WaitForInputIdle(HANDLE hProcess, DWORD dwMilliseconds)
+线程
+    每个线程都必须有一个入口点函数，主线程的入口点函数是main
+    辅助线程的入口点函数形如：
+        DWORD WINAPI ThreadFunc(PVOID pvParam)
+    线程的创建
+        HANDLE CreateThread(
+            PSECURITY_ATTRIBUTES psa,           //如果希望线程有默认的安全属性，传入NULL，否则传入一个SECURITY_ATTRIBUTES指针，其中的bInheritHandle成员为true
+            DWORD cbStackSize,                  //栈空间大小，实际分配的大小取max(cbStackSize, 连接器的/STACK设置)
+            PTHREAD_START_ROUTINE pfnStartAddr, //线程函数的地址
+            PVOID pvParam,                      //传递给线程函数的参数
+            DWORD dwCreateFlags,                //为0时线程立刻执行，为CREATE_SUSPENDED则暂停执行，可以在恢复执行前更改线程的一些属性
+            PDWORD pdwThreadID                  //存储新线程ID的指针，可以为NULL
+        )
+    线程的挂起
+        一个线程可以被挂起多次，系统会给线程内核对象记录挂起计数，必须在计数减至0时线程才可能被调度
+        在创建线程时可以将dwCreateFlags参数设置为CREATE_SUSPENDED
+        也可以使用下面函数挂起
+            DWORD SuspendThread()
+    恢复执行时调用下面函数，会使得进程的挂起计数器减一
+        DWORD ResumeThread(HANDLE hThread)
+    线程的终止
+        线程函数返回
+        线程调用ExitThread()
+            VOID ExitThread(DWORD dwExitCode)
+        同一个进程或另一个进程的线程调用TerminateThread()
+            BOOL TerminateThread(HANDLE hThread, DWORD dwExitCode)
+                该函数是非阻塞的，如果需要确认线程被终止，需要WaitForSingleObject()函数
+        包含线程的进程终止运行
+    优先级
+        在CreateThread()创建线程时没有参数可以改变优先级，所以总是以normal创建的，必须手动在创建时传入CREATE_SUSPENDED标志，修改优先级后再恢复线程执行
+        BOOL SetThreadPriority(HANDLE hThread, int nPriority)
+            THREAD_PRIORITY_TIME_CRITICAL
+            THREAD_PRIORITY_HIGHEST
+            THREAD_PRIORITY_ABOVE_NORMAL
+            THREAD_PRIORITY_NORMAL
+            THREAD_PRIORITY_BELOW_NORMAL
+            THREAD_PRIORITY_LOWEST
+            THREAD_PRIORITY_IDLE
+        int GetThreadPriority(HANDLE hThread)
+    获取创建窗口的线程id
+        DWORD GetWindowThreadProcessId(HWND hWnd, LPDWORD lpdwProcessId)
+    线程同步
+        原子操作
+            以下函数对一个LONG型变量进行原子地加法运算
+                LONG InterlockedAdd(PLONG volatile plAddend, LONG lIncrement)
+                LONGLONG InterlockedAdd64(PLONGLONG volatile pllAddend, LONGLONG llIncrement)
 
+            以下函数把第一参数所指向的内存地址的当前值原子地替换为第二个参数的值，并返回原来的值
+                LONG InterlockedExchange(PLONG volatile plTarget, LONG lValue)
+                LONGLONG InterlockedExchange64(PLONGLONG volatile plTarget, LONGLONG lValue)
+                PVOID InterlockedExchangePointer(PVOID* volatile ppvTarget, PVOID pvValue)
 
+            以下函数把第一参数的值与第3参数比较，如果相同，则把第2参数赋值给第一参数，并返回原来的值
+                LONG InterlockedCompareExchange(PLONG plDestination, LONG lExchange, LONG lComparand) //内部过程（并非实现）
+                {
+                    LONG lRet = *plDestination;
+                    if(*plDestination == lComparand)
+                        *plDestination = lExchange;
+                    return lRet;
+                }
+                PVOID* InterlockedCompareExchangePointer(PVOID* ppvDestination, PVOID pvExchange, PVOID pvComparand)
+            
+            以下函数原子地++或--
+                LONG InterlockedIncrement(PLONG plAddend)
+                LONG InterlockedDecrement(PLONG plAddend)
+
+            原子单链表操作函数
+                InitializeSListHead
+                InterlockedPushEntrySList
+                InterlockedPopEntrySList
+                InterlockedFlushSList
+                QueryDepthSList
+            获取CPU信息
+                typedef struct _SYSTEM_LOGICAL_PROCESSOR_INFORMATION 
+                {
+                    ULONG_PTR                      ProcessorMask;
+                    LOGICAL_PROCESSOR_RELATIONSHIP Relationship;
+                    union 
+                    {
+                        struct 
+                        {
+                            BYTE Flags;
+                        } ProcessorCore;
+                        struct 
+                        {
+                            DWORD NodeNumber;
+                        } NumaNode;
+                        CACHE_DESCRIPTOR Cache;
+                        ULONGLONG        Reserved[2];
+                    } DUMMYUNIONNAME;
+                } SYSTEM_LOGICAL_PROCESSOR_INFORMATION, *PSYSTEM_LOGICAL_PROCESSOR_INFORMATION;
+            
+            BOOL GetLogicalProcessorInformation(PSYSTEM_LOGICAL_PROCESSOR_INFORMATION Buffer, PDWORD ReturnedLength)
+        关键段
+            需要给每一个要被共享的数据定义一个CRITICAL_SECTION类型的变量，然后使用
+                VOID InitializeCriticalSection(PCRITICAL_SECTION pcs) 初始化CRITICAL_SECTION变量
+            操作
+                VOID EnterCriticalSection(PCRITICAL_SECTION PCS)
+                VOID LeaveCriticalSection(PCRITICAL_SECTION PCS)
+                BOOL TryEnterCriticalSection(PCRITICAL_SECTION pcs) 当不能进入关键段时立即返回false
+            处于等待状态的线程不会处于饥饿状态，因为对EnterCriticalSection()的调用有一个超时机制，超时时长由
+                HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Session Manager的CriticalSectionTimeout值决定，默认为30天时间
+            当线程不再需要访问共享资源时
+                VOID DeleteCriticalSection(PCRITICAL_SECTION pcs)
+            当EnterCriticalSection()失败需要等待时，线程需要从用户态->内核态，这个开销很大，可以在使用关键段的同时使用自旋锁来初始化
+                BOOL InitializeCriticalSectionAndSpinCount(PCRITICAL_SECTION pcs, DWORD dwSpinCount) 返回函数是否成功
+                DWORD SetCriticalSectionSpinCount(PCRITICAL_SECTION pcs, DWORD dwSpinCount)  
+                    dwSpinCount：自旋锁循环次数，值可以为0~0xFFFFFF
+        读写锁
+            读写锁可以区分只读线程和写入线程，写入线程独占资源的访问
+                VOID InitializeSRWLock(PSRWLOCK SRWLock)
+            写入线程
+                VOID AcquireSRWLockExclusive(PSRWLOCK SRWLock)
+                VOID ReleaseSRWLockExclusive(PSRWLOCK SRWLock)
+            读取线程
+                VOID AcquireSRWLockShared(PSRWLOCK SRWLock)
+                VOID ReleaseSRWLockShared(PSRWLOCK SRWLock)
+        条件变量
+            BOOL SleepConditionVariableCS(
+                PCONDITION_VARIABLE pConditionVariable,
+                PCRITICAL_SECTION pCriticalSection,
+                DWORD dwMilliseconds
+            )
+            BOOL SleepConditionVariableSRW(
+                PCONDITION_VARIABLE pConditionVariable,
+                PSRWLOCK PSRWLOCK,
+                DWORD dwMilliseconds,
+                ULONG Flags     //写入线程传入0，读取线程传入CONDITION_VARIABLE_LOCKMODE_SHARED
+            )
+            VOID WakeConditionVariable(PCONDITION_VARIABLE pConditionVariable)
+            VOID WakeAllConditionVariable(PCONDITION_VARIABLE pConditionVariable)
+        DWORD WaitForSingleObject(HANDLE hObject, DWORD dwMilliseconds)
+            hObject标识要等待的内核对象
+            dwMilliseconds指定调用线程愿意等待的时间（无限时间设为INFINITE），如果超时，返回WAIT_TIMEOUT，否则返回WAIT_OBJECT_0
+        DWORD WaitForMultipleObjects(DWORD dwCount, CONST HANDLE* phObjects, BOOL bWaitAll, DWORD dwMilliseconds)
+            dwCount指定所需等待的内核对象数组的元素的个数
+            bWaitAll为true时，等待所有内核对象，否则只等待任何一个对象
+            当bWaitAll为true，且所有对象都被触发时，函数返回WAIT_OBJECT_0
+            当bWaitAll为false，函数会返回WAIT_OBJECT_0 ~ WAIT_OBJECT_0 + dwCount - 1中间的值，标识第几个内核对象被触发，所以可以使用一个switch语句来判断结果
+                auto const dw = WaitForMultipleObject(4, arr, FALSE, 5000);
+                switch(dw)
+                {
+                case WAIT_FAILED: //...
+                case WAIT_TIMEOUT: //...
+                case WAIT_OBJECT_0: //第0个内核对象被触发
+                case WAIT_OBJECT_0 + 1: //第1个内核对象被触发
+                ...
+                case WAIT_OBJECT_0 + 3: //第3个内核对象被触发
+                }
+        事件
+            创建事件
+                HANDLE CreateEvent(
+                    PSECURITY_ATTRIBUTES psa,
+                    BOOL bManualReset,  //自动重置事件被触发时，只有一个正在等待该事件的线程成为可调度状态，手动充值事件被触发时，所有等待的线程都将成为可调度状态
+                    BOOL bInitialState, //初始化为触发还是未触发状态
+                    PCTSTR pszName
+                )
+                另外记得需要使用CloseHandle()将事件句柄关闭
+            触发事件
+                BOOL SetEvent(HANDLE hEvent)
+            将事件->未触发状态
+                BOOL ResetEvent(HANDLE hEvent)
+            脉冲触发
+                BOOL PulseEvent(HANDLE hEvent)
+                    函数先触发事件，然后立即恢复到未触发状态，类似于
+                        SetEvent(hEvent);
+                        ResetEvent(hEvent);
+        计时器
+            可等待的计时器是一种内核对象，可以在某个指定的时间触发，或每隔一段时间触发一次
+            创建
+                HANDLE CreateWaitableTimer(
+                    PSECURITY_ATTRIBUTES psa, 
+                    BOOL bManualReset,  //手动重置计时器被触发时，正在等待该计时器的所有线程都变成可调度状态，自动重置定时器被触发时，只有一个正在等待该计时器的线程变成可调度状态
+                    PCTSTR pszName
+                )
+            触发
+                BOOL SetWaitableTimer(
+                    HANDLE hTimer,
+                    const LARGE_INTEGER* pDueTime,          指定计时器第一次触发的事件
+                    LONG lPeriod,                           指定第一次触发之后，每个多久再次触发，如果只想触发一次，传入0
+                    PTIMERAPCROUTINE pfnCompletionRoutine,
+                    PVOID pvArgToCompletionRoutine,
+                    BOOL bResume                            是否挂起和唤醒计算机，通常传入FALSE
+                )
+            取消触发
+                BOOL CancelWaitableTimer(HANDLE hTimer)
+            APC（asynchronous procedure call）调用
+                当线程创建了定时器，并使用SleepEx(), WaitForSingleObjectEx(), WaitForMultipleObjectEx(), MsgWaitForMultipleObjectEx(), SingleObjectAndWait()进入等待状态时
+                可以在调用SetWaitableTimer()时向pfnCompletionRoutine传递一个函数指针，函数原型形如
+                    VOID APIENTRY TimerAPCRoutine(PVOID pvArgToCompletionRoutine, DWORD dwTimerLowValue, DWORD dwTimerHighValue) 
+                    {
+                        //dwTimerLowValue 和 dwTimerHighValue表示计时器被触发的时间
+                    }
+                需要保证APC函数在计时器再次被触发前执行完毕
+        信号量
+            创建
+                HANDLE CreateSemaphore(
+                    PSECURITY_ATTRIBUTE psa, 
+                    LONG lInitialCount,     在创建信号量时有多少个资源可用
+                    LONG lMaximumCount,     应用程序能够处理的资源的最大数量
+                    PCTSTR pszName
+                )
+            释放
+                BOOL ReleaseSemaphore(
+                    HANDLE hSemaphore, 
+                    LONG lReleaseCount,     //把lReleaseCount的值加到信号量的当前资源计数上
+                    PLONG plPreviousCount   //返回当前资源计数的值，可以为NULL
+                )
+        互斥量
+            创建
+                HANDLE CreateMutex(
+                    PSECURITY_ATTRIBUTE psa,
+                    BOOL bInitialOwner, 如果为FALSE，互斥量不被任何线程占有，处于触发状态，如果为TRUE，则对象的线程ID设为调用线程的线程ID，处于未触发状态
+                    PCTSTR pszName
+                )
+            释放
+                BOOL ReleaseMutex(HANDLE hMutex)
+        组合函数
+            经常需要触发一个对象并等待另一个对象
+                DWORD SignalObjectAndWait(
+                    HANDLE hObjectToSignal, 只能是互斥量、信号量或事件
+                    HANDLE hObjectToWaitOn, 可以是互斥量、信号量、事件、计时器、进程、线程、作业、控制台输入、变更通知
+                    DWORD dwMilliseconds,   花多长时间来等待hObjectToWaitOn
+                    BOOL bAlertable         指定当线程处于等待状态时，是否能够对添加到队列中的APC进行处理
+                )
+    线程池
+        以异步方式调用函数
+        每隔一段时间调用一个函数
+            定义所需要执行的回调函数，形如
+                VOID CALLBACK TimeoutCallback(PTP_CALLBACK_INSTANCE pInstance, PVOID pvContext, PTP_TIMER pTimer)
+            创建线程池计时器
+                PTP_TIMER CreateThreadpoolTimer(PTP_TIMER_CALLBACK pfnTimerCallback, PVOID pvContext, PTP_CALLBACK_ENVIRON pcbe)
+            向线程池注册计时器
+                VOID SetThreadpoolTimer(PTP_TIMER pTimer, PFILETIME pftDueTime, DWORD msPeriod, DWORD msWindowLength)
+            关闭
+                void CloseThreadpoolTimer(PTP_TIMER pti)
+            
 COM
     每个使用COM库的线程（注意是线程）都必须分别调用一次初始化函数
         HRESULT CoInitializeEx(LPVOID pvReserved, DWORD dwCoInit)
@@ -593,6 +934,13 @@ UI相关
                 HICON hIconSm;
             } WNDCLASSEXW, *PWNDCLASSEXW, *NPWNDCLASSEXW, *LPWNDCLASSEXW; 
             
+            其中lpfnWndProc是一个函数指针，指向窗口过程函数，形如
+                LRESULT Wndproc(
+                    HWND unnamedParam1,     //接受消息的窗口句柄
+                    UINT unnamedParam2,     //uMsg
+                    WPARAM unnamedParam3,   //uMsg的wParam
+                    LPARAM unnamedParam4    //uMsg的lParam
+                );
             ATOM RegisterClassEx(const WNDCLASSEXW* unnamedParam1)
                 函数成功时返回一个标识这个窗口类的id，否则返回0
                 
@@ -671,6 +1019,14 @@ UI相关
             然后修改lpWndClass中的lpszClassName成员为超类的类名，把hInstance成员设置为自己的句柄
             然后调用RegisterClass()函数来注册超类
             同时注意需要保存lpfnWndProc成员，以备后面还原
+        
+        HWND FindWindowEx(
+            HWND hWndParent,        //从父窗口中搜索子窗口，如果为NULL则搜索桌面窗口的子窗口
+            HWND hWndChildAfter,    //从这个指定的子窗口中搜索父窗口在Z轴上的下一个子窗口，如果为NULL，则从父窗口的第一个子窗口开始找
+            LPCSTR lpszClass,       //窗口类名
+            LPCSTR lpszWindow       //窗口的标题名，如果为NULL则找所有的窗口
+        )
+            
     窗口样式
         重叠窗口 WS_OVERLAPPED WS_OVERLAPPEDWINDOW
             通常用作程序的主窗口
@@ -861,4 +1217,510 @@ UI相关
                 }
                 return DefWindowProc(hwnd, uMsg, wParam, lParam);
             }
-    
+
+文件IO
+    DWORD GetFileType(HANDLE hDevice)
+        函数返回值：
+            FILE_TYPE_UNKNOWN
+            FILE_TYPE_DISK  磁盘文件
+            FILE_TYPE_CHAR  文件是一个字符文件，一般是一个并口设备或控制台
+            FILE_TYPE_PIPE  文件是一个命名管道或匿名管道
+    创建文件
+        HANDLE CreateFile(
+            LPCSTR                lpFileName,               完整文件路径，一般最长只能为MAX_PATH，其中反斜线+转义符只算1个字符，拓展名也算进长度，当长度超出时，直接返回INVALID_HANDLE_VALUE，并且GetLastError()返回3，错误信息为The system cannot find the path specified.
+            DWORD                 dwDesiredAccess,          可以为GENERIC_READ, GENERIC_WRITE, 和两者的按位或
+            DWORD                 dwShareMode,              指定是否可以与其他进程共享，如果为0，则当前进程必须先关闭句柄，其他进程才能使用，可选的值为0, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE
+            LPSECURITY_ATTRIBUTES lpSecurityAttributes,     可以为NULL
+            DWORD                 dwCreationDisposition,
+            DWORD                 dwFlagsAndAttributes,
+            HANDLE                hTemplateFile
+        )
+            函数失败返回INVALID_HANDLE_VALUE
+            dwCreationDisposition的值可以是：
+                CREATE_NEW 创建一个新文件，如果同名文件已经存在，则调用失败
+                CREATE_ALWAYS 总是创建一个新文件，如果同名文件存在，则覆盖
+                OPEN_EXISTING 打开一个已有文件，如果不存在则失败，当使用这个函数来打开设备时，必须使用这个值
+                OPEN_ALWAYS 打开一个已有文件，如果不存在则创建新文件
+                TRUNCATE_EXISTING 打开已有文件，并清除内容，如果文件不存在则失败
+            dwFlagsAndAttributes
+                FILE_ATTRIBUTE_ARCHIVE
+                FILE_ATTRIBUTE_NORMAL
+                FILE_ATTRIBUTE_ENCRYPTED
+                FILE_ATTRIBUTE_NOT_CONTENT_INDEXED
+                FILE_ATTRIBUTE_OFFLINE
+                FILE_ATTRIBUTE_READONLY
+                FILE_ATTRIBUTE_SYSTEM
+                FILE_ATTRIBUTE_TEMPORARY    文件数据只会使用一小段时间，为了提高性能，系统尽量将文件保存到内存中
+                FILE_FLAGS_OVERLAPPED 用于异步IO
+    获取文件信息
+        BOOL GetFileSizeEx(HANDLE hFile, PLARGE_INTEGER pliFileSize)
+            返回文件的逻辑大小
+        DWORD GetCompressedFileSize(PCTSTR pszFileName, PDWORD pdwFileSizeHigh)
+            返回文件的物理大小的低32位，即文件在硬盘上实际占用的字节数
+            通过指针pdwFileSizeHigh来存储大小的高32位
+    读取
+        BOOL SetFilePointerEx(HANDLE hFile, LARGE_INTEGER liDistanceToMove, PLARGE_INTEGER pliNewFilePointer, DWORD dwMoveMethod)
+            设置文件指针，并在pliNewFilePointer中存入新的文件指针
+            可以通过将liDistanceToMove参数设为0来获取当前的文件指针位置
+        typedef struct _OVERLAPPED
+        {
+            /*---由驱动程序设置，返回时使用他们的值---*/
+            DWORD Internal;     //存储错误码
+            DWORD InternalHigh; //存储已传输的字节数
+            
+            /*---需要在调用时初始化---*/
+            DWORD Offset;       //对于非文件设备，设置为0
+            DWORD OffsetHigh;
+            HANDLE hEvent;
+        } OVERLAPPED, *LPOVERLAPPED;
+        BOOL ReadFile(HANDLE hFile, PVOID pvBuffer, DWORD nNumBytesToRead, PDWORD pdwNumBytes, OVERLAPPED* pOverlapped)
+            使用异步IO时，将pdwNumBytes设置为NULL
+        BOOL ReadFileEx(HANDLE hFile, PVOID pvBuffer, DWORD nNumBytesToRead, OVERLAPPED* pOverlapped, LPOVERLAPPED_COMPLETION_ROUTINE pFnCompletionRoutine)
+            IO完成时调用pFnCompletionRoutine所指向的回调函数
+            回调函数形如
+                VOID WINAPI CompletionRoutine(DWORD dwError, DWORD dwNumBytes, OVERLAPPED* po)
+    写入
+        BOOL WriteFile(HANDLE hFile, CONST VOID* pvBuffer, DWORD nNumBytesToWrite, PDWORD pdwNumBytes, OVERLAPPED* pOverlapped)
+            使用异步IO时，将pdwNumBytes设置为NULL
+        BOOL WriteFileEx(HANDLE hFile, PVOID pvBuffer, DWORD nNumBytesToRead, OVERLAPPED* pOverlapped, LPOVERLAPPED_COMPLETION_ROUTINE pFnCompletionRoutine)
+        BOOL FlushFileBuffers(HANDLE hFile)
+
+
+Direct2D
+    D2D是用来替代已有的GDI GDI+的2D图形API，它可以在有硬件加速的条件下基于Direct3D渲染，也可以在没有时基于软件渲染
+    包含头文件
+        <d2d1.h>    C和C++的主要D2D API
+        <d2d1_1.h>  给win8和之后用的D2D API
+        
+        <d2d1helper.h>  C++的辅助函数、类和结构体
+        <d2d1_1helper.h> win8之后的版本
+
+        <d2dbasetypes.h> 基本绘图原语，例如点和举行，包含于<d2d1.h>中
+        <d2d1effects.h> 图形效果，win8之后可用
+        <d2d1effecthelper.h> 图形效果的辅助函数、类和结构体，win8之后可用
+        <d2derr.h>  定义了d2d的错误码，包含于<d2d1.h>中
+    链接库
+            d2d1.lib        
+    创建一个D2D工厂并指定渲染目标
+        ID2D1Factory* pD2DFactory{};
+        D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &pD2DFactory)
+    创建
+        创建完D2D工厂后，指定渲染目标
+            ID2D1HwndRenderTarget* pRt{};
+            auto const hr = pD2DFactory->CreateHwndRenderTarget(
+                D2D1::RenderTargetProperties(),     //使用默认的渲染目标属性
+                D2D1::HwndRenderTargetProperties(   //设置HWND的渲染属性
+                    hwnd,                       //渲染窗口
+                    D2D1::SizeU(...)            //渲染大小
+                ),
+                &pRt
+            );
+        创建绘图资源
+            创建完渲染目标后可以从这个渲染目标创建各种绘图资源，例如画刷
+                ID2D1SolidColorBrush* pBlackBrush{};
+                pRt->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::Black), &pBlackBrush)
+            有以下几种绘图资源
+                位图bitmap
+                    ID2D1RenderTarget::CreateBitmapFromWicBitmap()
+                画刷brush
+                    ID2D1SolidColorBrush
+                    ID2D1LinearGradientBrush
+                    ID2D1RadialGradientBrush
+                    ID2D1BitmapBrush
+                几何形状geometry
+                    几何形状ID2D1Geometry用于创建复杂的形状
+                图层layer
+                
+                网格mesh
+    绘制
+        使用渲染目标来绘制
+        pRt->BeginDraw();
+        pRt->DrawRectangle(D2D1::RectF(...));
+        auto const hr = pRt->EndDraw();
+    释放
+        需要释放渲染目标和渲染设备和绘图资源
+            SafeRelease(pRt);
+            SafeRelease(pBlackBrush);
+        最后释放D2D工厂
+            SafeRelease(pD2DFactory)
+DirectWrite
+    DWWrite用于渲染高质量的Microsoft ClearType、OpenType，当与Direct2D使用时支持硬件加速的渲染
+    typeface和 font的区别
+        typeface其实是通常意义上的“字体”
+        font是指某个fontface的某种具体呈现结果，包含了typeface的某个粗细，斜体，字号
+    IDWriteLocalizedStrings
+    {
+        HRESULT FindLocaleName(WCHAR const* localeName, UINT32* index, BOOL* exists)
+            当localeName不存在时，index赋值为UINT_MAX，exists赋值为FALSE，返回S_OK
+        UINT32 GetCount()
+            返回语言的个数
+        HRESULT GetLocaleName(UINT32 index, WCHAR* localeName, UINT32 size)
+            返回第index（从0开始）个locale名存储到localeName字符串中，size为数组的大小（以字符数为单位，包括\0）
+        GetLocaleNameLength()
+            
+        GetString()
+        GetStringLength()
+    }
+
+    IDWriteFontFamily
+    {
+        HRESULT GetFamilyNames(IDWriteLocalizedStrings** names)
+        GetFirstMatchingFont()
+        GetMatchingFonts()
+    }
+
+    IDWriteFontCollection
+    {
+        HRESULT FindFamilyName(WCHAR const* familyName, UINT32* index, BOOL* exist)
+        HRESULT GetFontFamily(UINT32 index, IDWriteFontFamily** fontFamily)
+        GetFontFamilyCount()
+        GetFontFromFontFace()
+        
+    }
+
+    IDWriteFactory
+    {
+        HRESULT GetSystemFontCollection(IDWriteFontCollection** fontCollection, BOOL checkForUpdates)
+    }
+    IDWriteFactory1
+    IDWriteFactory2
+    IDWriteFactory3
+    IDWriteFactory4
+    IDWriteFactory5
+    IDWriteFactory6
+    IDWriteFactory7
+    HRESULT DWriteCreateFactory(
+        DWRITE_FACTORY_TYPE factoryType,    //DWRITE_FACTORY_TYPE_SHARED:当前进程的其他部分共享这个工厂，共享一些字体数据 DWRITE_FACTORY_TYPE_ISOLATED
+        REFIID iid,         //__uuidof(IDWriteFactory)
+        IUnknown** factory  //指向要存储所创建的DirectWrite工厂的指针
+    )
+
+UWP
+    合并资源
+        在一个资源文件中
+            <!-- Dictionary1.xaml -->
+            <ResourceDictionary
+                xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" 
+                xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                xmlns:local="using:MSDNSample">
+
+                <SolidColorBrush x:Key="brush" Color="Red"/>
+
+            </ResourceDictionary>
+        要在另一个xaml中使用这个资源，可以合并到当前xaml的资源
+            <Page
+                x:Class="MSDNSample.MainPage"
+                xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                <Page.Resources>
+                    <ResourceDictionary>
+                        <ResourceDictionary.MergedDictionaries>
+                            <ResourceDictionary Source="Dictionary1.xaml"/>
+                        </ResourceDictionary.MergedDictionaries>
+
+                        <x:String x:Key="greeting">Hello world</x:String>
+
+                    </ResourceDictionary>
+                </Page.Resources>
+
+                <TextBlock Foreground="{StaticResource brush}" Text="{StaticResource greeting}" VerticalAlignment="Center"/>
+            </Page>
+    自定义标题栏
+        定制标题栏颜色
+            // using Windows.UI.ViewManagement;
+
+            var titleBar = ApplicationView.GetForCurrentView().TitleBar;
+
+            // Set active window colors
+            titleBar.ForegroundColor = Windows.UI.Colors.White;
+            titleBar.BackgroundColor = Windows.UI.Colors.Green;
+            titleBar.ButtonForegroundColor = Windows.UI.Colors.White;
+            titleBar.ButtonBackgroundColor = Windows.UI.Colors.SeaGreen;
+            titleBar.ButtonHoverForegroundColor = Windows.UI.Colors.White;
+            titleBar.ButtonHoverBackgroundColor = Windows.UI.Colors.DarkSeaGreen;
+            titleBar.ButtonPressedForegroundColor = Windows.UI.Colors.Gray;
+            titleBar.ButtonPressedBackgroundColor = Windows.UI.Colors.LightGreen;
+
+            // Set inactive window colors
+            titleBar.InactiveForegroundColor = Windows.UI.Colors.Gray;
+            titleBar.InactiveBackgroundColor = Windows.UI.Colors.SeaGreen;
+            titleBar.ButtonInactiveForegroundColor = Windows.UI.Colors.Gray;
+            titleBar.ButtonInactiveBackgroundColor = Windows.UI.Colors.SeaGreen;
+            注意当给一个颜色属性设置为null时，将使用默认系统颜色
+            颜色的透明度分量将被忽略
+
+        完全隐藏标题栏
+            需要先创建一个空的Grid，并将其作为titleBar，然后才能在原来标题栏的区域上防止元素，防止原来的标题栏区域被windows作为标题栏使用，从而无法接收信息
+                <Grid x:Name="AppTitleBar" Background="Transparent">
+                    <!-- Width of the padding columns is set in LayoutMetricsChanged handler. -->
+                    <!-- Using padding columns instead of Margin ensures that the background
+                    paints the area under the caption control buttons (for transparent buttons). -->
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition x:Name="LeftPaddingColumn" Width="0"/>
+                        <ColumnDefinition/>
+                        <ColumnDefinition x:Name="RightPaddingColumn" Width="0"/>
+                    </Grid.ColumnDefinitions>
+                </Grid>
+
+                void OnLaunched()
+                {
+                    // using Windows.ApplicationModel.Core;
+                    // Hide default title bar.
+                    var coreTitleBar = CoreApplication.GetCurrentView().TitleBar;
+                    coreTitleBar.ExtendViewIntoTitleBar = true;
+                    Window.Current.SetTitleBar(AppTitleBar);
+                }
+    设计一个返回按键
+        最低要求是要实现一个返回按钮的响应事件
+            // MainPage.xaml.cs
+            private void BackButton_Click(object sender, RoutedEventArgs e)
+            {
+                App.TryGoBack();
+            }
+
+            // App.xaml.cs
+            //
+            // Add this method to the App class.
+            public static bool TryGoBack()
+            {
+                Frame rootFrame = Window.Current.Content as Frame;
+                if (rootFrame.CanGoBack)
+                {
+                    rootFrame.GoBack();
+                    return true;
+                }
+                return false;
+            }
+        有时，还需要支持返回的键盘快捷键Alt+←
+            // App.xaml.cs
+            // Add event handler in OnLaunced.
+            protected override void OnLaunched(LaunchActivatedEventArgs e)
+            {
+                // ...
+                // Do not repeat app initialization when the Window already has content,
+                // just ensure that the window is active
+                if (rootFrame == null)
+                {
+                    // ...
+                    // rootFrame.NavigationFailed += OnNavigationFailed;
+
+                    // Add support for accelerator keys. 
+                    // Listen to the window directly so the app responds
+                    // to accelerator keys regardless of which element has focus.
+                    Window.Current.CoreWindow.Dispatcher.AcceleratorKeyActivated +=
+                        CoreDispatcher_AcceleratorKeyActivated;
+
+                    // ...
+
+                }
+            }
+
+            // ...
+
+            // Add this code after the TryGoBack method added previously.
+            // Perform forward navigation if possible.
+            private bool TryGoForward()
+            {
+                Frame rootFrame = Window.Current.Content as Frame;
+                if (rootFrame.CanGoForward)
+                {
+                    rootFrame.GoForward();
+                    return true;
+                }
+                return false;
+            }
+
+            // Invoked on every keystroke, including system keys such as Alt key combinations.
+            // Used to detect keyboard navigation between pages even when the page itself
+            // doesn't have focus.
+            private void CoreDispatcher_AcceleratorKeyActivated(CoreDispatcher sender, AcceleratorKeyEventArgs e)
+            {
+                // When Alt+Left are pressed navigate back.
+                // When Alt+Right are pressed navigate forward.
+                if (e.EventType == CoreAcceleratorKeyEventType.SystemKeyDown
+                    && (e.VirtualKey == VirtualKey.Left || e.VirtualKey == VirtualKey.Right)
+                    && e.KeyStatus.IsMenuKeyDown == true
+                    && !e.Handled)
+                {
+                    if (e.VirtualKey == VirtualKey.Left)
+                    {
+                        e.Handled = TryGoBack();
+                    }
+                    else if (e.VirtualKey == VirtualKey.Right)
+                    {
+                        e.Handled = TryGoForward();
+                    }
+                }
+            }
+        有时，还需要支持平板模式下系统任务栏自带的返回按键，这个按键处理需要在SystemNavigationManager.GetForCurrentView().BackRequested添加一个处理函数
+            // App.xaml.cs
+            // Add event handler in OnLaunced.
+            protected override void OnLaunched(LaunchActivatedEventArgs e)
+            {
+                // ...
+                // Do not repeat app initialization when the Window already has content,
+                // just ensure that the window is active
+                if (rootFrame == null)
+                {
+                    // ...
+                    // Add support for accelerator keys. 
+                    // ... (Previously added code.)
+
+                    // Add support for system back requests. 
+                    SystemNavigationManager.GetForCurrentView().BackRequested 
+                        += System_BackRequested;
+
+                    // ...
+
+                }
+            }
+
+            // ...
+            // Handle system back requests.
+            private void System_BackRequested(object sender, BackRequestedEventArgs e)
+            {
+                if (!e.Handled)
+                {
+                    e.Handled = TryGoBack();
+                }
+            }
+        有的鼠标还带有返回和向前按键，需要在CoreWindow.PointerPressed添加处理函数
+            // App.xaml.cs
+            // Add event handler in OnLaunced.
+            protected override void OnLaunched(LaunchActivatedEventArgs e)
+            {
+                // ...
+                // Do not repeat app initialization when the Window already has content,
+                // just ensure that the window is active
+                if (rootFrame == null)
+                {
+                    // ...
+                    // Add support for system back requests. 
+                    // ... (Previously added code.)
+
+                    // Add support for mouse navigation buttons. 
+                    Window.Current.CoreWindow.PointerPressed += CoreWindow_PointerPressed;
+
+                    // ...
+
+                }
+            }
+
+            // ...
+
+            // Handle mouse back button.
+            private void CoreWindow_PointerPressed(CoreWindow sender, PointerEventArgs e)
+            {
+                // For this event, e.Handled arrives as 'true'.
+                if (e.CurrentPoint.Properties.IsXButton1Pressed)
+                {
+                    e.Handled = !TryGoBack();
+                }
+                else if (e.CurrentPoint.Properties.IsXButton2Pressed)
+                {
+                    e.Handled = !TryGoForward();
+                }
+            }
+        综上所有，要兼容所有的返回操作所需的代码如下
+            // App.xaml.cs
+            //
+            // (Add event handlers in OnLaunched override.)
+            protected override void OnLaunched(LaunchActivatedEventArgs e)
+            {
+                // ...
+                // Do not repeat app initialization when the Window already has content,
+                // just ensure that the window is active
+                if (rootFrame == null)
+                {
+                    // ...
+                    // rootFrame.NavigationFailed += OnNavigationFailed;
+
+                    // Add support for accelerator keys. 
+                    // Listen to the window directly so the app responds
+                    // to accelerator keys regardless of which element has focus.
+                    Window.Current.CoreWindow.Dispatcher.AcceleratorKeyActivated +=
+                        CoreDispatcher_AcceleratorKeyActivated;
+
+                    // Add support for system back requests. 
+                    SystemNavigationManager.GetForCurrentView().BackRequested 
+                        += System_BackRequested;
+
+                    // Add support for mouse navigation buttons. 
+                    Window.Current.CoreWindow.PointerPressed += CoreWindow_PointerPressed;
+
+                    // ...
+
+                }
+            }
+
+            // ...
+
+            // (Add these methods to the App class.)
+            public static bool TryGoBack()
+            {
+                Frame rootFrame = Window.Current.Content as Frame;
+                if (rootFrame.CanGoBack)
+                {
+                    rootFrame.GoBack();
+                    return true;
+                }
+                return false;
+            }
+
+            // Perform forward navigation if possible.
+            private bool TryGoForward()
+            {
+                Frame rootFrame = Window.Current.Content as Frame;
+                if (rootFrame.CanGoForward)
+                {
+                    rootFrame.GoForward();
+                    return true;
+                }
+                return false;
+            }
+
+            // Invoked on every keystroke, including system keys such as Alt key combinations.
+            // Used to detect keyboard navigation between pages even when the page itself
+            // doesn't have focus.
+            private void CoreDispatcher_AcceleratorKeyActivated(CoreDispatcher sender, AcceleratorKeyEventArgs e)
+            {
+                // When Alt+Left are pressed navigate back.
+                // When Alt+Right are pressed navigate forward.
+                if (e.EventType == CoreAcceleratorKeyEventType.SystemKeyDown
+                    && (e.VirtualKey == VirtualKey.Left || e.VirtualKey == VirtualKey.Right)
+                    && e.KeyStatus.IsMenuKeyDown == true
+                    && !e.Handled)
+                {
+                    if (e.VirtualKey == VirtualKey.Left)
+                    {
+                        e.Handled = TryGoBack();
+                    }
+                    else if (e.VirtualKey == VirtualKey.Right)
+                    {
+                        e.Handled = TryGoForward();
+                    }
+                }
+            }
+
+            // Handle system back requests.
+            private void System_BackRequested(object sender, BackRequestedEventArgs e)
+            {
+                if (!e.Handled)
+                {
+                    e.Handled = TryGoBack();
+                }
+            }
+
+            // Handle mouse back button.
+            private void CoreWindow_PointerPressed(CoreWindow sender, PointerEventArgs e)
+            {
+                // For this event, e.Handled arrives as 'true'.
+                if (e.CurrentPoint.Properties.IsXButton1Pressed)
+                {
+                    e.Handled = !TryGoBack();
+                }
+                else if (e.CurrentPoint.Properties.IsXButton2Pressed)
+                {
+                    e.Handled = !TryGoForward();
+                }
+            }
