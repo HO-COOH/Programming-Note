@@ -1,13 +1,10 @@
 using namespace System;
-$list = [Collections.Generic.List[int]]::new();
+using namespace System.IO;
+using namespace System.Diagnostics;
 
-for ($i = 0; $i -lt 5; $i++) 
+$counter = [PerformanceCounter]::new("Processor", "% Processor Time", "_Total", [Environment]::MachineName);
+while ($true)
 {
-    $list.Add($i);
+    [Console]::WriteLine($counter.NextValue());
+    [System.Threading.Thread]::Sleep(1000);
 }
-
-# $list.ForEach({param ($v) 
-#     [Console]::WriteLine($v);
-# });
-
-"Hello World".Split(' ').ForEach({[Console]::WriteLine($_)});

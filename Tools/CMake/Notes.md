@@ -29,6 +29,12 @@ CMake中任何的变量、参数都是字符串，如果字符串中包含空格
 
 定义一个变量使用函数``set(variableName value)``
 
+给一个变量设置多个值时，就成为了一个list，而list变量实际上是用分号`;`隔开的单个字符串变量，例如下面两个变量设置是完全一样的
+```cmake
+set(MY_LIST "one" "two")
+set(MY_LIST "one;two")
+```
+
 要在字符串中要插入变量，使用``${Variable}``
 
 - if
@@ -602,6 +608,7 @@ find_program (
     )
   ```
 
+注意使用Visual Studio时不支持在configure time指定构建Release和Debug，必须在build time指定，例如`cmake --build . --config Release`
 
 
 # target_link_libraries

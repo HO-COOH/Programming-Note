@@ -58,6 +58,14 @@
             {
                 //...
             }
+    _ASSERT, _ASSERTE, _ASSERT_EXPR
+        #include <crtdbg.h>
+        用于在Debug模式下当条件为FALSE时打印调试信息
+        // Typical usage:
+        _ASSERT_EXPR( booleanExpression, message ); 输出表达式的字符串+简单调试信息+自定义的message
+        _ASSERT( booleanExpression );   输出一个简单调试信息
+        _ASSERTE( booleanExpression );  输出表达式的字符串+调试信息
+
     VC++运行库
         /MT -> LibCMt.lib  静态链接发行版本
         /MTd -> LibCMtD.lib 静态链接调试版本
@@ -1394,9 +1402,118 @@ DirectWrite
         REFIID iid,         //__uuidof(IDWriteFactory)
         IUnknown** factory  //指向要存储所创建的DirectWrite工厂的指针
     )
+C++/WinRT
+    IInspectable类型
+        每个WinRT的类都继承于IInspectable，类似于Com中的IUnknown和C#中的System.Object
 
+    box_value()函数
+        用来将一个基本类型或除了数组的数组以外的数组类型转化为一个引用，来传递给具有引用语义参数的函数
+        template<typename T, typename = std::enable_if_t<!std::is_convertible_v<T, winrt::hstring>>>
+        winrt::Windows::Foundation::IInspectable box_value(winrt::hstring const& value);    //除了hstring以外的通用版本
+
+        winrt::Windows::Foundation::IInspectable box_value(winrt::hstring const& value);    //hstring的重载
+    unbox_value()函数
+        将一个IInspectable引用转化回一个基本类型或数组类型
+        template<typename T>
+        T unbox_value(winrt::Windows::Foundation::IInspectable const& value);
+
+        template<typename T>
+        winrt::hstring unbox_value_or(winrt::Windows::Foundation::IInspectable const& value, winrt::hstring const& default_value);
+
+        template<typename T>
+        T unbox_value_or(winrt::Windows::Foundation::IInspectable const& value, T const& default_value)
+    事件处理
+        事件管理机制可以使用任何C++的函数类型
+        在Xaml中与物件连接的事件处理函数在code behind中必须是public函数，C#中没有这个限制，可以是private
+        通常不把事件处理函数写在.idl里，而是直接生成在.h和.cpp文件中
+        通常在一个物件上右键->属性->事件处理器会列出所有该物件的事件，然后双击要添加的事件处理函数，VS会自动生成一个处理函数
+        也可以手动注册一个事件处理函数，例如在MainPage的构造函数中
+            带this指针的成员函数
+                MainPage::MainPage()
+                {
+                    InitializeComponent();
+                    myButton().Click({ this, &MainPage::ClickHandler });
+                }
+            不带this指针的静态成员函数
+                MainPage::MainPage()
+                {
+                    InitializeComponent();
+
+                    myButton().Click( MainPage::ClickHandler );
+                }
+            lambda
+                MainPage::MainPage()
+                {
+                    InitializeComponent();
+
+                    myButton().Click([this](IInspectable const& /* sender */, RoutedEventArgs const& /* args */)
+                    {
+                        myButton().Content(box_value(L"Clicked"));
+                    });
+                }
+        注销事件处理函数
+            使用winrt::event_token
+                注册事件处理函数时会返回一个winrt::event_token，使用将这个token作为参数调用同一个注册函数将注销这个事件处理函数
+                    struct MainPage
+                    {
+                    private:
+                        winrt::event_token token;
+                    public:
+                        MainPage()
+                        {
+                            token = myButton().Click(...);
+                        }
+                        ~MainPage()
+                        {
+                            myButton().Click(token);    //取消事件处理函数
+                        }
+                    };
+            自动注销
+                在注册事件时添加一个winrt::auto_revoke参数，将返回一个winrt::event_revoker<T>对象
+                这个对象在超出作用域析构时自动注销事件处理函数，所以无需手动注销
+                    struct MainPage
+                    {
+                    private:
+                        winrt::Windows::UI::Xaml::Controls::Button::Cick_revoker event_revoker;
+                    public:
+                        MainPage()
+                        {
+                            event_revoker = myButton().Click(winrt::auto_revoke, ...);
+                        }
+                    };
+                有时使用auto_revoke会抛出winrt::hresult_no_interface异常，表明该事件源不支持弱引用
+                此时需要手动注销
+    异步
+        执行时间可能超过50毫秒的Windows Runtime API都被写成异步函数，函数名以Async结尾
+        在Windows::Foundation名称空间中定义了以下4中异步操作对象
+            IAsyncAction
+            IAsyncActionWithProgress<TProgress>
+            IAsyncOperation<TResult>
+            IAsyncOperationWithProgress<TResult, TProgress>
+        当携程不需要返回值时，携程返回类型为前两种
+        当需要在携程中返回一个Windows Runtime类时，返回类型为后两种
+        当需要在携程中返回一个非Windows Runtime类时，返回类型可以std::future或concurrency::task （在parallel patterns library <ppltasks.h>中）
+    容器
+        template <typename T, typename Allocator = std::allocator<T>>
+        winrt::Windows::Foundation::Collections::IObservableVector<T> single_threaded_observable_vector(std::vector<T, Allocator>&& values = {})
 UWP
-    合并资源
+    UWP项目类型
+        blank app, unit test app 
+            创建一个带空白页的uwp，使用XAML UI框架，空白页继承自Windows.UI.Xaml.Controls.Page和单元测试项目
+        core app 
+            创建一个不使用XAML定义UI的工程
+        class library 
+            创建一个dll，可以由其他托管语言（例如C#）调用
+        Windows Runtime component  
+            是一个自足的软件模块，可以由任何windows runtime语言使用（C# C++/WinRT VB C++/CX）
+            使用C++/WinRT创建一个Windows Runtime Component
+                1. 创建一个新项目，在idl文件中定义好类的接口
+                2. 构建这个项目，会生成对应的.h和.cpp文件，添加实现代码
+                3. 在要使用这个Component的工程中添加一个要使用的Component的.winmd文件引用
+                4. 所要包含的头文件生成在<winrt/...>下
+        Optional code package 创建一个可执行的C#代码包
+        
+        合并资源
         在一个资源文件中
             <!-- Dictionary1.xaml -->
             <ResourceDictionary
@@ -1724,3 +1841,610 @@ UWP
                     e.Handled = !TryGoForward();
                 }
             }
+    后台播放
+        https://docs.microsoft.com/en-us/windows/uwp/audio-video-camera/background-audio
+    后台内存控制
+        https://docs.microsoft.com/en-us/windows/uwp/launch-resume/reduce-memory-usage
+        public App()
+        {
+            this.InitializeComponent();
+            this.Suspending += OnSuspending;
+
+            this.EnteredBackground += App_EnteredBackground;
+            this.LeavingBackground += App_LeavingBackground;
+            
+            Windows.System.MemoryManager.AppMemoryUsageLimitChanging += MemoryManager_AppMemoryUsageLimitChanging;
+            Windows.System.MemoryManager.AppMemoryUsageIncreased += MemoryManager_AppMemoryUsageIncreased;
+        }
+
+        private _isInBackgroundMode = false;
+
+        private void App_EnteredBackground(object sender, EnteredBackgroundEventArgs e)
+        {
+            _isInBackgroundMode = true;
+        }
+
+        private void App_LeavingBackground(object sender, LeavingBackgroundEventArgs e)
+        {
+            _isInBackgroundMode = false;
+        }
+
+        /// <summary>
+        /// Raised when the memory limit for the app is changing, such as when the app
+        /// enters the background.
+        /// </summary>
+        /// <remarks>
+        /// If the app is using more than the new limit, it must reduce memory within 2 seconds
+        /// on some platforms in order to avoid being suspended or terminated.
+        ///
+        /// While some platforms will allow the application
+        /// to continue running over the limit, reducing usage in the time
+        /// allotted will enable the best experience across the broadest range of devices.
+        /// </remarks>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void MemoryManager_AppMemoryUsageLimitChanging(object sender, AppMemoryUsageLimitChangingEventArgs e)
+        {
+            // If app memory usage is over the limit, reduce usage within 2 seconds
+            // so that the system does not suspend the app
+            if (MemoryManager.AppMemoryUsage >= e.NewLimit)
+            {
+                ReduceMemoryUsage(e.NewLimit);
+            }
+        }
+
+        /// <summary>
+        /// Handle system notifications that the app has increased its
+        /// memory usage level compared to its current target.
+        /// </summary>
+        /// <remarks>
+        /// The app may have increased its usage or the app may have moved
+        /// to the background and the system lowered the target for the app
+        /// In either case, if the application wants to maintain its priority
+        /// to avoid being suspended before other apps, it may need to reduce
+        /// its memory usage.
+        ///
+        /// This is not a replacement for handling AppMemoryUsageLimitChanging
+        /// which is critical to ensure the app immediately gets below the new
+        /// limit. However, once the app is allowed to continue running and
+        /// policy is applied, some apps may wish to continue monitoring
+        /// usage to ensure they remain below the limit.
+        /// </remarks>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void MemoryManager_AppMemoryUsageIncreased(object sender, object e)
+        {
+            // Obtain the current usage level
+            var level = MemoryManager.AppMemoryUsageLevel;
+
+            // Check the usage level to determine whether reducing memory is necessary.
+            // Memory usage may have been fine when initially entering the background but
+            // the app may have increased its memory usage since then and will need to trim back.
+            if (level == AppMemoryUsageLevel.OverLimit || level == AppMemoryUsageLevel.High)
+            {
+                ReduceMemoryUsage(MemoryManager.AppMemoryUsageLimit);
+            }
+        }
+
+        /// <summary>
+        /// Reduces application memory usage.
+        /// </summary>
+        /// <remarks>
+        /// When the app enters the background, receives a memory limit changing
+        /// event, or receives a memory usage increased event, it can
+        /// can optionally unload cached data or even its view content in
+        /// order to reduce memory usage and the chance of being suspended.
+        ///
+        /// This must be called from multiple event handlers because an application may already
+        /// be in a high memory usage state when entering the background, or it
+        /// may be in a low memory usage state with no need to unload resources yet
+        /// and only enter a higher state later.
+        /// </remarks>
+        public void ReduceMemoryUsage(ulong limit)
+        {
+            // If the app has caches or other memory it can free, it should do so now.
+            // << App can release memory here >>
+
+            // Additionally, if the application is currently
+            // in background mode and still has a view with content
+            // then the view can be released to save memory and
+            // can be recreated again later when leaving the background.
+            if (isInBackgroundMode && Window.Current.Content != null)
+            {
+                // Some apps may wish to use this helper to explicitly disconnect
+                // child references.
+                // VisualTreeHelper.DisconnectChildrenRecursive(Window.Current.Content);
+
+                // Clear the view content. Note that views should rely on
+                // events like Page.Unloaded to further release resources.
+                // Release event handlers in views since references can
+                // prevent objects from being collected.
+                Window.Current.Content = null;
+            }
+
+            // Run the GC to collect released resources.
+            GC.Collect();
+        }
+
+        private void MainPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            // << free large data sructures and set them to null, here >>
+
+            // Disconnect event handlers for this page so that the garbage
+            // collector can free memory associated with the page
+            Window.Current.Activated -= Current_Activated;
+            GC.Collect();
+        }
+    UWP非活动窗口透明效果
+        DependencyProperty
+            DependencyProperty提供了一个全局的访问依赖属性和提供属性事件响应的方法
+            一个依赖属性在XAML中通常用来实现：
+                数据绑定
+                样式
+                动画
+            一个类要支持Dependency property，需要在其继承链上继承有DependencyObject类
+            一个需要使用依赖属性的类，通常使用DependencyProperty.Register()方法返回的一个DependencyProperty作为其静态成员变量，然后提供一个wrapper成员属性来方便访问和赋值
+            DependencyObject
+                定义了访问依赖属性的方法
+            class PropertyMetadata
+            {
+                public PropertyMetadata(object defaultValue)
+                public PropertyMetadata(object defaultValue, PropertyChangedCallback propertyChangedCallback)
+                    其中回调函数需要形如
+                        public delegate void PropertyChangedCallback(DependencyObject d, DependencyPropertyChangedEventArgs e)
+
+                    public object DefaultValue{ get; }
+                public CreateDefaultValueCallback CreateDefaultValueCallback{ get; }
+                    其中CreateDefaultValueCallback是一个函数类型，应当是一个返回默认PropertyValue的工厂函数，形如
+                        public delegate object CreateDefaultValueCallback()
+                
+                public static PropertyMetadata Create(CreateDefaultValueCallback createDefaultValueCallback) 使用一个返回默认PropertyValue的工厂函数构造
+                public static PropertyMetadata Create(object defaultValue, PropertyChangedCallback propertyChangedCallback)
+                public static PropertyMetadata Create(CreateDefaultValueCallback createDefaultValueCallback, PropertyChangedCallback propertyChangedCallback) 
+            }
+
+            class DependencyObject
+            {
+                
+            }
+
+            class DependencyProperty
+            {
+                public static DependencyProperty Register(
+                    string name,                    依赖的属性名
+                    System.Type propertyType,       属性的类型，通常传入typeof(property)
+                    System.Type ownerType,          所有者的类型，通常传入typeof(OwnerClass)
+                    PropertyMetadata typeMetadata   当传入null时，等同于传入PropertyMetadata.Create(null)
+                )
+
+                public PropertyMetadata GetMetadata(System.Type forType)
+                    forType所要提取的metadata的信息的类型，传入typeof()
+
+                public static DependencyProperty RegisterAttached(
+                    string name,                依赖的属性名
+                    System.Type propertyType,         
+                    System.Type ownerType,              
+                    PropertyMetadata defaultMetadata    
+                )
+            }
+
+        class Compositor
+        {
+            public CompositionEffectFactory CreateEffectFactory(IGraphicsEffect graphicsEffect)
+                创建一个效果工厂CompositionEffectFactory，这个效果工厂可以创建graphicsEffect所描述的效果的实例
+                https://docs.microsoft.com/en-us/uwp/api/windows.ui.composition.compositor.createeffectfactory?view=winrt-22000#Windows_UI_Composition_Compositor_CreateEffectFactory_Windows_Graphics_Effects_IGraphicsEffect_
+                https://microsoft.github.io/Win2D/WinUI2/html/T_Microsoft_Graphics_Canvas_Effects_ArithmeticCompositeEffect.htm
+                支持的效果类型：
+                    ArithmeticCompositionEffect
+                    CompositeEffect
+                    BlendEffect (21 of 26 modes)
+                    ColorSourceEffect
+                    SaturationEffect
+                    Transform2DEffect
+            public CompositionEffectFactory CreateEffectFactory(IGraphicsEffect graphicsEffect, IEnumerable<string> animatableProperties)
+
+        }
+
+        class CompositionEffectFactory
+        {
+            public CompositionEffectBrush CreateBrush()
+                用创建效果工厂时指定的效果和动画属性创建画刷
+        }
+
+        class CompositionEffectSourceParameter
+        {
+            public CompositionEffectSourceParameter(string name) 
+                这个合成效果的名字
+            public string Name { get; }
+        }
+
+        class ArithmeticCompositeEffect
+        {
+            /*
+                将两个图片合并成1个的效果
+                需要初始化的参数是
+                {
+                    Name
+                    Source1
+                    Source1Amount
+                    Source2
+                    Source2Amount
+                    MultiplyAmount
+                    Offset
+                }
+                This effect combines two images using a weighted sum:
+
+                result = (Source1 * Source1Amount) + (Source2 * Source2Amount) + (Source1 * Source2 * MultiplyAmount) + Offset
+
+                Different settings of these coefficients can blend the images in many different ways, for instance:
+
+                To add two images:
+                Source1Amount = 1
+                Source2Amount = 1
+                MultiplyAmount = 0
+                Offset = 0
+
+                To multiply two images:
+                Source1Amount = 0
+                Source2Amount = 0
+                MultiplyAmount = 1
+                Offset = 0
+
+                To subtract Source2 from Source1:
+                Source1Amount = 1
+                Source2Amount = -1
+                MultiplyAmount = 0
+                Offset = 0
+
+                To interpolate between Source1 and Source2 by amount 't':
+                Source1Amount = 1 - t
+                Source2Amount = t
+                MultiplyAmount = 0
+                Offset = 0
+
+                To invert Source1:
+                Source1Amount = -1
+                Source2Amount = 0
+                MultiplyAmount = 0
+                Offset = 1
+            */
+        }
+
+        /*Specifies the way in which a brush paints areas outside its typical content region.*/
+        enum CanvasEdgeBehavior
+        {
+            Clamp = 0, //Repeat the edge pixels of the brush's content.  
+            Wrap = 1, //Tile the brush's content.
+            Mirror = 2 //Tile the the brush's content, and flip each alternate tile.
+        }
+
+        class BorderEffect
+        {
+            /*
+                定义了延申图片的效果，例如重复边缘像素或者包裹对边的像素
+                需要定义的参数
+                {
+                    ExtendX
+                    ExtendY
+                    Source
+                }
+            */
+        }
+
+        enum BlendEffectMode //https://microsoft.github.io/Win2D/WinUI2/html/T_Microsoft_Graphics_Canvas_Effects_BlendEffectMode.htm
+        {
+            //
+            // Summary:
+            //     Multiply blend mode.
+            Multiply = 0,
+            //
+            // Summary:
+            //     Screen blend mode.
+            Screen = 1,
+            //
+            // Summary:
+            //     Darken blend mode.
+            Darken = 2,
+            //
+            // Summary:
+            //     Lighten blend mode.
+            Lighten = 3,
+            //
+            // Summary:
+            //     [NoComposition] Dissolve blend mode.
+            Dissolve = 4,
+            //
+            // Summary:
+            //     Color burn blend mode.
+            ColorBurn = 5,
+            //
+            // Summary:
+            //     Linear burn blend mode.
+            LinearBurn = 6,
+            //
+            // Summary:
+            //     Darker color blend mode.
+            DarkerColor = 7,
+            //
+            // Summary:
+            //     Lighter color blend mode.
+            LighterColor = 8,
+            //
+            // Summary:
+            //     Color dodge blend mode.
+            ColorDodge = 9,
+            //
+            // Summary:
+            //     Linear dodge blend mode.
+            LinearDodge = 10,
+            //
+            // Summary:
+            //     Overlay blend mode.
+            Overlay = 11,
+            //
+            // Summary:
+            //     Soft light blend mode.
+            SoftLight = 12,
+            //
+            // Summary:
+            //     Hard light blend mode.
+            HardLight = 13,
+            //
+            // Summary:
+            //     Vivid light blend mode.
+            VividLight = 14,
+            //
+            // Summary:
+            //     Linear light blend mode.
+            LinearLight = 15,
+            //
+            // Summary:
+            //     Pin light blend mode.
+            PinLight = 16,
+            //
+            // Summary:
+            //     Hard mix blend mode.
+            HardMix = 17,
+            //
+            // Summary:
+            //     Difference blend mode.
+            Difference = 18,
+            //
+            // Summary:
+            //     Exclusion blend mode.
+            Exclusion = 19,
+            //
+            // Summary:
+            //     [NoComposition] Hue blend mode.
+            Hue = 20,
+            //
+            // Summary:
+            //     [NoComposition] Saturation blend mode.
+            Saturation = 21,
+            //
+            // Summary:
+            //     [NoComposition] Color blend mode.
+            Color = 22,
+            //
+            // Summary:
+            //     [NoComposition] Luminosity blend mode.
+            Luminosity = 23,
+            //
+            // Summary:
+            //     Subtract blend mode.
+            Subtract = 24,
+            //
+            // Summary:
+            //     Division blend mode.
+            Division = 25
+        }
+
+        class BlendEffect
+        {
+            /*
+                定义混合两个图片的效果
+                输出的图片大小是两个输入图片大小的交集
+
+                需要初始化的参数
+                {
+                    Mode
+                    Background
+                    Foreground
+                }
+            */
+        }
+
+        要使用一个效果
+            1.创建一个/一些效果实例
+                其中效果的Source字段可以是另一个效果的实例，也可以是一个CompositionEffectSourceParameter
+                var luminosityBlendingEffect = new ArithmeticCompositeEffect
+                {
+                    //...
+                }
+            2.使用compositor创建一个CompositionEffectFactory
+                var factory = Window.Current.Compositor.CreateEffectFactory(luminosityBlendingEffect)
+            3.使用这个工厂创建画刷
+                var brush = factory.CreateBrush()
+            4.使用compositor创建一个CompositionBackdropBrush
+                var backdropBrush = Window.Current.Compositor.CreateHostBackdropBrush() //表示从应用的后面获取颜色数据
+            5.将这个backdropBrush绑定到画刷中使用了CompositionEffectSourceParameter作为Source字段的效果上
+                brush.SetSourceParameter("Backdrop", backdropBrush)
+            完整范例https://docs.microsoft.com/en-us/uwp/api/windows.ui.xaml.media.xamlcompositionbrushbase?view=winrt-22000
+    
+    判断当前系统主题
+        var DefaultTheme = new Windows.UI.ViewManagement.UISettings();
+        var uiTheme = DefaultTheme.GetColorValue(Windows.UI.ViewManagement.UIColorType.Background).ToString();
+        if(uiTheme == "#FF000000")
+        {
+            WindowsThemeText.Text = "Dark";
+        }
+        else if(uiTheme == "#FFFFFFFF")
+        {
+            WindowsThemeText.Text = "Light";
+        }
+        /*
+        else
+        {
+            WindowsThemeText.Text = "Some new Updated theme found";
+        }
+        */
+    添加主题变更事件响应函数
+        var Listener = new ThemeListener();
+        Listener.ThemeChanged += Listener_ThemeChanged;
+
+        private void Listener_ThemeChanged(ThemeListener sender)
+        {
+            var theme = sender.CurrentTheme;
+            switch(theme)
+            {
+                case ApplicationTheme.Dark:
+                case ApplicationTheme.Light:
+            }
+        }
+
+XAML
+    数据绑定
+        通常数据存在一个专门的数据类里，然后这个类的UI呈现即ViewModel存放一个数据类的实体作为公有成员，然后在XAML需要引用数据的地方使用数据绑定
+        例如一个TextBlock要引用一个数据
+            public class Recording //假设这是一个数据类
+            {
+                public string line;
+            }
+
+            public class RecordingViewModel //代表这个数据类的UI呈现
+            {
+                private Recording defaultRecording = new Recording();
+
+                public Recording DefaultRecording { get { return this.defaultRecording; } }
+            }
+
+            public sealed partial class MainPage : Page
+            {
+                MainPage()
+                {
+                    this.ViewModel = new RecordingViewModel();
+                }
+                public RecordingViewModel ViewModel{ get; set; }
+            }
+
+            <TextBlock Text = "{x:Bind ViewModel.DefaultRecording.line}"/>
+
+    ControlTemplate
+        可以通过ControlTemplate的方式自定义Control的一些行为或者创建自定义Control
+        一个ControlTemplate有且只能有一个FrameworkElement作为根元素，但是这个根元素（即这个唯一的FrameworkElement）可以包含若干个FrameworkElement来组合出想要的Control
+    TemplateBinding
+        TemplateBinding只能在ControlTemplate中使用
+        <object propertyName="{TemplateBinding <sourceProperty>}"/>
+        将对象object的propertyName属性的绑定为另一个sourceProperty
+        当使用现有的Control来创建实现一个新Control时，常见将同一个对象的同一个属性绑定到自身
+        例如当使用一个TextBlock来实现一个新Control时，且希望使用TextBlock来显示新Control的Text属性时，可以写
+            <TextBlock Text="{TemplateBinding Text}"/>
+    VisualState
+        使用VisualState来控制当一个Control的State为某个值时，更改Control的某些属性
+        要更改的属性使用<Setter Target="<PropertyName>" Value="<value>"/>对象
+        例如一个自定义的CheckBox有3个State：选中、未选中、半选中，则可以使用下面的VisualState来控制各个状态的一些属性的值
+            <VisualStateManager.VisualStateGroups>
+                <VisualStateGroup x:Name="CheckStates">
+                    <VisualState x:Name="Checked">
+                        <VisualState.Setters> 
+                            <Setter Target="CheckGlyph.Opacity" Value="1"/>
+                        </VisualState.Setters>
+                    </VisualState>
+
+                    <VisualState x:Name="Unchecked">
+                        <VisualState.Setters> 
+                            ...
+                        </VisualState.Setters>
+                    </VisualState>
+
+                    <VisualState x:Name="Indeterminate">
+                        <VisualState.Setters> 
+                            ...
+                        </VisualState.Setters>
+                    </VisualState>
+
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+    Storyboard
+        Storyboard可以用来随时间改变某个属性的值，最常见的用途是实现动画
+        有3种动画
+            DoubleAnimation
+            PointAnimation
+            ColorAnimation
+        对一个对象使用storyboard，不直接定义在这个对象中，而是通常将storyboard定义在资源部分，并通过名字来引用要应用效果的对象的名字
+            <Page ...>
+                <Page.Resources>
+                    <!-- Storyboard resource: Animates a rectangle's opacity. -->
+                    <Storyboard x:Name="myStoryboard">
+                    <DoubleAnimation
+                        Storyboard.TargetName="MyAnimatedRectangle"
+                        Storyboard.TargetProperty="Opacity"
+                        From="1.0" To="0.0" Duration="0:0:1"/>
+                    </Storyboard>
+                </Page.Resources>
+
+                <!--Page root element, UI definition-->
+                <Grid>
+                    <Rectangle x:Name="MyAnimatedRectangle"
+                    Width="300" Height="200" Fill="Blue"/>
+                </Grid>
+            </Page>
+        有时，需要更改的属性是一个Control的内部对象的属性，例如一个TextBlock的Foreground是一个SolidColorBrush，要更改这个SolidColorBrush的颜色，即SolidColorBrush的Color属性
+            <Storyboard x:Name="myStoryboard">
+                <ColorAnimation
+                    Storyboard.TargetName="tb1"
+                    Storyboard.TargetProperty="(TextBlock.Foreground).(SolidColorBrush.Color)"
+                    From="Red" To="Green"/>
+            </Storyboard>
+            每一对圆括号表示一个属性
+            圆括号的语法为(<Type Name>.<Property Name>)
+            圆括号之间的句号.表示向下一个层级
+        属性
+            From, To, By
+                指定起始值，终点值，起始值的偏移量作为终点值
+                通常需要3个值中指定2个
+            AutoReverse
+                自动返回，即动画会播放2次
+            RepeatBehavior
+                指定动画播放几次
+                可以是Forever，使得永远循环动画
+            SpeedRatio
+    STA
+        Single-threaded aparatments
+        ATSA
+WINUI3
+    项目类型
+        Blank app, packaged 
+            创建一个使用C#.NET5 或Win32 C++开发的基于WinUI的应用，会默认新建一个继承于Windows.UI.Xaml.Window基本窗口
+            同时会创建一个package manifest和其他用于支持构建的文件，最终会打包成一个MSIX安装包
+        Blank app, packaged with WAP
+            与上面不同的是会在解决方案里多创建一个打包工程用于打包成MSIX安装包
+    
+
+    WINUI3跟随Windows App SDK一起发布，支持Win11->Win10 1809
+    前身是Project Reunion
+    Windows App SDK包含下面的功能
+        WINUI3：支持C# .NET开发和C++ Win32开发，提供了统一的UI设计风格
+        DWriteCore：硬件加速的高质量文字渲染
+        MRT Core：统一的程序资源管理，例如管理在程序中使用的字符串、图片、数值等
+        App instancing：设置是否允许一个应用的多个实例同时运行
+        激活管理
+        电源管理
+        窗口管理
+        使用Azure App Registration推送消息
+    下载Windows App SDK: https://docs.microsoft.com/en-us/windows/apps/windows-app-sdk/set-up-your-development-environment?tabs=stable
+    资源
+        https://docs.microsoft.com/en-us/windows/uwp/app-resources/
+    APP manifest
+        https://docs.microsoft.com/en-us/uwp/schemas/appxpackage/appx-package-manifest
+    多语言支持
+        使用文本编辑器打开Package.appxmanifest
+        找到
+            <Resource>
+                <Resource Language="x-generate"/>
+            </Resource>
+        删除generate行，并添加所支持的语言代码，例如
+            <Resource>
+                <Resource Language="en-US"/>
+                <Resource Language="es-ES"/>
+            </Resource>
