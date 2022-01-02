@@ -1,0 +1,129 @@
+定义一个消息
+    message SearchRequest {
+        required string query = 1;
+        optional int32 page_number = 2;
+        optional int32 result_per_page = 3;
+    }
+    消息字段序号
+        每个字段需要有一个独特的序号
+        序号不允许使用19000~19999
+        由于序号越大，需要用来编码序号的字节越多所以
+        优先给使用频繁的字段用小序号，不那么频繁的字段使用大序号
+    保留字段序号
+        如果在某次更新消息类型时去掉了一个字段，那么后来的维护者可能会使用同一个字段序号，造成使用老版本消息的程序出现错误
+        解决方法是在删除字段时使用reserved关键字保留这个字段序号，后来的更新就不能再使用这个保留的字段序号
+            message Foo
+            {
+                reserved 2, 15, 9 to 11
+            }
+    字段要求
+        required 必须出现
+        optional 可选，但不能出现吵过一次
+            可选类型如果在消息中没有出现，则使用默认值
+            可以在定义消息类型时给定默认值
+                optional int32 resultPerPage = 3 [defualt = 10]
+            如果没有给定默认值，则使用该类型的默认值
+            例如数字类型的默认值是0，字符串的默认值是空字符串，枚举类型的默认值是第一个枚举值
+        repeated 可以出现任何次（包括0次，此时成为可选字段）
+
+生成代码
+    protocol buffer编译器对每个消息类型生成一个对应的类的.h和.cc文件
+    包括getter和setter，序列化和反序列化方法
+字段类型
+    protocol Buffer中的类型         C++类型
+        double  double
+        float   float
+        int32   int32       对于可能经常出现负数的类型，使用sint32
+        int64   int64       对于可能经常出现负数的类型，使用sint64
+        uint32  uint32      
+        uint64  uint64
+        sint32  int32
+        sint64  int64
+        fixed32 uint32      当值经常大于2^28时比uint32更加高效
+        fixed64 uint64      当值经常大于2^56时比uint64更加高效
+        sfixed32 int32
+        sfixed64 int64      
+        bool    bool
+        string string   UTF-8编码
+        bytes   string
+枚举类型
+    message SearchRequest {
+        required string query = 1;
+        optional int32 page_number = 2;
+        optional int32 result_per_page = 3 [default = 10];
+        enum Corpus {
+            UNIVERSAL = 0;
+            WEB = 1;
+            IMAGES = 2;
+            LOCAL = 3;
+            NEWS = 4;
+            PRODUCTS = 5;
+            VIDEO = 6;
+        }
+        optional Corpus corpus = 4 [default = UNIVERSAL];
+    }
+    在枚举定义中加入option allow_alias = true;可以允许枚举类型中包含相同的枚举值作为枚举量别名
+        enum EnumAllowingAlias {
+            option allow_alias = true;
+            UNKNOWN = 0;
+            STARTED = 1;
+            RUNNING = 1;
+        }
+    可以将枚举类型定义在消息类型之外，此时可以在同一个.proto文件中复用
+    如果在某次更新消息类型时去掉了枚举类型，那么后来的维护者可能会在其他字段中误用了枚举类型中的枚举值，造成使用老版本消息的程序出现错误
+    解决方法是在删除字段时使用reserved关键字保留这个枚举类型的枚举值
+消息类型组合
+    在同一个.proto文件中，可以将一个消息类型作为另一个更大的消息类型的字段，实现消息的组合
+        message Result
+        {
+            ...
+        }
+
+        message SearchResponse
+        {
+            repeated Result result = 1;
+        }
+import
+    可以使用import语句将不同文件定义的消息类型导入本.proto文件中
+        import "myproject/other.proto";
+    默认情况下，import只将被引用的.proto文件中定义的消息类型导入，而不会嵌套导入（将引用的.proto文件中其他引入的proto定义的消息类型一同引入）
+    此时可以使用import public语句
+        import public "new.proto";
+嵌套类型
+    当定义的嵌套类型需要在别的类型中使用时，可以使用<Parent>.<Type>的语法
+        message SearchResponse{
+            message Result
+            {
+                ...
+            }
+        }
+
+        message SomeOtherMessage{
+            optional SearchResponse.Result result = 1
+        }
+拓展
+    在一个消息类型中使用extensions关键字+要预留的字段序号，在另一个引入这个消息类型的.proto中可以使用这些预留的字段序号来添加所需的字段，例如
+        message Foo
+        {
+            extensions 100 to 199;
+        }
+
+        /*在另一个.proto文件中*/
+        import "Foo.proto"
+
+        extend Foo
+        {
+            optional int32 bar = 126;   //在原来的Foo中添加一个bar字段
+        }
+oneof
+    如果一个消息类型有很多optional字段，而且这些optional字段最多只能同时有一个被设置，则可以一使用oneof来规定这些optional关键字来节约内存
+    所有被oneof关键字修饰的字段将公用一段内存，且其中一个被设置会使得其余字段被清空
+    oneof修饰的字段无需也不能包含其他存在性修饰的关键字，即不能包含required optional repeated关键字
+        message SampleMessage
+        {
+            oneof test_oneof
+            {
+                string name = 4;
+                SubMessage sub_message = 9;
+            }
+        }

@@ -356,6 +356,10 @@ atoi()  将nptr所指的字符串的开头部分转化为相应的整数，长�
             绝对值第二小的规约数：(1+2^-23) * 2^(1-127) = (1+2^-23)*2^-126
             这两个数之间的差为：2^-23 * 2^-126 = 2^-149，这个差值远小于绝对值最小的非规约数与0的差值，所以为了填补规约数到非规约数的空隙，就使用非规约数
             非规约数相当于填补了从0 ~ 2^-126之间的范围
+    C的浮点数环境
+        #include <fenv.h>
+            浮点数异常
+                FE_DIVIBYZERO
 19.signal库
     #include <signal.h>
     signal库中定义了6种信号
@@ -671,6 +675,139 @@ cctype函数
 使用临时文件：
     char *tmpnam(char *s);  //生成一个包含L_tmpnam个字符的字符串并存储到s所指的字符数组中
     这个函数可以在同一目录下生成最多不超过TMP_MAX个不同的文件名
+流对象的关系：
+    std::ios_base
+        std::basic_ios -> 
+            std::basic_istream -> std::cin|std::wcin  <-----------------------------------------------
+                std::basic_ifstream                                                                  |
+                std::basic_istringstream                                                             |-------------std::basic_iostream 
+            std::basic_ostream -> std::cout|std::wcout, std::cerr|std::wcerr, std::clog|std::wclog <-|
+                std::basic_ofstream
+                std::basic_ostringstream
+    std::ios_base 是所有IO流对象的基类，它主要保存
+        状态信息
+        控制信息：例如locale和输入输出格式化的标志位
+        私有存储：
+        回调函数：当调用imbue(), copyfmt(), ~ios_base()时允许回调任意个数的的回调函数
+        成员类：
+            class failure
+                继承链：exception -> runtime_error -> system_error -> ios_base::failure
+            class Init
+                这个类用于正确地初始化C++标准定义的流对象，例如std::cin, std::cout
+                这个类会追踪所有流对象的创建次数，并当输出流的最后一个引用被析构时即使刷新缓存
+            enum event
+            {
+                erase_event,    在~ios_base()和basic_ios::copyfmt()实际拷贝成员前调用
+                imbue_event,    在imbue()调用
+                copyfmt_event,  在copyfmt()实际拷贝成员后且拷贝异常设置前调用
+            }
+
+            openmode
+            {
+                app,    追加
+                binary, 二进制打开
+                in,     读取
+                out,    写入
+                trunc,  截断文件
+                ate     追加到结尾
+            }
+
+            fmtflags
+            {
+                dec,
+                oct,
+                hex,
+                basefield,
+                left,
+                right,
+                internal,
+                adjustfield,
+                scientific,
+                fixed,
+                floatfield,
+                boolalpha,
+                showbase,
+                showpoint,
+                showpos,
+                skipws,
+                unitbuf,
+                uppercase
+            }
+
+            iostate
+            {
+                good,       没有错误
+                badbit,     发生不可恢复的错误
+                failbit,    发生了可恢复的错误（例如格式化输出错误，格式化输入错误）
+                eofbit      流已经达到文件尾
+            }
+
+            seekdir
+            {
+                beg,
+                end,
+                cur
+            }
+        成员函数：
+            格式化控制
+                flags() const -> fmtflags   //返回当前格式化标志位
+                flags(fmtflags flags)       //设置新格式化标志位，返回原来的标志位
+
+                setf(fmtflags flags) -> fmtflags //设置新格式化标志位，返回原来的标志位
+                setf(fmtflags flags, fmtflags mask) -> fmtflags
+            
+                precesion() const -> streamsize //返回当前的小数的显示位数
+                precision(streamsize new_precision) -> streamsize //设置新的小数的显示位数，返回原来的小数的显示位数
+                    std::basic_ios::init()设置的默认值是6
+                
+                width() const -> streamsize //返回当前的输出宽度
+                width(streamsize new_width) -> streamsize //设置新的输出宽度，返回原来的输出宽度
+                    常用于与setf()设置对齐方式一起使用来打印出整齐的表格
+                
+                getloc() const -> std::locale //返回当前流引用的locale对象
+                imbue(const std::locale& loc) -> std::locale //先调用register_callback()设置过的回调函数，再设置当前流引用的locale对象，返回之前的locale对象
+
+                register_callback(event_callback function, int index) -> void //注册一个回调函数，当imbue(), copyfmt(), ~ios_base()中调用，index为自定义的用来区分回调函数的索引标识
+                    event_callback形如：
+                        using event_callback = void (*)(event type, std::ios_base& ios, int index);
+                            ios是调用这个回调函数的对象，在ios_base中为*this
+                            index参数是调用这个回调函数的标识，可以在回调函数中判断type和index来区分不同的回调函数
+
+                static sync_with_stdio(bool sync = true) -> bool 设置C++标准定义的的流对象是否与C标准的流同步，返回之前的同步状态
+                    C++标准定义的流对象为：cin, cout, cerr, clog, wcin, wcout, wcerr, wclog
+                    C标准定义的流对象为：stdin, stdout, stderr
+                    对于一个与C的流f同步的C++标准流对象str，以下的函数效果相同
+                        fputc(f, c)     <=> str.rdbuf()->sputc(c)   
+                        fgetc(f)        <=> str.rdbuf()->sbumpc()
+                        ungetc(c, f)    <=> str.rdbuf()->sputback(c)
+                    同步的C++流对象是线程安全的，多个线程的输出可能会交叉，但是不会竞争
+    std::basic_ios
+        提供了对实现了std::basic_streambuf接口的流对象的一些控制
+        template<typename CharT, typename Traits = std::char_traits<CharT>> class basic_ios : public std::ios_base
+            using ios = basic_ios<char>
+            using wios = basic_ios<wchar_t>
+        成员：
+            using char_type = CharT;
+            using traits_type = Traits;
+            using int_type = Traits::int_type;
+            using pos_type = Traits::pos_type;
+            using off_type = Traits::off_type;
+        成员函数：
+            good() const    -> bool  
+            eof() const     -> bool
+            fail() const    -> bool
+            bad() const     -> bool  
+            operator!()const-> bool                 如果badbit或failbit被设置就false
+            
+            rdstate() const -> iostate              返回当前的流状态
+            setstate(iostate state) -> void         在当前的流错误状态的基础上设置新的错误状态，等同于clear(rdstate() | state)
+            clear(iostate state = goodbit) -> void  设置新的错误状态为state，注意，如果是要清楚某一个错误状态，应该调用clear(rdstate() & ~ios_base::failbit)
+
+            exceptions() const -> iostate  返回当前哪些std::ios_base::iostate中的错误会引发异常
+            exceptions(ios_base::iostate except) -> void 设置哪些std::ios_base::iostate中的错误会引发异常，如果当前流已经发生了这个错误，则立刻抛出异常
+
+
+
 流迭代器：
     std::basic_streambuf
         #include <streambuf>
@@ -685,9 +822,85 @@ cctype函数
             |     |         |
            begin  next      end
         一个std::basic_streambuf对象可能同时支持写入和读取，这时它的状态由六个指针控制
+            输入的缓冲区指针：
+                begin:eback
+                next:gptr
+                end:egptr
+                对应的成员函数：
+                    eback() const -> char_type*
+                    gptr() const  -> char_type*
+                    egptr() const -> char_type*
+            输出的缓冲区指针：
+                begin:pbase
+                next:pptr
+                end:epptr
+                对应的成员函数：
+                    pbase() const -> char_type*
+                    pptr() const  -> char_type*
+                    epptr() const -> char_type*
+        原理：
+            对于输入缓冲区，当next < end时，可以在next的位置读取一个元素并递增指针，当begin < next时，可以放回一个读取的元素并递减指针
+                对应的成员函数：
+                    in_avail() -> std::streamsize 当next < end时，返回当前缓冲区还可以读多少个元素，即egptr()-gptr()，否则调用showmanyc()来评估字符流还有多少个字符可以读取
+
+                    sbumpc() -> int_type 当next < end时，读取一个元素并递增指针，否则调用uflow()
+                    sgetc() -> int_type 当next < end时，读取一个元素而且不递增指针，否则调用underflow()
+                    snextc() -> int_type 调用sbumpc()来在next的位置读取一个元素并递增指针，当缓冲区耗尽时，sbumpc()会调用uflow()来获取数据填充缓冲区，然后调用sgetc()来读取一个字符，返回Traits::eof()表明当前输入字符流已经读完且uflow()不能获取到更多数据
+                    
+                    virtual xsgetn(char_type* s, std::streamsize count) -> std::streamsize 等同于重复调用sbumpc()直到count次或者Traits::eof()，读取到的字符存储到s指针，返回最后成功读取到的字符数，派生类可以重载这个函数来提供更高效的实现
+                    sgetn(char_type* s, std::streamsize count) -> std::streamsize 调用派生类的xsgetn(s, count)
+
+                    sputbackc(char_type c) -> int_type 当begin < next且字符c与next指针的前面一个元素相同时，返回当前next指针的元素，Traits::to_int_type(*gptr())并递减next指针，否则调用pbackfail(Traits::to_int_type(c))
+                    sungetc() -> int_type 当begin < next时，不与前一个元素比较，返回当前next指针的元素，Traits::to_int_type(*gptr())并递减next指针，否则调用pbackfail() 
+            对于输出缓冲区，当next < end时，可以在next的位置写入一个元素并递增指针
+                对应的成员函数：
+                    sputc(char_type ch) -> int_type 当next < end时，写入一个元素并递增指针，否则调用overflow(ch)，成功时返回Traits::to_int_type(ch)，失败返回Traits::eof()
+                    virtual xsputn(char_type const* s, std::streamsize count) -> std::stramsize 等同于重复调用sputc()直到count次或者Traits::eof()，如果过程中缓冲区写满，可以调用overflow()或者由派生类定义的其他实现
+                    sputn(char_type const* s, std::streamsize count) -> std::streamsize 调用派生类的xsputn(s, count)
+            缓冲区相关函数：
+                virtual setbuf(char_type* s, std::streamsize n) -> basic_streambuf 设置控制的字符流的指针指向s且大小为n，返回this
+                pubsetbuf(char_type* s, std::streamsize n) -> basic_streambuf*  调用setbuf(s, n)
+                    例如：设置字符流指向一个字符数组
+                        int cnt = 0;
+                        char buf[1024*10 + 1];
+                        std::ifstream file;
+                        file.rdbuf()->pubsetbuf(buf, sizeof(buf));
+                        file.open("/usr/share/dict/words");
+                        for(std::string line; getline(file, line);)
+                            ++cnt;
+                        std::cout << cnt << '\n';
+                virtual seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which = ios_base::in | ios_base::out) -> pos_type
+                    设置字节流对当前的偏移位置，off为偏移量，dir为偏移方式，which为作用到那个字节流，可以是in或out或同时作用于两者，返回设置偏于后的当前位置的绝对值
+                pubseekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which = ios_base::in | ios_base::out) -> pos_type
+                    调用seekoff(off, dir, which)
+                virtual seekpos(pos_type pos, std::ios_base::openmode which = ios_base::in | ios_base::out) -> pos_type
+                    设置字节流的绝对位置，which为作用到哪个字节流，可以是in或out或同时作用于两者，返回设置偏于后的当前位置的绝对值
+                pubseekpos(pos_type pos, std::ios_base::openmode which = ios_base::in | ios_base::out) -> pos_type
+                    调用seekpos(pos, which)
+                virtual sync() -> int 将缓冲区中的数据写入到设备，对于输入缓冲区，通常要从字符流读取新输入，对于输出缓冲区，通常要写入到字符流，成功返回0，失败返回-1
+                pubsync() -> int 调用sync()
+            locale相关
+                virtual imbue(std::locale const& loc) -> void 设置当前的locale
+                pubimbue(std::locale const& loc) -> void 调用imbue(loc)
+                getloc() -> std::locale 返回当前的locale
+
+        一个典型的std::basic_streambuf实现通常就包含3或6个指针，和一个std::locale成员对象
         对于char和wchar_t有两个预定义的类型别名：
-        using streambuf=basic_streambuf<char>;
-        using wstreambuf=basic_streambuf<wchar_t>;
+            using streambuf=basic_streambuf<char>;
+            using wstreambuf=basic_streambuf<wchar_t>;
+    std::basic_filebuf
+        #include <fstream>
+        template<typename CharT, typename Traits = std::char_traits<CharT>>
+        class basic_filebuf : public basic_streambuf<CharT, Traits>
+        字节流是文件对象，underflow(), overflow(), sync()函数执行实际的文件IO
+        预定义的类型别名：
+            using filebuf = basic_filebuf<char>
+            using wfilebuf = basic_filebuf<wchar_t>
+    std::basic_stringbuf
+        #include <sstream>
+        template<typename CharT, typename Traits = std::char_traits<CharT>, typename Allocator = std::allocator<CharT>>
+        class basic_stringbuf : public basic_streambuf<CharT, Traits>
+        典型的basic_stringbuf是直接将一个std::basic_string作为缓冲区和字符流
     std::ostream_iterator
         #include <iterator>
         template<class T, class charT=char, class Traits=std::char_traits<charT>> class ostream_iterator;
@@ -767,6 +980,16 @@ locale：
                 LC_MONETARY
                 LC_NUMERIC
                 LC_TIME
+    <locale>
+        std::locale
+            一个std::locale对象是一个不可修改的索引表，指向一些不可修改的facet，facet定义了本地化的一些场景
+            C++中的每个流对象都引用了一个std::locale对象来解析和格式化输出数据
+            每个std::basic_regex也引用了一个std::locale
+            <algorithm>中的函数在比较字符串对象时就会引用std::locale中的某些facet作为比较函数
+            每个std::locale对象都至少引用了以下的标准facet
+                std::collate
+
+
         
 2.String类 string头文件
     string对象的地址到底在哪里？
@@ -1985,6 +2208,69 @@ locale：
             friend returnType friendfunc(A & a, B & b);
         };
         class B{...};
+位集
+    #include <bitset>
+    template<std::size_t N>
+    class bitset
+    {
+        constexpr bitset(); //初始化所有的位为0
+        constexpr bitset(unsigned long long val); //将bitset的最右边M（M是64和N的最小值）位设置为与val相同的值，如果N大于M（即val的长度比这个bitset小），其余位设置为0
+
+        template<typename CharT, typename Traits, typename Alloc>
+        explicit bitset(
+            std::basic_string<CharT, Traits, Alloc> const& str,
+            typename std::basic_string<CharT, Traits, Alloc>::size_type pos = 0,
+            typename std::basic_string<CharT, Traits, Alloc>::size_type n = npos
+        ); 
+        //从字符串str中提取pos位到pos+n的字符作为值，字符只能是0或1，否则抛出std::invalid_argument异常，如果pos > str.size()，则抛出std::out_of_range异常
+
+        template<typename CharT, typename Traits, typename Alloc>
+        explicit bitset(
+            std::basic_string<CharT, Traits, Alloc> const& str,
+            typename std::basic_string<CharT, Traits, Alloc>::size_type pos = 0,
+            typename std::basic_string<CharT, Traits, Alloc>::size_type n = npos,
+            CharT zero,   //指定0的字符表示
+            CharT one    //指定1的字符表示
+        );
+
+        template<typename CharT>
+        explicit bitset(
+            CharT const* s,
+            typename std::basic_string<CharT>::size_type n = std::basic_string<CharT>::npos,
+            CharT zero = CharT('0'),
+            CharT one = CharT('1')
+        );
+        
+        bool operator==(const bitset& rhs) const noexcept;
+        bool operator!=(const bitset& rhs) const noexcept;
+        consexpr bool operator[](std::size_t pos) const;    //与test()不同的是，这个函数不会抛出越界异常，越界时的行为是未定义的UB
+        bool test(std::size_t pos) const;   //会进行边界检查，越界抛出std::out_of_range异常
+        bitset& set() noexcept; //将所有位设置为1
+        bitset& set(std::size_t pos, bool val = true); //将pos位设置为val，如果pos越界，抛出std::out_of_range异常
+        bitset& reset() noexcept; //将所有位设置为0
+        bitset& reset(std::size_t pos); //将pos位设置为0，如果pos越界，抛出std::out_of_range异常
+        bitset& flip() noexcept; //将所有位取反，等同于this ^= this;
+        bitset& flip(std::size_t pos); //将pos位取反，如果pos越界，抛出std::out_of_range异常
+        reference operator[](std::size_t pos);  //返回一个std::bitset::reference封装，使得可以写入这个位
+
+        bool all() const noexcept;  //是否都为1
+        bool any() const noexcept;  //是否有1
+        bool none() const noexcept; //是否都为0
+
+        std::size_t count() const noexcept;  //返回1的个数
+
+        &= |= ^= ~ <<= >>= << >>
+
+        unsigned long to_ulong() const; //如果unsigned long长度不足，抛出std::overflow_error异常
+        unsigned long long to_ullong() const; //如果unsigned long long长度不足，抛出std::overflow_error异常
+        template<typename CharT, typename Traits, typename Alloc> std::basic_string<CharT, Traits, Alloc> to_string() const;
+        template<typename CharT, typename Traits, typename Alloc> std::basic_string<CharT, Traits, Alloc> to_string(
+            CharT zero = CharT('0'), 
+            CharT one = CharT('1')
+        ) const;
+
+        
+    }
 智能指针：
     #include <memory>
     智能指针就是在声明时分配堆内存，并在指针变量退出所在作用域后自动释放分配的内存
@@ -2050,20 +2336,120 @@ locale：
         当程序会使用多个指向同一个对象的指针，就用shared_ptr
         允许复制和赋值，在复制时会增加引用计数，退出作用域后将指向同一内存的shared_ptr的引用计数减少1，当引用计数减少到0时释放这一块内存
         在类内包含使用shared_ptr的成员可能造成循环引用的问题，如：
-        struct A
-        {
-            shared_ptr<B> ptr_to_B;
-            //A(shared_ptr<B> ptr):ptr_to_B(ptr){}
-        };
-        auto ptr_A=make_shared(A);
-        auto ptr_B=make_shared(A);
-        ptr_A.ptr_to_B=ptr_B;
-        ptr_B.ptr_to_B=ptr_A;   //此时ptr_A与ptr_B内包含的shared_ptr指针造成循环引用，彼此都引用另一个A的对象，所以当退出作用域后内存无法释放，造成内存泄漏      
+            struct B;
+            struct A
+            {
+                shared_ptr<B> ptr_to_B;
+                //A(shared_ptr<B> ptr):ptr_to_B(ptr){}
+            };
+            struct B
+            {
+                shared_ptr<A> ptr_to_A;
+            };
+            int main()
+            {
+                {
+                    auto ptr_A = make_shared<A>();
+                    auto ptr_B = make_shared<B>();
+                    ptr_A->ptr_to_B = ptr_B;
+                    ptr_B->ptr_to_A = ptr_A;   //此时ptr_A与ptr_B内包含的shared_ptr指针造成循环引用，彼此都引用另一个A的对象，所以当退出作用域后内存无法释放，造成内存泄漏  
+                }
+            }
+        构造：
+            constexpr shared_ptr() noexcept
+            constexpr shared_ptr(nullptr_t) noexcept
+     
+            template<typename Y> shared_ptr(Y* ptr)
+            template<typename Y, typename Deleter> shared_ptr(Y* ptr, Deleter deleter)
+
+            template<typename Deleter> shared_ptr(nullptr_t, Deleter deleter)
+
+            template<typename Y, typename Deleter, typename Alloc> shared_ptr(Y* ptr, Deleter deleter, Alloc alloc)
+
+            template<typename Y> shared_ptr(shared_ptr<Y>& r, T* ptr)
+                跟另一个shared_ptr r共享所有权信息，但是实际指向ptr
+                所以要注意保证ptr的生存期与r一致
+                通常使用在需要一个shared_ptr来指向r所管理的对象的某个成员时，例如
+                    struct Thing
+                    {
+                        Member member;
+                    };
+                    auto thing = std::make_shared<Thing>();
+                    std::shared_ptr<Member> member{thing, &thing->member};
+                    //此时即使对thing调用.reset()，或者thing指针超出作用域，member指针仍然有效
+                    thing.resst();
+                    UseMember(member);
+            
+        方法：
+            T* get() const noexcept
+            long use_count() const noexcept  //返回所指向的对象被多少个shared_ptr所共有
+            bool unique() const noexcept    //等同于use_count()==1，已经deprecated，因为use_count()
+            
+            template<typename T> bool owner_before(shared_ptr<T> const& rhs) const noexcept
+            template<typename T> bool owner_before(weak_ptr<T> const& rhs) const noexcept
+
+
+            相当于static_cast<Y*>(r.get())
+                template<typename T, typename U> std::shared_ptr<T> std::static_pointer_cast(std::shared_ptr<U> const& r) noexcept
+                template<typename T, typename U> std::shared_ptr<T> std::static_pointer_cast(std::shared_ptr<U>&& r) noexcept
+
+            相当于dynamic_cast<Y*>(r.get())
+                template<typename T, typename U> std::shared_ptr<T> std::dynamic_pointer_cast(std::shared_ptr<U> const& r) noexcept
+                template<typename T, typename U> std::shared_ptr<T> std::dynamic_pointer_cast(std::shared_ptr<U>&& r) noexcept
+            
+            相当于const_cast<Y*>(r.get())
+                template<typename T, typename U> std::shared_ptr<T> std::const_pointer_cast(std::shared_ptr<U> const& r) noexcept
+                template<typename T, typename U> std::shared_ptr<T> std::const_pointer_cast(std::shared_ptr<U>&& r) noexcept
+
+            相当于reinterpret_cast<Y*>(r.get())
+                template<typename T, typename U> std::shared_ptr<T> std::reinterpret_pointer_cast(std::shared_ptr<U> const& r) noexcept
+                template<typename T, typename U> std::shared_ptr<T> std::reinterpret_pointer_cast(std::shared_ptr<U>&& r) noexcept
+
+            获取指向shared_ptr所管理的对象的指针删除器
+                template<typename Deleter, typename T> Deleter* get_deleter(std::shared_ptr<T> const& p) noexcept
+
+            
     3.weak_ptr
         不参与引用计数的shared_ptr
+        构造：
+            constexpr weak_ptr() noexcept
+            
+            当r实际指向了一个对象时，构造一个指向同一个对象的weak_ptr，否则这个weak_ptr为空
+            weak_ptr(weak_ptr const& r) noexcept
+            template<typename Y> weak_ptr(weak_ptr<Y> const& r) noexcept    //当Y*可以隐式转换为T*时
+            template<typename Y> weak_ptr(shared_ptr<Y> const& r) noexcept  //当Y*可以隐式转换为T*时
+
+            移动构造函数，被移动的weak_ptr被制空且use_count()返回0
+            weak_ptr(weak_ptr&& r) noexcept
+            template<typename Y> weak_ptr(weak_ptr<Y>&& r) noexcept //当Y*可以隐式转换为T*时
+
         方法:
             long int use_count() const //返回这个weak_ptr所指向的对象被多少个shared_ptr所共有
-            
+            bool expired() const //返回这个weak_ptr是否指向了一个对象，相当于use_count()==0
+            std::shared_ptr<T> lock() const //返回一个shared_ptr，如果这个weak_ptr指向的对象已经被释放，则返回一个空shared_ptr，相当于expired() ? shared_ptr<T>() : shared_ptr<T>(*this)
+    4. template<typename T> std::enable_shared_from_this
+        使得一个由std::shared_ptr管理的类对象安全的产生其他指向同一对象的std::shared_ptr
+        需要公有继承这个类，并当需要产生指向this的std::shared_ptr时，调用shared_from_this()方法
+            struct My : std::enable_shared_from_this<My>
+            {
+                std::shared_ptr<My> get_ptr()
+                {
+                    return shared_from_this();
+                }
+            };
+        通常来说，如果希望用std::shared_ptr管理一个类，就不希望它能被直接创建在栈上，此时可以把这个类的构造函数设为private
+            struct My : std::enable_shared_from_this<My>
+            {
+            private:
+                My() = default;
+            public:
+                std::shared_ptr<My> get_ptr()
+                {
+                    return shared_from_this();
+                }
+            };
+        
+
 STL
     容器：
         顺序容器：
@@ -4732,6 +5118,34 @@ C++11:
                 __m256i _mm256_abs_epi32(__m256i a)
             其他：
         AVX512:向量512位宽，只有少数intel CPU支持
+C++11 数学库
+    #include <cmath>
+    基本运算
+        abs() 绝对值
+        fdim() 返回0和两个浮点数的差的中的最大值max(0, x-y)
+    指数运算
+        exp() e^x
+        exp2() 2^x
+        expm1() e^x-1
+    对数运算
+        log() lnx
+        log10() log(10)x
+        log2() log(2)x
+        lopg1p() ln(1+x)
+    幂运算
+        pow()
+        sqrt() 根号x
+        cbrt() 立方根x
+        hypot() 几何平均值，即x^2+y^2的平方根，或x^2+y^2+z^2的平方根
+    三角函数
+        sin()
+        cos()
+        tan()
+        asin()
+        acos()
+        atan() 返回[-pi/2,pi/2]
+        atan2() 返回[-pi,pi]
+        
 C++11 正则表达式
     #include <regex>
     1.基础
@@ -5079,7 +5493,7 @@ C++20：
         将view作用于range时相当于是一个声明，只有当真正需要访问作用后的元素时才执行真正的计算
         view类都定义在名称            std::ranges::views中，然而标准提供了一个名称空间别名来简化，所以只需使用std::views
             namespace std
-                {
+            {
                 namespace views = ranges::views;
             }
         ranges的用法：
@@ -5088,6 +5502,9 @@ C++20：
             auto square = [](int i) { return i * i; };
             for (int i : ints | std::views::filter(even) | std::views::transform(square))
                 std::cout << i << ' ';
+        上面的|运算符连接等同于
+            std::views::transform(std::views::filter(ints, even), square))
+            
     3.概念 Concepts
         Concept是一个具名的布尔值谓词，在编译器用来评估模板参数是否符合某种要求，作用类似于SFINAE与traits相结合
         concepts引入了两个新关键字concept和require和一个新头文件<concepts>
@@ -5141,7 +5558,13 @@ C++20：
         
 
     4.协程 Coroutines
-
+        协程就是可以被暂停和恢复的函数
+        普通函数必须执行完毕才会返回到主调函数
+        而协程可以执行到暂停点，返回到主调函数，主调函数又可以恢复执行协程
+        C++中，一个函数包含已下任意3个关键字则成为协程
+            co_await
+            co_return
+            co_yield
         coroutine_traits 
             决定携程返回的promise的类型，要求R中必须定义了一个类型别名promise_type
                 template<typename, typename...>
@@ -5202,6 +5625,71 @@ C++20：
             template<typename T, typename U> constexpr bool cmp_greater_equal(T t, U u) noexcept;
             template<typename T, typename U> constexpr bool cmp_less(T t, U u) noexcept;
             template<typename T, typename U> constexpr bool cmp_less_equal(T t, U u) noexcept;
+    8.<format>
+        在C++20前，有两种方法输出一个格式化字符串
+            printf()
+                缺点：
+                    类型不安全
+                    不可扩展，仅支持内置类型
+                优点：
+                    易读，将格式化字符串和参数分开
+                    易于本地化
+                        原因是可以直接替换格式化字符串，而不用改变参数的顺序
+            std::ostream
+                缺点：
+                    不易读
+                    难以本地化
+                优点：
+                    类型安全
+                    可以扩展，重载<<操作符即可
+        C++20引入格式化库<format>
+            类型安全
+            可扩展
+            易读
+            易于本地化
+        占位符
+            普通占位符由一对空花括号表示
+                std::cout << std::format("Read {} bytes from {}", bytes_read, filename);  
+            带索引的占位符
+                std::cout << std::format("Read {0} bytes from {1}", bytes_read, filename);
+                带索引的占位符使得更容易本地化，因为只需要替换格式化字符串，而无需改变参数的顺序
+                例如上面的例子本地化为中文
+                    std::cout << std::format("从文件 {1} 读取了 {0} 个字节", bytes_read, filename);
+            占位符的一般形式
+                {arg-id(optional):format-spec} 
+                arg-id：可选的参数索引，从0开始，在同一个格式化字符串中的占位符必须要么都带索引，要么都不带，不可以混用
+                format-spec:
+                    fill-and-align：任意填充字符（可空）+以下3种表示对其方式的字符
+                        < 左对齐（默认）
+                        > 右对齐（默认）
+                        ^ 居中
+                            char c = 120;
+                            auto s0 = std::format("{:6}", 42);    // value of s0 is "    42"
+                            auto s1 = std::format("{:6}", 'x');   // value of s1 is "x     "
+                            auto s2 = std::format("{:*<6}", 'x'); // value of s2 is "x*****"
+                            auto s3 = std::format("{:*>6}", 'x'); // value of s3 is "*****x"
+                            auto s4 = std::format("{:*^6}", 'x'); // value of s4 is "**x***"
+                            auto s5 = std::format("{:6d}", c);    // value of s5 is "   120"
+                    sign：
+                        + 正数带正号
+                        - 负数带符号，正数不带（默认）
+                         (一个空格) 正数带一个空格，负数带负号（常用于对其正数和负数）
+                    #：表示使用特殊格式化方法
+        库函数：
+            template<typename ...Args> std::string(/*char编码的格式化字符串*/, Args&&... args);
+            template<typename ...Args> std::string(std::locale const& loc, /*char编码的格式化字符串*/, Args&&... args); //带locale的版本
+            template<typename ...Args> std::wstring(/*wchar_t编码的格式化字符串*/, Args&&... args);
+            template<typename ...Args> std::wstring(std::locale const& loc, /*wchar_t编码的格式化字符串*/, Args&&... args); //带locale的版本
+
+            vformat()是去除模板化的版本，且可以使用运行时构造的格式化字符串
+            std::string vformat(std::string_view fmt, std::format_args);
+            std::string vformat(std::locale const& loc, std::string_view fmt, std::format_args);    //带locale的版本
+            std::wstring vformat(std::wstring_view fmt, std::format_args);
+            std::wstring vformat(std::locale const& loc, std::wstring_view fmt, std::format_args); //带locale的版本
+
+            args比实际需要的参数多不会产生错误，例如
+                std::format("{} {}!", "Hello", "world", "something"); // OK, produces "Hello world!"
+
 
 Effective C++
     1.C++的四个子语言

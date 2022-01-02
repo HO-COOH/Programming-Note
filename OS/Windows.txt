@@ -65,7 +65,11 @@
         _ASSERT_EXPR( booleanExpression, message ); 输出表达式的字符串+简单调试信息+自定义的message
         _ASSERT( booleanExpression );   输出一个简单调试信息
         _ASSERTE( booleanExpression );  输出表达式的字符串+调试信息
-
+    字符集
+        在Project Properties->Advanced->Character Set中
+        Not Set：单字节字符编码，例如UTF-8
+        Use Unicode Character Set：双字符字节编码，例如UTF-16（Windows原生）
+        Use Multi-Byte Character Set：多字节字符编码（罕见）
     VC++运行库
         /MT -> LibCMt.lib  静态链接发行版本
         /MTd -> LibCMtD.lib 静态链接调试版本
@@ -1402,7 +1406,70 @@ DirectWrite
         REFIID iid,         //__uuidof(IDWriteFactory)
         IUnknown** factory  //指向要存储所创建的DirectWrite工厂的指针
     )
+MFC
+    Microsoft Foundation Class主要是Win32和COM的面向对象化的接口
+    MFC源码
+        头文件 \atlmfc\include
+        源文件 \atlmfc\src\mfc
+    MFC程序组成部分
+        线程对象 CWinThread
+        应用对象 CWinApp
+        文档模板 CDocTemplate
+        Frame：所有可视组件都显示在这个frame窗口中 CFrameWnd
+        文档 CDocument
+        View CView
+            常见View
+                CScrollView
+                CFormView
+                CEditView
+                CTreeView
+                CListView
+                CRichEditView
+        
+MVVM
+    View定义了界面，通常是Xaml，或者极少与界面呈现相关的代码
+    ViewModel定义了界面与核心业务逻辑和核心业务数据交互的逻辑，包括界面元素响应的处理函数
+    Model定义了核心业务逻辑，与界面完全剥离开
 C++/WinRT
+    每个winrt中的类都有一个接收nullptr的构造函数，用来延迟初始化，而默认构造函数会实际构造对象
+    数据绑定
+        数据绑定的3歌要素
+            数据源
+            绑定目标（通常就是UI元素）
+            传输数据（实际发生数据传输的对象）
+        一个类要支持单项或双向绑定，就需要在数据变化时发出事件，此时需要让类实现Windows::UI::Xaml::Data::INotifyPropertyChanged接口
+            例如下面这个类ViewModel需要跟UI的一个Button的字符串绑定
+                /*idl*/
+                runtimeclass HostViewModel : Windows.UI.Xaml.Data.INotifyPropertyChanged
+                {
+                    HostViewModel();
+                    String NextButtonText;
+                }
+
+                /*.h*/
+                struct HostViewModel
+                {
+                    winrt::
+                }
+        所有在XAML中使用的{x:Bind}绑定的数据都必须以相同名字的getter和setter出现在这个xaml对应的idl文件中
+        绑定一个XAML数据到另一个XAML
+            XAML：
+                <TextBox x:Name="myTextBox"/>
+                <TextBlock Text="{x:Bind myTextBox.Text, Mode=OneWay}" />
+            idl中
+                runtimeclass MainPage : Windows.UI.Xaml.Controls.Page
+                {
+                    MainPage();
+                    Windows.UI.Xaml.Controls.TextBox myTextBox{get;};
+                }
+        数据绑定的模式
+            一次性绑定，数据不会再更新
+            单向绑定OneWay，UI会随着数据源的改变而更新
+            双向绑定TwoWay，UI会随着数据源的改变而更新，同时UI的更新（例如用户在输入框输入文字）也会更新数据源
+
+    绑定一个XAML数据集合
+            例如itemsSource
+
     IInspectable类型
         每个WinRT的类都继承于IInspectable，类似于Com中的IUnknown和C#中的System.Object
 
@@ -1496,6 +1563,168 @@ C++/WinRT
     容器
         template <typename T, typename Allocator = std::allocator<T>>
         winrt::Windows::Foundation::Collections::IObservableVector<T> single_threaded_observable_vector(std::vector<T, Allocator>&& values = {})
+    IDL
+        IDL用来定义Windows Runtime 类，用来生成对应的C++/WinRT的类的头文件
+        IDL源文件以.idl结尾，使用midl.exe生成一个Windows Runtime metadata文件，以.winmd结尾
+        类型
+            值类型
+                整数类型
+                    Boolean
+                    Int16
+                    Int32
+                    Int64
+                    UInt8
+                    UInt16
+                    UInt32
+                    UInt64
+                    Char: UTF-16 code unit
+                    String
+                浮点数类型
+                    Single
+                    Double
+                128位Guid
+                枚举类型 enum
+                    普通枚举
+                        内部数据类型是Int32
+                    标志枚举
+                        在普通枚举的基础上加[flags]修饰
+                        内部数据类型是Uint32
+                            [flags]
+                            enum SetOfBooleanValues
+                            {
+                                None   = 0x00000000,
+                                Value1 = 0x00000001,
+                                Value2 = 0x00000002,
+                                Value3 = 0x00000004,
+                            };
+                结构体类型 struct
+                可空类型 转化为Windows.Foundation.IReference<T>
+            引用类型
+                类
+                    Object 所有类类型的基类
+                    runtimeclass
+                        构造函数
+                            构造函数可以重载
+                            如果没有声明构造函数，则不能产生一个实例，没有默认构造函数，需要使用工厂函数
+
+                        属性
+                            与C#属性不同，idl的属性仅代表访问方式，不代表实际的存储
+                            <Type> <Name>{get; set};
+                        方法
+                            ovrrride
+                            protected
+                            重载
+                                idl的方法重载需要方法接收不同数量的参数
+                                只是不同类型的参数不能重载
+                        事件
+                        可见性
+                            由于IDL是用来定义接口的，所以runtimeclass中的成员都是public的
+                        static
+                            可以使用static关键字修饰不支持实例化的静态类
+                            此时所有的成员也都必须被修饰为static
+                                static runtimeclass Singleton
+                                {
+                                    ...
+                                }
+                        继承
+                        事件
+                            在类中定义一个事件使得这个类成为事件的源，事件源通知提供了事件处理函数的类
+                            定义一个事件，需要定义事件委托（即事件处理函数）的类型，例如一个窗口大小改变的事件
+                                event Windows.UI.Xaml.WindowSizeChangedEventHandler SizeChanged;
+                            定义一个事件会隐式的添加两个方法，一个添加事件处理函数的的add()方法，一个取消事件处理函数的remove()方法
+                            通常，一个事件处理函数包含两个参数，事件源+事件参数
+                接口 interface
+                    接口声明了一些方法，继承它的类需要实现
+                    接口也可以继承，使用requires关键字
+                        interface IControl
+                        {
+                            void Paint();
+                        }
+
+                        interface ITextBox requires IControl
+                        {
+                            void SetText(String text);
+                        }
+
+                        interface IListBox requires IControl
+                        {
+                            void SetItems(String[] items);
+                        }
+
+                        interface IComboBox requires ITextBox, IListBox
+                        {
+                            ...
+                        }
+                委托
+                    delegate <ReturnType> <MethodName>(<ParameterList>)
+            一维数组类型 T[]
+        函数
+            参数
+                值类型
+                    值类型默认是输入参数
+                    可以通过使用out关键字转化为输出参数
+                    使用struct作为参数时由于是值类型，所以发生拷贝
+                    可以使用ref const关键字转化为传递一个常量指针
+                        Boolean IsIdentity(ref const Windows.Foundation.Numerics.Matrix4x4 value)
+                数组类型
+                    // Pass array pattern: read-only array from caller to callee
+                    void PassArray(Int32[] values);
+
+                    // Fill array pattern: caller allocates array for callee to fill
+                    void FillArray(ref Int32[] values);
+
+                    // Receive array pattern: callee allocates and fill an array returned to caller
+                    void ReceiveArray(out Int32[] values);
+        属性
+            一个属性通常来定义元信息
+            属性类似于struct，没有构造函数，按成员顺序赋值
+            可以在定义Attribute时使用attributeusage(...)的圆括号中加上目标对象的种类，多个种类之间用逗号分隔
+                target_all
+                target_delegate
+                target_enum
+                target_event
+                target_field
+                target_interface
+                target_method
+                target_parameter
+                target_property
+                target_runtimeclass
+                target_struct
+            如果一个属性类型名以Attribute结尾，则可以省略Attribute，例如下面的HelpAttribute属性在使用时可以只用Help
+                [attributeusage(target_runtimeclass, target_event, target_method, target_property)]
+                attribute HelpAttribute
+                {
+                    String classUri;
+                    String topic;
+                }
+
+                [Help("https://docs.", "topic")]
+                runtimeclass BookSku
+                {
+
+                }
+        泛型
+            嵌套的泛型右尖括号之间需要加空格
+                Windows.Foundation.IasyncOperation<Windows.Foundation.Collections.IVector<String>> GetCollection(); //error
+                Windows.Foundation.IasyncOperation<Windows.Foundation.Collections.IVector<String> > GetCollection();//OK
+            不能将数组类型作为泛型类型
+                Windows.Foundation.IAsyncOperation<Int32[]> GetArray(); //error
+            解决方法
+                返回一个IInspectable类型，数组内容使用Windows::Foundation::PropertyValue或者box_value包起来
+                在使用时再转化为winrt::Windows::Fountation::IPropertyValue类型，创建一个winrt::com_array<T>的变量，调用.GetInt32Array()赋值给winrt::com_array<T>变量
+                    Windows::Foundation::IAsyncOperation<Windows::Foundation::IInspectable> RetrieveCollectionAsync()
+                    {
+                        co_return Windows::Foundation::PropertyValue::CreateInt32Array({ 99, 101 }); // Box an array into a PropertyValue.
+                    }
+                
+                    /*使用*/
+                    auto boxed_array = co_await RetrieveCollectionAsync();
+                    auto property_value = boxed_array.as<winrt::Windows::Foundation::IPropertyValue>();
+                    winrt::com_array<int32> array;
+                    property_value.GetInt32Array(array);
+    注意事项：
+        winrt::event<T>的类型必须是Windows Runtime类型
+        
 UWP
     UWP项目类型
         blank app, unit test app 
@@ -1512,8 +1741,13 @@ UWP
                 3. 在要使用这个Component的工程中添加一个要使用的Component的.winmd文件引用
                 4. 所要包含的头文件生成在<winrt/...>下
         Optional code package 创建一个可执行的C#代码包
-        
-        合并资源
+    图标
+        SymbolIcon
+            <SymbolIcon Symbol="SymbolName"/> 资源列表https://docs.microsoft.com/en-us/windows/apps/design/style/segoe-ui-symbol-font
+        FontIcon
+            <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="<&#xE(开头的代码)>"/> https://docs.microsoft.com/en-us/windows/apps/design/style/segoe-ui-symbol-font
+            
+    合并资源
         在一个资源文件中
             <!-- Dictionary1.xaml -->
             <ResourceDictionary
@@ -2328,23 +2562,13 @@ XAML
             }
 
             <TextBlock Text = "{x:Bind ViewModel.DefaultRecording.line}"/>
-
-    ControlTemplate
-        可以通过ControlTemplate的方式自定义Control的一些行为或者创建自定义Control
-        一个ControlTemplate有且只能有一个FrameworkElement作为根元素，但是这个根元素（即这个唯一的FrameworkElement）可以包含若干个FrameworkElement来组合出想要的Control
-    TemplateBinding
-        TemplateBinding只能在ControlTemplate中使用
-        <object propertyName="{TemplateBinding <sourceProperty>}"/>
-        将对象object的propertyName属性的绑定为另一个sourceProperty
-        当使用现有的Control来创建实现一个新Control时，常见将同一个对象的同一个属性绑定到自身
-        例如当使用一个TextBlock来实现一个新Control时，且希望使用TextBlock来显示新Control的Text属性时，可以写
-            <TextBlock Text="{TemplateBinding Text}"/>
     VisualState
         使用VisualState来控制当一个Control的State为某个值时，更改Control的某些属性
         要更改的属性使用<Setter Target="<PropertyName>" Value="<value>"/>对象
         例如一个自定义的CheckBox有3个State：选中、未选中、半选中，则可以使用下面的VisualState来控制各个状态的一些属性的值
             <VisualStateManager.VisualStateGroups>
                 <VisualStateGroup x:Name="CheckStates">
+
                     <VisualState x:Name="Checked">
                         <VisualState.Setters> 
                             <Setter Target="CheckGlyph.Opacity" Value="1"/>
@@ -2365,6 +2589,85 @@ XAML
 
                 </VisualStateGroup>
             </VisualStateManager.VisualStateGroups>
+    ControlTemplate
+        可以通过ControlTemplate的方式自定义Control的一些行为或者创建自定义Control
+        一个ControlTemplate有且只能有一个FrameworkElement作为根元素，但是这个根元素（即这个唯一的FrameworkElement）可以包含若干个FrameworkElement来组合出想要的Control
+        定义一个ControlTemplate，需要指定一个Name和作用对象的类型<ControlTemplate x:Key="<Name>" TargetType="<TargetType>"/>，定义在Resource中
+            <ControlTemplate x:Key="CheckBoxTemplate" TargetType="CheckBox">
+                ...
+            </ControlTemplate>
+        对某个控件使用ControlTemplate时，在Template属性使用这个资源
+            <CheckBox Template="{StaticResource CheckBoxTemplate}"/>
+    TemplateBinding
+        TemplateBinding只能在ControlTemplate中使用
+        <object propertyName="{TemplateBinding <sourceProperty>}"/>
+        将对象object的propertyName属性的绑定为另一个sourceProperty
+        当使用现有的Control来创建实现一个新Control时，常见将同一个对象的同一个属性绑定到自身
+        例如当使用一个TextBlock来实现一个新Control时，且希望使用TextBlock来显示新Control的Text属性时，可以写
+            <TextBlock Text="{TemplateBinding Text}"/>
+    DataTemplate
+        一些容器例如ListView和GridView中的项目的显示方式是由ListViewItem和GridViewItem来定义的
+        当不进行自定义时，将默认使用项目的.ToString()方法来展示文字内容
+        可以定义两方面的内容
+            DataTemplate
+                将一个DataTemplate作为ListView.ItemTemplate的内容
+                如果在DataTemplate中使用了x:Bind，则需要在DataTemplate添加x:DataType属性指定数据源的类名
+                    <ListView x:Name="colorsListView">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataTemplate="local:NamedColor">
+                                <Grid>
+                                    ...
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                
+            ControlTemplate
+                将一个Style作为ListView.ItemContainerStyle的内容
+                    <ListView x:Name="colorsListView">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter ... />
+                                ...
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                    </ListView>
+                另外，在VS->View->Other Window->Document outline中选中要修改的控件->Property，可以编辑其默认的Style
+                在修改Style时，最好是先创建一个副本，在副本的基础上修改
+    DataTemplateSelector
+        DataTemplate将定义的数据展示方式作用于一个容器内的所有项目
+        DataTemplateSelector可以根据项目的属性来选择不同的DataTemplate作用于不同的项目
+        要定义一个DataTemplateSelector，需要从它继承出自己的类，并override SelectTemplate()方法，将逻辑写在code-behind中，然后在XAML的资源部分创建一个这样的类的实体
+            class TaskListDataTemplateSelector : DataTemplateSelector
+            {
+                public override DataTemplate SelectTemplate(object item, DependencyObject container)
+                {
+                    FrameworkElement element = container as FrameworkElement;
+                    if(element != null && item != null && item is Task)
+                    {
+                        Task taskItem = item as Task;
+                        if(taskItem.Priority == 1)
+                        {
+                            return element.FindResource("importantTaskTemplate") as DataTemplate;
+                        }
+                        else
+                        {
+                            return element.FindResource("myTaskTemplate") as DataTemplate;
+                        }
+                    }
+                    return null;
+                }
+            }
+
+            /*xaml*/
+            <Window.Resource>
+                <local:TaskListDataTemplateSelector x:Key="taskListDataTemplateSelector"/>
+            </Window.Resource>
+
+            <!- Use -->
+            <ListBox ... ItemTemplateSelector="{StaticResource taskListDataTemplateSelector}"/>
+
+
     Storyboard
         Storyboard可以用来随时间改变某个属性的值，最常见的用途是实现动画
         有3种动画
@@ -2412,6 +2715,8 @@ XAML
     STA
         Single-threaded aparatments
         ATSA
+    假数据
+        
 WINUI3
     项目类型
         Blank app, packaged 

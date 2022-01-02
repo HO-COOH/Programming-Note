@@ -1,0 +1,18 @@
+LEB128编码
+    LEB128 （Little Endian Base 128）是一种可变长度的编码方式来编码任意大小的整数，其编码规则是：
+        无符号LEB128：
+            先将整数表示成二进制的形式
+            使用0填充使得二进制的位数达到7的倍数
+            将得到的二进制以7位为一组分组，将除了最高位组之外的每一组7位二进制前最高位加一个1，最高位的7位二进制前加一个0
+            最后输出时，以最低位组->最高位组的顺序输出每个8位二进制数
+            例如：
+                624485
+                MSB ------------------ LSB
+                10011000011101100101  In raw binary
+                010011000011101100101  Padded to a multiple of 7 bits
+            0100110  0001110  1100101  Split into 7-bit groups
+            00100110 10001110 11100101  Add high 1 bits on all but last (most significant) group to form bytes
+                0x26     0x8E     0xE5  In hexadecimal
+            → 0xE5 0x8E 0x26            Output stream (LSB to MSB)
+        有符号LEB128：
+            与无符号类似，只是在表示成二进制形式时使用2的补码形式
