@@ -2534,8 +2534,68 @@ UWP
                 case ApplicationTheme.Dark:
                 case ApplicationTheme.Light:
             }
-        }
+    多窗口
+        使用AppWindow
+            AppWindow创建的窗口与主窗口同属于一个UI线程中
+            注意使用AppWindow创建对话框时，由于一个模态对话框只会阻塞创建它的窗口而不会阻塞其他窗口，而一个UI线程只能创建一个对话框
+            所以要注意不能同时创建多个对话框
+            var appWindow = await AppWindow.TryCreateAsync();   
+            var frame = new Frame();
+            frame.Navigate(typeof(MainPage));
+            ElementCompositionPreview.SetAppWindowContent(appWindow, frame);
+            await appWindow.TryShowAsync();
 
+            class Windows.UI.WindowManagement.AppWindow
+            {
+                RequestSize() //设置窗口大小
+                RequestMove()   //移动窗口
+            }
+
+            enum WindowingEnvironmentKind
+            {
+                Overlapped, //通常是桌面平台
+                Tiled,      //Xbox和Windows打开平板模式
+                Unknown
+            }
+
+            class Windows.UI.WindowManagement.DisplayRegion
+            {
+                string DisplayMonitorDeviceId{get;}
+                bool IsVisible { get; }
+                WindowingEnvironment WindowingEnvironment { get; }
+                Point WorkAreaOffset { get; }   //是屏幕物理像素减去任务栏的像素数，与缩放无关
+
+                event Changed()
+            }
+
+            class Windows.UI.WindowManagement.WindowingEnvironment
+            {
+                static IReadOnlyList<WindowingEnvironment> FindAll();
+                static IReadOnlyList<WindowingEnvironment> FindAll(WindowingEnvironmentKind kind);
+                IReadOnlyList<DisplayRegion> GetDisplayRegions();
+
+                WindowingEnvironmentKind Kind { get; }
+                bool IsEnabled { get; }
+            }
+        使用ApplicationView
+            一个可见窗口CoreApplicationView实际上是一个CoreWindow+CoreDispatcher
+            通常不直接操作CoreApplicationView，而是通过ApplicationView来操作
+            通过调用ApplicationView.GetForCurrentView()来获取当前窗口
+                CoreApplicationView newView = CoreApplication.CreateNewView();
+                int newViewId = 0;
+                await newView.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                {
+                    Frame frame = new Frame();
+                    frame.Navigate(typeof(SecondaryPage), null);   
+                    Window.Current.Content = frame;
+                    // You have to activate the window in order to show it later.
+                    Window.Current.Activate();
+
+                    newViewId = ApplicationView.GetForCurrentView().Id;
+                });
+                bool viewShown = await ApplicationViewSwitcher.TryShowAsStandaloneAsync(newViewId);
+    运行期查询接口
+        class Windows.Foundation.Metadata.ApiInformation
 XAML
     数据绑定
         通常数据存在一个专门的数据类里，然后这个类的UI呈现即ViewModel存放一个数据类的实体作为公有成员，然后在XAML需要引用数据的地方使用数据绑定
@@ -2562,6 +2622,17 @@ XAML
             }
 
             <TextBlock Text = "{x:Bind ViewModel.DefaultRecording.line}"/>
+        注意，当在C++WinRT的工程中使用x:Bind时，需要在idl文件中声明一个与被绑定对象相同类型和名字的只读成员，无需在.h和.cpp中添加，例如：
+            /*xaml*/
+            <TextBox x:Name="myTextBox" />
+            <TextBlock Text="{x:Bind myTextBox.Text, Mode=OneWay}" />
+
+            /*idl*/
+            runtimeclass MainPage : Windows.UI.Xaml.Controls.Page
+            {
+                MainPage();
+                Windows.UI.Xaml.Controls.TextBox myTextBox{ get; };
+            }
     VisualState
         使用VisualState来控制当一个Control的State为某个值时，更改Control的某些属性
         要更改的属性使用<Setter Target="<PropertyName>" Value="<value>"/>对象
