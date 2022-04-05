@@ -1,8 +1,19 @@
 ## Setting up render context
 - ``glfwInit``: initialize the library
 - ``glfwCreateWindow(GLFWwindow*)``: create a windowed window
-- ``glfwMakeContextCurrent(GLFWwindow*)``: make the wond'ws context current
+- ``glfwMakeContextCurrent(GLFWwindow*)``: make the window context current
 - ``(glfwSwapInterval)``: limit the frames
+
+## VS工程设置
+1. 下载编译GLFW库
+2. 链接`opengl32.lib` 和`glfw3.lib`
+3. 
+
+## vcpkg+CMAKE
+```cmake
+    find_package(glfw3 CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE glfw)
+```
 
 ## Components
 ### vertex shader
@@ -157,3 +168,115 @@ Transform position, rotation, angle of the camera.
 #### Model matrix
 Transform position, rotation, angle of the object.
 
+## GLSL
+### 基本类型
+- 标量类型
+  - bool
+  - int
+  - uint
+  - float
+  - double
+- 向量类型，其中n可以是2,3,4，引用其中的某个元素使用x y z w
+  - bvecn
+  - ivecn
+  - uvecn
+  - vecn (float vec)
+  - dvecn
+- 矩阵类型
+  - matnxm，其中n和m都可以是2，3，4
+  - matn，matnxn的缩写
+  - dmatnxm （OpenGL4.0）
+  - dmatn （OpenGL4.0）
+- 结构体类型，使用类似于C++的语法定义
+
+### 内置变量
+GLSL内部定义了一些有特殊含义的自带变量，通常用于数据传输，以gl_开头
+### 函数
+- GLSL的函数不支持递归调用
+- GLSL的函数形参支持`in` `out` `inout`修饰，类似于输入、输出引用，对于`out`参数，调用时类似于接受了一个undefined值
+```glsl
+//MyFunction调用时接收的值为(10.5, undefined, 10.0)
+void MyFunction(in float inputValue, out int outputValue, inout float inAndOutValue)
+{
+	inputValue = 0.0;
+	outputValue = int(inAndOutValue + inputValue);
+	inAndOutValue = 3.0;
+}
+
+void main()
+{
+	float in1 = 10.5;
+	int out1 = 5;
+	float out2 = 10.0;
+	MyFunction(in1, out1, out2);
+	//调用结束后in1 = 10.5, out1 = 10, out2 = 3.0
+}
+```
+### 顶点着色器
+预定义的输出：
+```glsl
+out gl_PerVertex
+{
+	vec4 gl_Position;		//剪裁空间下的位置输出
+	float gl_PointSize;		//只有绘制单点画元Point Primitive时才有效，会被限制在GL_POINT_SIZE_RANGE的范围中
+	float gl_ClipDistance[]; //
+};
+```
+
+### 片段着色器
+
+### glm
+	变换
+		glm::mat4
+			glm::mat4(1.0f)将初始化一个单位矩阵I
+		注意以下变换矩阵与向量相乘得到变换后位置时，在2D下将z分量赋值0.0f，w分量赋值1.0f
+		缩放
+			glm::scale(glm::mat4 const& m, glm::vec3 const& v) -> glm::mat4
+				按v的三个分量缩放生成一个变换矩阵与m相乘，返回相乘后的矩阵
+			```cpp
+				auto const t = glm::scale(glm::mat4(1.0f), glm::vec3(1.0f, 2.0f, 0.0f)); //缩放
+				auto const v = glm::vec2(1.0f, 2.0f); //点(1,2)
+				auto const result = t * glm::vec4(v, 0.0f, 1.0f); //(1,4)
+				std::cout << result << '\n';
+			```
+		位移
+			glm::translate(glm::mat4 const& m, glm::vec3 const& v) -> glm::mat4
+				按v的三个分量位移生成一个变换矩阵与m相乘，返回相乘后的矩阵
+			在2D下，v的z分量赋值为0
+			```cpp
+				auto const t = glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 2.0f, 0.0f));
+				auto const v = glm::vec2(1.0f, 2.0f); //点(1,2)
+				auto const result = t * glm::vec4(v, 0.0f, 1.0f); //(2,4)
+				std::cout << result << '\n';
+			```
+		旋转
+			glm::rotate(glm::mat4 const& m, T angle, glm::vec3 const& axis) -> glm::mat4
+				绕着axis表示的轴旋转angle角度（弧度制）生成一个变换矩阵与m相乘，返回相乘后的矩阵
+				在2D环境下即在x-y平面中绕坐标原点旋转，则axis应使用z轴（0，0，1）
+			```cpp
+				auto const t = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 2.0f));
+				auto const v = glm::vec2(1.0f, 2.0f); //点(1,2)
+				auto const result = t * glm::vec4(v, 0.0f, 1.0f);//(-2,1)
+				std::cout << result << '\n';`
+			```
+	坐标
+		从模型局部坐标到最终显示到屏幕上，需要3个矩阵变换
+		局部坐标 ==(Model matrix)==> 世界坐标 ==(View Matrix)==> 观察坐标 ==(Projection matrix)==> 屏幕剪裁坐标
+		即需要 
+			glm::mat4 model
+			glm::mat4 view
+			glm::mat4 projection
+		最后将局部位置vec3 local乘以这三个矩阵，得到最终opengl用的vec3 gl_Position
+			result = projection * view * model * local
+		projection matrix投影矩阵
+			正射投影矩阵
+				glm::ortho(T left, T right, T bottom, T top, T zNear, T zFar) -> glm::mat4
+					在3D中根据3个方向的6个范围创建一个正射投影矩阵
+				glm::ortho(T left, T right, T bottom, T top) -> glm::mat4
+					在2D中根据xy方向的2个范围创建一个正射投影矩阵
+		view matrix观察矩阵
+			构建观察矩阵需要3个信息：
+				摄像机（观察者）在世界坐标系中的坐标
+				摄像机看向的方向
+				摄像机的上方向
+		

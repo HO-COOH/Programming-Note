@@ -1,0 +1,195 @@
+Iterator模式
+    出现的类：
+        Iterator
+        ConcreteIterator
+        Aggregate
+        ConcreteAggregate
+Adaptor模式
+    出现的类：
+        Target （目标接口）
+        Client
+        Adaptor
+        Adaptee
+Template method模式
+    出现的类：
+        AbstractClass
+        ConcreteClass
+Factory模式
+    出现的类：
+        Factory
+        Product
+        ConcreteFactory
+        ConcreteProduct
+Singleton模式
+
+Prototype模式
+    出现的类：
+        Prototype
+        ConcretePrototype
+        Client
+Builder模式
+    出现的类：
+        Builder
+        Director
+        ConcreteBuilder
+        Client
+Abstract Factory模式
+    出现的类：
+        AbstractProduct
+        AbstractFactory
+        Client
+        ConcreteProduct
+        ConcreteFactory
+Bridge模式
+    将类的 功能层次结构 和 实现层次结构 分离
+
+    出现的类：
+        Abstraction
+            保存一个Implementor的实例，使用Implementor的方法定义基本功能委托
+        RefinedAbstraction
+            在Abstraction角色上增加新功能
+            增加的新功能可以使被所有实现，即Implementor使用，也可以使用其他改进的Implementor
+        Implementor
+            定义了用于实现Abstraction角色的接口的方法
+        ConcreteImplementor
+            实现Implementor角色中定义的接口
+Strategy模式
+    用于整体的替换算法
+    出现的类：
+        Strategy
+            定义实现策略的接口
+        ConcreteStrategy
+            实现具体的策略（算法）
+        Context
+            上下文，保存并使用一个Strategy的实例
+Composite模式
+    使得容器和内容具有一致性（一样的接口）
+    出现的类：
+        Component
+            定于Leaf和Composite的公共接口
+        Leaf
+            表示内容的角色，不能再添加子节点
+        Composite
+            表示容器的角色，可以放入Component，即Leaf和Composite
+        Client
+            使用Component的接口
+Decorator模式
+    不断的为对象添加装饰
+    出现的类：
+        Component
+            定义被装饰对象的接口
+        ConcreteComponent
+            实现Component定义的接口的具体被装饰对象
+        Decorator
+            继承Component并保存一个Component的实例，这样使得Decorator可以进一步再装饰Decorator
+        ConcreteDecorator
+            具体的装饰类，继承Decorator，并实现Component接口
+Visitor模式
+    将数据结构与处理分离开来，访问者类用来访问数据结构中的元素
+    出现的类：
+        Element
+            被Visitor访问的数据的接口，最重要的是定义一个接受Visitor的方法accept(Visitor)，调用visitor.visit(element)
+        ConcreteElement
+            实现Element接口
+        Visitor
+            定义用于访问Element的方法，visit(Element)，要对Element实现不同的操作只需实现新的ConcreteVisitor即可，不需要修改Element角色
+        ConcreteVisitor
+            实现Visitor接口
+Chain of Responsibility模式
+    将多个对象组成一条责任链（委托链），当一个对象无法处理时，委托给下一个对象
+    出现的类：
+        Handler
+            定义处理问题和设置委托的接口
+        ConcreteHandler
+            实现处理问题的方法
+        Client
+Facade模式
+    从相互关联的类整理出高层接口
+
+Mediator模式
+    建立一个仲裁者，减少组员类之间的互相沟通，常用于处理GUI中的界面逻辑
+    出现的类：
+        Mediator
+            定义做出决定和与Colleague通信的接口
+        ConcreteMediator
+            实现Mediator接口，实际作出决定
+        Colleague
+            定义与Mediator通信的接口，通常需要一个方法来保存一个Mediator实例的引用
+        ConcreteColleague
+
+Observer模式
+    当被观察对象状态发生变化时，通知观察者
+    出现的类：
+        Subject
+            定义添加、删除观察者的方法和获取当前状态的方法
+        ConcreteSubject
+
+        Observer
+            定义被通知的接口
+            通常获取当前状态的方法需要将自身和发生变化的状态值作为参数，形如：
+                void OnStateChanged(Subject self, int value)
+        ConcreteObserver
+
+Mememto模式
+    用类来存储状态，并能恢复状态
+    出现的类：
+        Originator
+            在状态变化时生成一个表示自己最新状态的Mememto实例，当把表示状态的Memento实例传递进来时恢复到那个状态
+        Memento
+            保存Originator的状态的信息，但不对外接口，而且也只能由Originator创建实例
+        
+State模式
+    用类表示状态并关联多个根据状态不同而不同的操作
+    出现的类：
+        State
+            定义了表示状态的接口和需要依赖于状态的操作的接口
+        ConcreteState
+            表示各种具体的状态，和实现该状态下的操作
+        Context
+            持有一个当前状态的实例，并提供给外部调用的接口
+Flyweight模式
+    尽量通过共享实例来减少new
+    出现的类：
+        Flyweight
+            被共享的实例
+        FlyweightFactory
+            生成没有被创建的实例，返回已经创建过的实例
+        Client
+            向FlyweightFactory请求实例
+Proxy模式
+    用一个代理类来代理实际执行操作的类
+    出现的类：
+        Interface
+            定义代理类和实际类的接口，这样使得在使用代理还是实际类时都无需更改代码
+        Proxy
+            保存一个实际类的实例
+        RealSubject
+            实际类
+        Client
+            使用代理类
+Command模式
+    用类表示要执行的操作，区别于直接调用函数
+    出现的类：
+        Command
+            定义执行操作的接口
+        ConcreteCommand
+            实现执行操作的方法
+        Receiver
+            执行Command的对象
+        Client
+            生成ConcreteCommand并分配Receiver角色
+        Invoker
+            调用Command中执行命令的方法的类
+Interpreter模式
+    用类表示语法
+        出现的类：
+            AbstractExpression
+                定义一个语法中表达式的接口
+            TerminalExpression : AbstractExpression
+                定义一个语法中的终结符表达式，即不能被继续展开的符号
+            NonterminalExpression : AbstractExpression
+                定义一个语法中的非终结符表达式，即可以被继续展开的符号
+            Context
+                为语法的解析提供信息，例如将字符串分解为token
+            Client
+    最终这个模式用来将一个语言解析成语法树（递归），并且也可以通过递归的方法遍历

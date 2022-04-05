@@ -2428,7 +2428,17 @@ locale：
             bool expired() const //返回这个weak_ptr是否指向了一个对象，相当于use_count()==0
             std::shared_ptr<T> lock() const //返回一个shared_ptr，如果这个weak_ptr指向的对象已经被释放，则返回一个空shared_ptr，相当于expired() ? shared_ptr<T>() : shared_ptr<T>(*this)
     4. template<typename T> std::enable_shared_from_this
-        使得一个由std::shared_ptr管理的类对象安全的产生其他指向同一对象的std::shared_ptr
+        由于shared_ptr的引用机制要生效，就必须要从另一个shared_ptr或weak_ptr中获取控制块的信息
+        因此如果要从一个对象中，特别是在成员方法中获取指向自身的被引用计数的shared_ptr，就必须使用某种机制来保存一个控制块的信息
+        而不能简单的由this构造一个shared_ptr
+            class NeedShare
+            {
+                auto get()
+                {
+                    return std::shared_ptr{this}; //错误，this可能会随时被delete
+                }
+            }
+        std::enable_shared_from_this使得一个由std::shared_ptr管理的类对象能安全的产生其他指向同一对象的std::shared_ptr
         需要公有继承这个类，并当需要产生指向this的std::shared_ptr时，调用shared_from_this()方法
             struct My : std::enable_shared_from_this<My>
             {
@@ -2448,8 +2458,10 @@ locale：
                     return shared_from_this();
                 }
             };
-        
-
+        std::enable_shared_from_this的原理决定需要使用某种机制在类中直接保存控制块信息，这样可以使用一个shared_ptr也可以使用一个weak_ptr成员
+        然而将保存一个指向this的shared_ptr成员将使得这个对象永远不能被析构，所以weak_ptr才是解决方案
+        std::enable_shared_from_this的源码就是在类中添加了一个private的weak_ptr成员，默认构造时为nullptr
+        当调用shared_from_this()时，shared_ptr的构造函数会通过trait来判断是否需要初始化这个weak_ptr成员
 STL
     容器：
         顺序容器：
@@ -4484,7 +4496,7 @@ C++11:
 
                     */
                 memory_order_acq_rel,   //确保原子操作前后的代码不能跨越这个原子操作，即之前的不能移到之后，之后的也不能移到之前
-                memory_order_seq_cst    //默认值，最强的顺序约束
+                memory_order_seq_cst    //seqeunce consistent，默认值，最强的顺序约束
             };
         }
         对于x86平台，所有原子量的load()操作都是acquire，所以使用这个内存序是没有代价的，同样的，所有原子量的store()都是release
@@ -5504,7 +5516,44 @@ C++20：
                 std::cout << i << ' ';
         上面的|运算符连接等同于
             std::views::transform(std::views::filter(ints, even), square))
-            
+        实现原理：
+            view_interface是一个用于实现view的接口定义类，使用CRTP语义，派生类按需实现其中定义的接口
+                https://en.cppreference.com/w/cpp/ranges/view_interface
+
+                template<typename D> requires std::is_class_v<D> && std::same_as<D, std::remove_cv_t<D>>
+                class std::ranges::view_interface
+                {
+                    empty()
+                    operator bool()
+                    data()
+                    size()
+                    front()
+                    back()          //bidirectional_range
+                    operator[]()    //random_access_range
+                }
+                例如：
+                    template<typename T, typename Allocator>
+                    class VectorView : public std::ranges::view_interface<VectorView<T, Allocator>>
+                    {
+                        typename std::vector<T, Allocator>::const_iterator begin{}, end{};
+                    public:
+                        VectorView() = default;
+                        VectorView(std::vector<T, Allocator> const& vec) : begin{vec.begin()}, end{vec.end()} {}
+                        auto begin() const { return begin; }
+                        auto end() const { return end; }
+                    }
+            subrange
+                std::semiregular概念定义了一种类型，可以复制，可以默认构造，类似于int这样的内置类型，但是不支持用==比较
+                    template<typename T> concept semiregular = std::copyable<T> && std::default_initializable<T>; 
+                std::regular概念定义了一种类型可以复制、可以默认构造，可以用==比较，类似于int这样的内置类型
+                    template<typename T> concept regular = std::semiregular<T> && std::equality_comparable<T>;
+                std::sentinel_for概念定义了一个迭代器类型和一个边界值类型是否可以比较
+                    template<typename S, typename I>
+                    concept sentinel_for = 
+                        std::semiregular<S> &&              //边界值类型可以复制、可以默认构造，不支持用==比较
+                        std::input_or_output_iterator<I>    //I是一个迭代器类型
+                        __WeaklyEqualityComparableWith<S, I>//定义了迭代器I可以与边界值S比较
+                
     3.概念 Concepts
         Concept是一个具名的布尔值谓词，在编译器用来评估模板参数是否符合某种要求，作用类似于SFINAE与traits相结合
         concepts引入了两个新关键字concept和require和一个新头文件<concepts>

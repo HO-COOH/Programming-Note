@@ -75,7 +75,55 @@
         /MTd -> LibCMtD.lib 静态链接调试版本
         /MD -> MSVCRt.lib 导入库，用于动态链接MSVCR80.dll库的发行版本（默认）
         /MDd -> MSVCRtD.lib 导入库，用于动态链接MSVCR80D.dll库的调试版本
-    
+    调用约定：
+        __cdecl
+            参数是从右到左入栈，所以第一个参数在栈顶，主调函数负责将参数出栈，函数名修饰时在前面加一个下划线
+        __stdcall
+            是Win32 API主要使用的调用约定，除了可变参数函数（可变参数函数使用__cdecl调用约定）
+            参数是从左到右入栈，所以第一个参数在栈顶，被调函数负责将参数出栈，函数名修饰时会在前面加一个下划线，在后面加一个'@'和参数的字节数
+
+Microsoft::VisualStudio::CppUnitTestFramework 单元测试框架
+    https://docs.microsoft.com/en-us/visualstudio/test/microsoft-visualstudio-testtools-cppunittestframework-api-reference?view=vs-2022#In_this_topic
+    包含#include "CppUnitTest.h"
+    使用名称空间using namespace Microsoft::VisualStudio::CppUnitTestFramework;
+    测试函数可以用不同的.cpp源文件、名称空间、类来分开
+        /*Source1*/
+        namespace UnitTestNamespace1
+        {
+            TEST_CLASS(UnitTestClass1)
+            {
+            public:
+                TEST_METHOD(UnitTestMethod1)
+                {
+                    //...
+                }
+            };
+        }
+    这样可以在Test Explorer中得到一个直管的树状图
+        Source1
+            UnitTestNamespace1
+                UnitTestClass1
+                    UnitTestMethod1
+    API和用法
+        初始化
+            在一个类中，使用TEST_METHOD_INITIALIZE(name)函数，将会在每个TEST_METHOD()单元测试函数执行前执行
+            在一个类中，使用TEST_METHOD_CLEANUP(name) 函数，将会在每个TEST_METHOD()单元测试函数执行后执行
+            类似的，在一个类中，使用TEST_CLASS_INITIALIZE(name)和TEST_CLASS_CLEANUP(name)函数，在同一个类的所有测试函数执行前和执行后执行一次
+        断言
+            Assert::AreEqual()
+            Assert::AreNotEqual()
+            Assert::AreSame() //断言两个对象的引用是否指向同一对象
+            Assert::AreNotSame() //断言两个对象的引用是否指向不同的对象
+            Assert::IsNull()
+            Assert::IsNotNull()
+            Assert::IsTrue()
+            Assert::IsFalse()
+            Assert::Fail() //强制失败
+            所有的断言函数都额外接受一个wchar_t const*作为输出信息，和一个__LineInfo*作为出错的行号
+        信息输出
+            Logger::WriteMessage(wchar_t const* message)
+            Logger::WriteMessage(char const* message)
+        
 1.高级数据类型
     为了统一成大写，VC++给很多类型取了大写的typedef
     INT->int
@@ -144,8 +192,35 @@
         }
 
     VOID SetLastError(DWORD dwErrCode) 设置Error值
+    错误模式
+        错误模式指定系统如何报告严重错误，包括：磁盘错误、驱动错误、数据对齐错误、未处理的异常等错误
+        默认情况下出现严重错误时系统将弹出一个对话框
+        可以按进程或按线程设置出现严重错误时的模式
+            SetErrorMode(UINT uMode)
+                uMode的值可以是以下值的组合
+                    0 对所有严重错误显示对话框
+                    SEM_FAILCRITICALERRORS 不显示关键错误的对话框
+                    SEM_NOALIGNMENTFAULTEXCEPT 系统自动处理数据对齐的错误
+                    SEM_NOGPFAULTERRORBOX 不显示错误报告程序
+                    SEM_NOOPENFILEERRORBOX 不显示打开文件错误提示
+            SetThreadErrorMode()
+            GetErrorMode()
+            GetThreadErrorMode()
+        通常进程应该一开始就调用SetErrorMode(SEM_FAILCRITICALERRORS) 防止错误对话框将进程挂起，其他错误模式应该按需要对线程设置
+    错误码
+        许多函数会直接返回错误码，而且还会设置一个Last-error-code
+        每个线程的最近的错误码是相互独立的，通过调用SetLastError()和SetLastErrorEx()来设置
+        错误码是一个32位无符号整数，其中29位（从0开始）是给应用程序预留，系统错误不会使用这一位、
+            系统错误码列表https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes
+    通知错误
+        要向用户通知错误，很多程序采用蜂鸣器MessageBeep()
+        或者闪烁窗口FlashWindow()和FlashWindowEx()
+        也可以显式一个对话框
+    不可恢复错误
+        当遇到不可恢复的错误时，使用FatalAppExit()显示一个对话框
+        这个函数最好只用作最后的救赎
+        
 
-    
 3.字符串
     在<winnt.h>中定义了这些宏
 
@@ -1300,6 +1375,15 @@ UI相关
 
 Direct2D
     D2D是用来替代已有的GDI GDI+的2D图形API，它可以在有硬件加速的条件下基于Direct3D渲染，也可以在没有时基于软件渲染
+    Direct2D和其他API的关系
+        Direct3D是Windows上提供的用户态（user-mode）最底层的图形API，使用立即模式渲染，但是调用复杂
+        Direct2D基于Direct3D的立即模式，提供了几何、位图、ClearType文字的渲染，大大简化了调用
+        Direct2D还提供了在远程桌面Remote Desktop Protocol的远程渲染
+    由于D2D只是个渲染API，所以渲染到一个窗口时需要程序员手动处理窗口消息，手动接收鼠标操作等
+    D2D使用一个简化版的COM标准来提供接口，接口都继承自IUnknown，但不需要在使用前初始化COM组件和线程模型
+    可以直接使用ATL库中的CComPtr智能指针来管理这些接口，例如
+        CComPtr<ID2D1Factory> pFactory;
+        HR(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &factory));
     包含头文件
         <d2d1.h>    C和C++的主要D2D API
         <d2d1_1.h>  给win8和之后用的D2D API
@@ -1312,12 +1396,14 @@ Direct2D
         <d2d1effecthelper.h> 图形效果的辅助函数、类和结构体，win8之后可用
         <d2derr.h>  定义了d2d的错误码，包含于<d2d1.h>中
     链接库
-            d2d1.lib        
+        d2d1.lib        
+        使用#pragma comment(lib, "d2d1.lib")
     创建一个D2D工厂并指定渲染目标
         ID2D1Factory* pD2DFactory{};
         D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &pD2DFactory)
-    创建
-        创建完D2D工厂后，指定渲染目标
+            D2D1_FACTORY_TYPE_SINGLE_THREADED、D2D1_FACTORY_TYPE_MULTI_THREADED与实际COM的线程模型无关，只是指定一个对象是否只能同时被一个线程访问
+        创建完D2D工厂后，指定渲染目标，而后在这个渲染目标上创建与设备相关的资源
+        渲染目标可以是一个窗口HWND或一个GDI设备DC或在D3D程序中的一个DirectX表面DXGI，甚至可以是一个离屏渲染用的bitmap
             ID2D1HwndRenderTarget* pRt{};
             auto const hr = pD2DFactory->CreateHwndRenderTarget(
                 D2D1::RenderTargetProperties(),     //使用默认的渲染目标属性
@@ -1327,6 +1413,35 @@ Direct2D
                 ),
                 &pRt
             );
+    创建渲染目标的新方法，通过D3D设备创建
+        步骤：
+            创建一个D3D设备
+            将D3D设备作为一个DXGI设备
+            获取这个DXGI设备的适配器
+                从DXGI适配器获取DXGI工厂
+                从DXGI工厂创建一个交换链
+                从这个交换链获取一个缓冲作为DXGI surface
+
+            用DXGI设备使用D2D工厂创建一个D2D设备
+            从这个D2D设备创建一个D2D设备上下文
+            用D2D设备上下文从上面的DXGI surface创建一个d2d surface作为渲染目标
+            后面使用这个D2D设备上下文绘制并渲染
+
+        ID3D11Device d3dDevice{};
+
+        //创建一个D3D设备
+        D3D11CreateDevice(
+            nullptr,                    //IDXGIAdapter* pAdapter，指定使用的显示适配器，如果为NULL，则使用IDXGIFactory::EnumAdapters找到的第一个显示适配器
+            D3D_DRIVER_TYPE_HARDWARE,   //https://docs.microsoft.com/en-us/windows/win32/api/d3dcommon/ne-d3dcommon-d3d_driver_type
+            NULL,                       //当设备类型是D3D_DRIVER_TYPE_SOFTWARE时才需要指定
+            D3D11_CREATE_DEVICE_BGRA_SUPPORT,
+            featureLevels,
+            ARRAYSIZE(featureLevels),
+            D3D11_SDK_VERSION,
+            &d3dDevice,
+            nullptr,
+
+        )
         创建绘图资源
             创建完渲染目标后可以从这个渲染目标创建各种绘图资源，例如画刷
                 ID2D1SolidColorBrush* pBlackBrush{};
@@ -1344,11 +1459,40 @@ Direct2D
                 图层layer
                 
                 网格mesh
+        D2D资源的创建过程区分了设备相关资源和设备不相关资源，所以可以写成这两个函数
+            HRESULT CreateDeviceIndependentResources()  //在创建窗口的时候调用
+            {
+                HRESULT hr; 
+                HR(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &m_factory)); 
+                // TODO: Create device-independent resources here 
+                return S_OK;
+            }
+            HRESULT CreateDeviceResource()
+            {
+                HRESULT hr; 
+                if (0 == m_target) 
+                { 
+                    CRect rect; 
+                    VERIFY(GetClientRect(&rect)); 
+                    D2D1_SIZE_U size = D2D1::SizeU(rect.Width(), rect.Height()); 
+                    HR(m_factory->CreateHwndRenderTarget(D2D1::RenderTargetProperties(), D2D1::HwndRenderTargetProperties(m_hWnd, size), &m_target));
+                }
+                return S_OK;
+            }
     绘制
         使用渲染目标来绘制
         pRt->BeginDraw();
         pRt->DrawRectangle(D2D1::RectF(...));
         auto const hr = pRt->EndDraw();
+        为了优化性能，可以在绘制前检查窗口是否被完全遮挡，如果是被遮挡就不需要绘制（DWM会在内部自动检查遮挡关系，不过还是可以在代码中手动操作）
+            if (0 == (D2D1_WINDOW_STATE_OCCLUDED & m_target->CheckWindowState()))
+            {
+                m_target->BeginDraw();
+
+                // TODO: render here
+
+                m_target->EndDraw();
+            }
     释放
         需要释放渲染目标和渲染设备和绘图资源
             SafeRelease(pRt);
@@ -1425,7 +1569,75 @@ MFC
                 CTreeView
                 CListView
                 CRichEditView
+    在MFC工程中添加ATL支持
+        在VS解决方案下的工程中右键->New Item->ATL->ATL support
+ATL
+    提供了一些基于C++模板的类库来简化实现COM组件的代码
+    继承关系：
+        CYourClass : 
+            CComObjectRoot 或 CComObjectRootEx
+            CComCoClass<T>
+            IDispatchImpl<T>
+            ISupportErrorInfoImpl
+        即要实现一个COM组件CYourClass，需要继承CComObjectRoot，CComCoClass，IDispatchImpl，ISupportErrorInfoImpl并实现其中的接口
+
+        使用一个COM对象
+            接口关系
+                外部通过调用CComObject<T>对象的方法来操作内部的CYourClass对象
+            包含关系
+                CComAggObject<T>直接将内部的CYourClass暴露成成员，外部通过成员指针直接对成员操作
+            
+        或者通过
+        CComObject<T>
+        CComAggObject<T>
+        CComPolyObject<T>
+    CComObjectRoot/CComObjectRootEx
+        管理引用计数，提供QueryInterface接口
+        QueryInterface()接口调用内部的CComObjectRootEx::InternalQueryInterface()，这个函数只处理COM map table中声明的接口
+        要声明这些接口，使用下面的宏
+            BEGIN_COM_MAP(CBeeper)
+                COM_INTERFACE_ENTRY(IBeeper)
+                COM_INTERFACE_ENTRY(IDispatch)
+                COM_INTERFACE_ENTRY_TEAR_OFF(IID_ISupportErrorInfo, CBeeper2)
+            END_COM_MAP()
+    CComAggObjectCoClass
+        定义了对象的工厂函数和聚合模型
+    IDispatchImpl
+        提供了在对象支持多接口类型是的IDispatch Interface成分
+    ISupportErrorInfoImpl
+        实现了ISupportErrorInfo接口，是的错误信息能正确的沿调用栈向上传播
+    工程创建
+        YourClass.cpp
+        YourClass.def
+        YourClass.idl
+
+        YourClass.rc
+        YourClass.rgs 注册这个COM dll的注册表信息
+
+        Resource.h   YourClass.rc的头文件
         
+        pch.h    预编译头，包含ATL的头文件
+        pch.cpp  #include "pch.h"
+
+        dllmain.h
+        dllmain.cpp
+
+        framework.h
+        targetver.h
+        要添加一个新类，右键工程->ATL->ATL Simple Object->Add
+        提供一个类名，VS会新生成一下的文件
+            NewClass.rgs
+            NewClass.h
+            NewClass.cpp
+        并在idl文件中添加新接口INewClass的声明
+        要添加一个新方法，在Class View中右键要添加方法或属性的接口名，选择Add Method或Add Property，然后跟随向导操作
+    其他问题：
+        在VS中编译工程，会发出
+            MSB8011: Failed to register output. Please try enabling Per-user Redirection or register the component from a command prompt with elevated permissions.
+        原因是要将COM组建注册到HKEY_CLASSES_ROOT需要管理员权限
+        解决方法：在工程设置->Linker->General->Per-user Redirection->Yes
+        可以将COM组件注册到HKEY_CURRENT_USER，消除这个错误
+
 MVVM
     View定义了界面，通常是Xaml，或者极少与界面呈现相关的代码
     ViewModel定义了界面与核心业务逻辑和核心业务数据交互的逻辑，包括界面元素响应的处理函数
@@ -2824,3 +3036,8 @@ WINUI3
                 <Resource Language="en-US"/>
                 <Resource Language="es-ES"/>
             </Resource>
+WMI
+    Windows Management Instrumentation
+    WMI用于管理Windows系统的数据和操作
+    可以通过使用WMI脚本来远程自动化一些管理员权限的操作，在企业应用中比较常见
+    

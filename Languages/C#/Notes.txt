@@ -925,3 +925,103 @@ Attribute
                     Offline, Online, Unknown
                 }
 
+10.调用C代码
+    需要使用名称空间
+        using System.Runtime.InteropServices;
+    从C#调用dll中的C代码
+        使用DllImport声明要引入的dll库
+        使用CharSet指定dll对于字符串的编码方式
+        SetLastError表明可以从Marshal.GetLastWin32Error()中获取错误码信息
+        类型的转换关系：
+            字符串类型：
+                Pinvoke通常能正确处理类型转换，但在特殊情况下可以使用MarshalAs属性来指定数据的二进制格式
+                要制定以\0结尾的ASCII字符串，使用MarshalAs(UnmanagedType.LPStr)，例如：
+                    [DllImport("somenativelibrary.dll")]
+                    static extern int MethodA([MarshalAs(UnmanagedType.LPStr)] string parameter);
+            常见基本类型：
+                byte -> uint8_t
+                sbyte -> uint8_t
+                short -> int16_t
+                ushort -> uint16_t
+                int -> int32_t
+                uint -> uint32_t
+                long -> int64_t
+                ulong -> uint64_t
+                char -> 由CharSet属性决定 char/char16_t
+                string -> 由CharSet属性决定 char*/char16_t*
+                System.IntPtr -> intptr_t
+                System.UIntPtr -> uintptr_t
+                bool -> BOOL (32位整数)
+                decimal -> DECIMAL
+                System.DateTime -> DATE
+                System.Guid -> GUID
+                delegate -> 函数指针
+                数组 -> 指针类型（在结构体中需要MarshalAs属性）
+                结构体（需要指定LayoutKind) -> 指向结构体的指针
+                对于C#的bool类型，需要特别注意，默认将转换为32位整形，当在C/C++中使用时有可能有不同的二进制表示，所以需要使用MarshalAs属性
+                例如需要使用C++中的原生bool类型（8位）时，需要指定UnmanagedType.U1或UnmanagedType.I1
+                    public struct CBool
+                    {
+                        [MarshalAs(UnmanagedType.U1)]
+                        public bool Value;
+                    }
+                    
+            类和结构体：
+                当C中需要指向结构体的指针时，需要在C#中定义这样的类，并指定StructLayout属性为LayoutKind.Sequential
+                    [DllImport("kernel32.dll")]
+                    static extern void GetSystemTime(SystemTime systemTime);
+
+                    [StructLayout(LayoutKind.Sequential)]
+                    class SystemTime {
+                        public ushort Year;
+                        public ushort Month;
+                        public ushort DayOfWeek;
+                        public ushort Day;
+                        public ushort Hour;
+                        public ushort Minute;
+                        public ushort Second;
+                        public ushort Milsecond;
+                    }
+
+                    public static void Main(string[] args) {
+                        SystemTime st = new SystemTime();
+                        GetSystemTime(st);
+                        Console.WriteLine(st.Year);
+                    }
+            对于C中的指针类型，
+            结构体类型：
+
+            对于函数指针类型，声明为与函数指针类型相同的deletegate类型，例如：
+                int (*)(char const*, struct stat const*, int)->
+                delegate int (string, stat, int)
+        例如：
+            [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+            private static extern int MessageBox(IntPtr hWnd, string lpText, string lpCaption, uint uType);
+11.垃圾回收
+    CLR在运行程序时会先开辟一块内存称为managed heap
+    堆区对象分为3代：0代，1代，2代
+    将堆区对象分代的原因是：
+        1.将堆区的一小片区域的内存压缩（即使堆区对象在内存中连续），比压缩整块managed heap快
+        2.新创建的对象通常有更短的生命周期，且跟其他对象的联系通常更多
+    另外，对于大体积的对象（通常大于85000字节），分配时将分配到专门的大对象堆区，大对象使用的堆区空间通常不会被压缩
+    在程序加载运行时，运行时Runtime会调用VirtualAlloc()分配一块连续的地址空间，称为managed heap，并储存一个指向这块内存起始位置的指针
+    当需要分配对象时，从这个指针开始分配，并移动指针，下一个对象将紧接着这个对象的后面分配，除非空间耗尽，这样的分配策略是高效的
+    当0代对象区内存耗尽时，执行一次垃圾回收，此时垃圾回收器找出没有被引用的对象，释放内存，并移动其他还在被引用的对象到连续的内存（称为压缩），并修改他们的指针，并将对象分配为1代
+    这样可以避免在空间更大的1,2代对象所占的空间中查找并提升性能
+    虚拟内存的3中状态：
+        空闲：这块内存没有被对象占用，可以用来分配新对象
+        保留：这块内存可以被使用，但不能用来分配新对象，但在这块内存被提交之前不能用来存储信息，即只读
+        已提交：这块内存已经分配到物理内存中
+    当垃圾回收器执行时，除了触发垃圾回收的线程外所有其他线程被暂停，触发垃圾回收的线程执行垃圾回
+    非managed resource
+        对于不被运行时管理的代码，例如原生C、C++代码，需要显式添加一个Dispose()方法来释放资源
+    运行模式
+        垃圾回收器有两种运行模式适用于不同的程序类型
+            工作站
+                默认的模式，而且当电脑只有一个处理器时只使用这个模式
+                可以运行在并发（或后台模式，此时其他线程可以继续执行）或非并发模式
+            服务器
+                垃圾回收器运行在多个线程中，且具有THREAD_PRIORITY_HIGHEST最高的优先级
+                由于回收器是多线程的，比工作站模式效率高
+                也可以运行在并发（或后台模式）或非并发模式
+                
