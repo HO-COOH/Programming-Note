@@ -1168,3 +1168,225 @@ Ajax（Asynchronous Javascript and XML）
     fetch():
         fetch(url)返回一个Promise对象
     blob（binary large object）
+
+Vue:
+    计算属性
+        有时候想在template中使用一些逻辑，如果直接使用js表达式，可能会导致template冗长难以调试
+        可以在导出对象中的computed属性中加入函数返回一个值，在template中按访问属性的方法来调用这个函数得到返回值
+        export default
+        {
+            ...
+            computed:
+            {
+                myComputedProperty()
+                {
+                    return {...}
+                }
+            }
+        }
+
+        <template>
+            <span> {{myComputedProperty}}</span>
+        </template>
+
+        计算属性用起来与methods中定义函数类似
+            export default
+            {
+                ...
+                methods:
+                {
+                    myComputedProperty()
+                    {
+                        return {...}
+                    }
+                }
+            }
+            <template>
+                <span> {{myComputedProperty()}}</span>
+            </template>
+        但计算属性有缓存机制，避免不必要的重复计算
+        但如果在计算属性中使用不带通知机制的对象，例如Date()，则意味着下次调用不会更新它的值，这时需要改用methods
+        计算属性默认是只读的，如果需要可写，需要显示定义一个get()和set()
+            computed:
+            {
+                fullnName:
+                {
+                    get()
+                    {
+                        ...
+                    }
+                    set()
+                    {
+                        ...
+                    }
+                }
+            }
+    绑定
+        数据绑定
+            字符串插入
+                使用{{字符串名}}来引用data()函数返回的某个变量
+                    <span>Messgae: {{msg}}</span>
+            HTML插入
+                如果使用{{}}语法，会导致直接插入原始HTML字符串
+                如果需要将HTML字符串解释为DOM，需要使用v-html=""指令
+                    <p>Using v-html directive: <span v-html="rawHtml"></span></p>
+            属性绑定
+                要在HTML的属性里插入字符串，需要使用v-bind:<属性>=""指令
+                    <div v-bind:id="dynamicId"></div>
+                简写
+                    由于属性绑定使用频繁，所以可以省略掉v-bind，只写出冒号后的内容
+                        <div :id="dynamicId></div>
+                绑定布尔值
+                    布尔值的绑定原则依据JS的真假值
+                        <button :disabled="isButtonDisabled"></button>
+                绑定对象
+                    例如要在HTML属性中绑定多个属性，可以直接使用在data()中返回的一个对象
+                    export default
+                    {
+                        ...
+                        data()
+                        {
+                            return {
+                                objectOfAttrs:
+                                {
+                                    id: 'container',
+                                    class: 'wrapper'
+                                }
+                            }
+                        }
+                    }
+
+                    <div v-bind="objectOfAttrs"></div>
+                动态属性绑定
+                    要绑定的属性也可以是用方括号[]括起来的动态的字符串变量
+                        <a v-bind:[attributeName]="url"></a>
+                        此时attributeName和url都是一个变量
+                绑定class
+                    使用双引号+花括号"{}"将class的值括起来
+                        <div :class="{active: isActive}"></div>
+                    vue的class可以和普通html class并存，这是因为普通html class没有v-bind:
+                        <div class="static" :class="{active: isActive}"></div>
+                绑定style
+                    使用双引号+花括号"{}"将style的值括起来
+                        data()
+                        {
+                            return {
+                                activeColor: 'red',
+                                fontSize: 30
+                            }
+                        }
+
+                        <div :style="{color: activeColor, fontSize: fontSize + 'px'}"></div>
+                    也可以将style绑定到一个JS对象
+                        data()
+                        {
+                            return {
+                                styleObject: {
+                                    color: 'red',
+                                    fontSize: 30
+                                }
+                            }
+                        }
+
+                        <div :style="styleObject"></div>
+                    也可以将style绑定到一个JS的对象数组，此时数组中的对象将会被合并成一个对象
+                        <div :style="[baseStyles, overridingStyles]"></div>
+                    
+            使用表达式
+                在可以用绑定的地方都可以用JS表达式
+                必须是一个单一的JS表达式
+            
+        方法绑定
+            方法事件处理器
+                使用@<html事件>="方法名"的语法
+                    <button @click="onClick"/>
+            内联事件处理器
+                也可以对方法增加参数，使之成为内联事件处理器
+                    methods:
+                    {
+                        say(message)
+                        {
+                            alert(message);
+                        }
+                    }
+
+                    <button @click="say('hello')"></button>
+                内联事件处理器可以使用一个$event变量，在调用事件处理函数时，该变量为原始的DOM事件
+                    <button @click="warn('somgthing', $event)"></button>
+                
+        运行时选择渲染
+            v-if="value"使得该node在value为真时才渲染
+            v-else 使得与v-if配对的node在value为假时才显示
+            v-else-if
+            v-show="value"使得该node在value为真时才显示，否则隐藏，实际上是通过CSS的display属性来控制的，所以总是会存在在DOM中
+                所以当元素可能经常要切换显示/隐藏状态时使用v-show
+        v-for
+            v-for绑定到一个JS数组
+                data()
+                {
+                    return {
+                        items: [{message: 'Foo'}, {message: 'Bar'}]
+                    }
+                }
+
+                <li v-for="item in items">
+                    {{item.message}}
+                </li>
+                v-for还支持第二绑定参数，绑定到当前元素的索引
+                    <li v-for="(item, index) in items">
+                        ...
+            v-for绑定到一个对象
+                按JS for in循环的方式迭代对象的每一个属性的值
+                data()
+                {
+                    return {
+                        myObject:
+                        {
+                            title: 
+                        }
+                    }
+                }
+
+                <ul>
+                    <li v-for="value in myObject">
+                        {{value}}
+                    </li>
+                </ul>
+                v-for在绑定到对象时支持两个绑定参数，此时按<value, key>的形式迭代对象的属性
+                    <li v-for="(value, key) in  myObject">
+                        ...
+                或三个参数，按<value, key, index>的形式迭代对象的属性
+                    <li v-for="(value, key, index) in myObject">
+                        ...
+            v-for绑定整数范围
+                <span v-for="n in 10">{{n}}</span>
+    组件
+        组件注册
+            全局注册
+                在App.vue中注册的组件可以在整个app的任何一个.vue文件中使用
+                调用app的component()方法注册全局组件
+                    const app = createApp({})
+                    app.component(
+                        'MyComponent',
+                        {
+                            //实现
+                        }
+                    )
+                MyComponent放到单独的.vue文件时，需要import再注册
+                    import MyComponent from './MyComponent.vue'
+                    app.component('MyComponent', MyComponent)
+                .component()方法可以串联调用
+                    app
+                    .component('ComponentA', ComponentA)
+                    .component('ComponentB', ComponentB)
+                    .component('ComponentC', ComponentC)
+            局部注册
+                在某一个父组件的.vue文件中注册一个子组件
+                在父组件的components对象中添加要注册并使用的子组件
+                    import ComponentA from './ComponentA.vue'
+                    export default{
+                        components:
+                        {
+                            ComponentA
+                        }
+                    }

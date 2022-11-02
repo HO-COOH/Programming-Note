@@ -105,7 +105,8 @@
     智能类型转换
         多数情况下不需要做显式类型转换
         编译器会自动根据is运算符在作用域内将操作数转换成相应类型
-            fun demo(x: Any) {
+            fun demo(x: Any) 
+            {
                 if (x is String) {
                     print(x.length) // x is automatically cast to String
                 }
@@ -149,7 +150,9 @@
                 enumValues<EnumClass>() : Array<EnumClass>  //返回包含EnumClass枚举类型的所有枚举值的数组
                 enumValueOf<EnumClass>(value: String) : EnumClass //返回以字符串value为枚举名的枚举值，若不存在抛出IllegalArgumentException异常        
     类型别名
+        类型别名可以用于给类类型（包括泛型）或函数类型起一个类型别名
         用typealias <Name> = <Type>定义一个类型别名，例如
+            typealias NodeSet = Set<Network.Node>
             typealias ClickHandler = (Button, ClickEvent) -> Unit
 
 二、语句
@@ -257,6 +260,8 @@
             class Person(firstName: String){ }  //firstName是主要构造函数的一个参数
         可以将需要初始化的类成员的声明直接放在主要构造函数中，使得主要构造函数可以直接对数据初始化
             class Person(val firstName: String) //firstName是Person类的一个成员，并在主要构造函数中直接被初始化
+        主要构造函数中也可以给某个类成员加可见性修饰符，例如
+            class Dice(private val numSides : Int)
         主要构造函数只用于初始化，不能包含代码，代码要放在init语句块中，此时init语句块可以使用主要构造函数中的参数
             class Person(fullName:String)
             {
@@ -294,8 +299,32 @@
                         field = value
                         // counter = value // ERROR StackOverflow: Using actual name 'counter' would make setter recursive
                 }
-    
-
+        委托属性
+            一个类的属性可以从另一个类中获得，这样的属性成为委托属性
+            用val声明的属性要求被委托类需要有一个运算符函数operator getValue(thisRef, property)方法
+            用var声明的属性还额外需要一个setValue(thisRef, property, value)方法
+            使用
+                val property : Type by Delegate声明一个委托属性
+            标准定义了几个常用的被委托类
+                lazy(lambda) 用于延迟初始化一个属性，在第一次使用时调用lambda计算其值，以后再使用时直接返回
+                    interface Lazy<out T>
+                    {
+                        operator fun <T> getValue(): T
+                    }
+                    fun <T> lazy(mode: LazyThreadSafetyMode, initializer: () -> T) : Lazy<T>
+                    其中mode可选的值：
+                        SYCHRONIZED 多线程安全（默认）
+                        PUBLICATION 多个线程可以同时初始化，但只有最先返回值的线程所返回的值作为最终初始化的值
+                        NONE 无线程安全
+                observable(initialValue, lambda) 用于在值发生改变后调用回调函数lambda
+                    inline fun <T> observable(
+                        initialValue : T,
+                        crossinline onChange: (property: KProperty<*>, oldValue: T, newValue: T) -> Unit
+                    ): ReadWriteProperty<Any?, T>
+            委托到另一个属性
+                ::topLevelInt 委托到一个全局属性
+                this::memberInt 委托到这个类的另一个属性
+                anotherClassInstance::anotherClassInt 委托到另一个类的属性
     4.接口类
         接口类使用关键字interface声明，接口类可以定义具体方法或抽象方法，与抽象类不同的是，接口类不能存储非抽象的数据成员，或者需要用get()方法来赋初值
         接口类的方法如果没有定义，默认为abstract修饰的抽象方法
@@ -407,6 +436,24 @@
 
         a(i_1,...,i_n) a.invoke(i_1,...,i_n)
 
+        a..b和a in b的重载例子：
+            kotlin自带的数字范围1..10实际是使用了Int.rangeTo()的方法，返回一个IntRange类型
+                public operator fun rangeTo(other: Int) : IntRange
+            IntRange中定义了.contains()方法，所以可以使用in运算符来运用到for循环中
+            IntRange继承自IntProgression类
+            这个类定义了iterator()方法返回一个迭代器，使得其可以用在for循环中
+            还定义了一个中置函数step()方法返回一个新的IntProgress类，这个方法用来修改每次步进的数值
+                class IntProgression
+                {
+                    ...
+                }
+                public infix fun IntProgression.step(step : Int) : IntProgression
+                class IntRange(...) ： IntProgression
+                {
+                    override fun contains(value: Int) : Boolean
+                }
+
+
     6.创建对象
         var object = MyClass()
 五、继承
@@ -472,7 +519,18 @@
                 }
             派生类中的嵌套类可以使用super@<OuterClassName>来调用外层类的基类的方法
 泛型
-
+    类型推导
+        如果泛型的类型参数可以通过例如构造函数推导，则可以省略类型
+            class Box<T>(t:T){ var value = t}
+            val box = Box(1) // T=>Int
+    协变covariant 与逆变 contravariant
+        如果有Animal 基类和Cat子类
+        则当类型构造器对内部元素类型只有抛出操作时，称之为协变，例如
+            一个List<Cat>可以赋值给一个List<Animal>，因为List<Cat>是List<Animal>的子类，从而“抛出”给接收List<Animal>的引用来消费
+        当类型构造器对内部元素类型只有接收操作时，称之为逆变，例如
+            List<Animal>可以添加一个Cat的元素，“接收”一个List<Cat>来消费
+        当容器既有抛出又有接收时，应该是不变的
+        kotlin允许在定义类型时或使用时（函数参数，变量生命）定义通过in、out关键字分别定义逆变和协变
 六、stdlib
     stdlib中的容器分为可修改容器和不可修改容器，继承层次
                                                     MutableList
@@ -486,25 +544,194 @@
                 List    Set
     通用：
         创建容器
-            listOf()
-            meptyList<T>()
-            mutableListOf()
-            setOf()
-            emptySet<T>()
-            mutableSetOf()
-            mapOf()
-            mutableMapOf()
-                Map的构造函数需要使用键值对Pair类型来构造，构造一个Pair使用<key> to <value>的语法
-                val numbersMap = MapOf("key1" to 1, "key2" to 2, "key3" to 3)
-            
+            值初始化
+                listOf()    emptyList<T>()  mutableListOf()
+                setOf()     emptySet<T>()   mutableSetOf()
+                mapOf()     mutableMapOf()
+                    Map的构造函数需要使用键值对Pair类型来构造，构造一个Pair使用<key> to <value>的语法
+                    val numbersMap = MapOf("key1" to 1, "key2" to 2, "key3" to 3)
+            建造者初始化
+                也可以使用带接收者的函数类型使用建造者模式来初始化一个容器
+                buildList()
+                    完整签名：inline fun <E> buildList(builderAction: MutableList<E>.()->Unit)
+                buildSet()
+                buildMap()
+        复制
+            使用.toXXX()开头的成员函数会对容器进行深复制，例如.toList()会复制构造一个新的List
+        迭代器
+            实现了Iterable<T>接口的类可以返回一个迭代器Iterator<out T>
+                interface Iterator<out T>
+                {
+                    abstract operator fun hasNext() : Boolean
+                    abstract operator fun next(): T     //返回当前的值，并前进迭代器
+                }
+            对于可修改的容器即实现了MutableIterable<T>接口的类可以返回一个迭代器MutableIterator，相比Iterator多了一个.remove()方法
+                interface MutableIterator<out T> : Iterator<T>
+                {
+                    abstract fun remove()
+                }
+        顺序
+            标准中定义了另一个可迭代的类Sequence<T>，类似于Iterable，但不同的是对于Sequence类的操作是推迟的，而Iterable是即使的
+        算法
+            对所有容器都通用的算法是作为拓展函数而不是成员方法实现的，包括
+                变换
+                    map()
+                    mapIndexed()
+                    mapNotNull() 如果map()操作可能返回null，则跳过，不把null输出到目标容器中
+                    mapIndexedNotNull()
+                    mapKeys() 用于Map，变换键，保留值
+                    mapValues() 用于Map，变换值，保留键
+                    
+                    zip()可用其中置函数的形式 a zip b
+                    unzip()以List<Pair>作为输入，输出包含两个list的list，第一个list的元素是所有Pair的第一个元素，第二个list的元素是所有Pair的第二个元素
+
+                    associateWith() 接受一个函数，并将容器的元素作为键，以函数返回的结果作为值，生成一个Map
+                    associateBy() 接受一个函数，并将函数返回的值作为键，容器元素作为值，生成一个Map
+                    associate() 接受一个函数，函数返回一个Pair，生成一个Map
+
+                    flatten()将容器的容器（二维容器）展开成一维容器
+                    flatMap() 接受一个函数，将一个容器变换为另一个容器，再将变换后的结果展开，生成一维容器，相当于先调用.map()，再调用.flatten()
+
+                    joinToString() 返回一个容器所有元素序列化后合成的一个字符串，可以通过提供separator, prefix, postfix来定制生成的字符串
+                        如果容器的元素太多，可以指定limit和trucated的参数，将超过limit后的元素以truncated字符串代替
+                        还可以提供一个函数来对容器的元素转换
+                    joinTo(buffer)  
+                过滤
+                    filter()
+                    filterIndex()_
+                    filterNot()
+                    filterIsInstance<T>()
+                    filterNotNull()
+
+                    partition() 返回Pair<List>，第一个List是满足谓词的，第二个List是剩余的元素
+
+                    any() 
+                        当any()不接谓词时，可以用来检查容器是否为非空
+                    none()
+                        当none()不接谓词时，可以用来检查容器是否为空
+                    all()
+                +/-
+                    + 可以接收一个元素或一个容器，返回合并后的新容器
+                    - 可以接收一个元素或一个容器，接收元素时，移除原容器中第一次出现该元素的位置，接收容器时，移除容器中所有出现的元素
+                分组
+                    .groupBy() 接收一个函数，将函数的返回值作为键，容器的元素的List作为值，生成一个Map
+                        如果对于某些元素，函数返回相同的键，则在值的List后插入，注意与assocateBy()的区别，associateBy()会覆盖现有的值
+                    .groupingBy() 与groupBy()类似，但返回一个延迟计算的Grouping对象，如果需要对groupBy()操作后的容器继续执行某些操作可以使用gourpingBy()提升性能
+
+                获取成员
+                    .slice()可以接收一个range或一些索引的集合
+                    .take()从容器获取头部的一些元素
+                    .takeLast()从容器获取尾部的一些元素（顺序保持与原容器一致）
+                    .drop()从容器获取去掉头部的一些元素后剩下的元素
+                    .dropLast()从容器获取去掉尾部的一些元素后剩下的元素
+                    .takeWhile()接收一个谓词，从容器中获取头部直到第一个不满足谓词的所有元素
+                    .takeLastWhile()
+                    .dropWhile()接收一个谓词，从容器中获取头部第一个不满足的谓词的元素到容器末尾的元素
+                    .dropLastWhile()
+
+                    .chunck(size)把容器拆分成chunck大小的子容器
+                    .chuncked(size, lambda) chuck()的延迟计算版本
+
+                    .windowed(size) 返回容器中按滑动窗口生成的容器的List
+                        可指定step
+                        partialWindows = true 会同时返回容器比滑动窗口小的窗口
+                        可附加一个lambda对滑动窗口生成的窗口做变换
+                    .zipWithNext({lambda}) 相当于.windowed(2)，但元素的类型是Pair，lambda可选
+
+                    .elementAt(index)
+                    .first() 同find()
+                        接收一个可选的lambda谓词，返回第一个满足谓词的元素，如果没有则抛出异常
+                    .last() 同findLast()
+                        接收一个可选的lambda谓词，返回最后一个满足谓词的元素，如果没有则抛出异常
+                    .firstOrNull()
+                    .lastOrNull()
+                        类似于.first()和last()，但没有时返回null，不跑出异常
+
+                    .elementAtOrNull(index) 越界时返回null
+                    .elementAtOrElse(index, lambda) 越界时执行函数lambda
+                    
+                    .random() 返回随机一个元素，如果容器为空，抛出异常
+                    .randomOrNull() 返回随机一个元素，如果容器为空，返回null
+
+                    .contains(element) 原理是调用元素的.equal()方法比较，也可以用中置函数in的形式
+                    .containsAll(container)
+
+                    .isEmpty()
+                    .isNotEmpty()
+
+                排序
+                    .sorted()
+                    .sortedDescending()
+                    .sortedWith(comparator) 使用一个比较器来排序
+                        可以通过直接构造一个Comparator对象，或使用compareBy()函数来创建一个Comparator
+                    .sortedBy(selector) 接收一个函数，将元素转换为一个可比较对象，再使用这个可比较对象来比较
+                    .sortedByDescending(selector)
+
+                    .reversed()
+                    .asReversed() 返回一个顺序相反的浅拷贝
+
+                    .shuffled() 打乱容器，可选接收一个Random对象
+                聚合操作
+                    .minOrNull()
+                    .maxOrNull()
+
+                    .minByOrNull(selector)
+                    .maxByOrNull(selector) 接受一个lambda，将元素转换为可比较对象再比较
+
+                    .minWithOrNull(comaprator)
+                    .maxWithOrNull(comparator)
+
+                    .minOfOrNull(selector)接受一个lambda，将元素转换为可比较对象后再比较，返回转换后的值
+                    .maxOfOrNull(selector)
+
+                    .minOfWithOrNull(comparator, selector)接受两个lambda，先使用selector将元素转换为可比较对象，再使用comparator比较，返回comparator比较转换后的值
+                    .maxOfWithOrNull(comparator, selector)
+
+                    .average() 仅对数值类Iterable有效
+                    .sum()
+                    .sumOf(selector)
+                    .count()
+    List
+        subList(a, b)  返回[a, b)的一个子数组的View
+
+        indexOf(element) 从前往后找，返回element所在的索引，没找到返回-1
+        lastIndexOf(element) 从后往前找，没找到返回-1
+        indexOfFirst(predicate)
+        indexOfLast(predicate)
+        binarySearch(element) 要求容器已排序，如果找到了，返回索引，没找到返回-insertionPoint-1，可以接一个可选的范围参数指定搜索的索引范围
+
+        fill(value) 
+
+        对于读写和只读List
+        sort() / sorted()
+        sortBy(selector)
+        sortByDescending(selector)
+        sortWith(comparator)
+        shuffle() / shuffled()
+        reverse() / reversed()
     Set
+        union(anotherSet)    并集
+        intersect(anotherSet)交集
+        subtract(anotherSet) 差集
+
         判重过程：
             1.比较hash code，如果没有找到相同hash code的引用，则没有重复
             2.当找到相同hash code的引用时，使用===运算符来比较两个引用是否指向相同对象，如果===返回相同，则是重复，如果===返回不相同，则使用操作符==来比较两个引用所指向的对象是否“等同”
         所以Set中的两个引用相同的条件是：
             两个引用指向同一对象（所以此时hash code相同，===返回相同）
             hash code相同的不同一个对象（所以===返回不同），但是==返回相同
-        
+    Map
+        getOrElse(key, lambda)
+        getOrDefault(key, defaultValue)
+        filterKeys(predicate)
+        filterValues(predicate)
+        plus(pair)  / plusAssign(pair)
+        minus(pair) / minusAssign(pair)
+        put(key, value)
+        putAll(groupOfPairs)
+        remove(key / keyValuePair)
+
+
 七、Lambda表达式
     1.形式
         Lambda表达式由一对花括号{}括起来，花括号中首先声明形参和其类型，然后用一个指向符号->加上函数体构成
@@ -539,8 +766,26 @@
                 a()
             }
             doThing {println("Doing things")}
+    5.带接收者的lambda表达式
+        可以对某个对象调用的函数类型，类似于C++中的成员函数指针，也类似于kotlin中的扩展函数
+        类型为
+            ReceiverType.(ParameterType) -> ReturnType
+        在函数体内，用this指代接收者，this可以省略
+        例如：
+            val sum = fun Int.(Int) -> Int = { other -> this.plus(other) }
+            //可以省略this
+            val sum = fun Int.(Int) -> Int = { other -> plus(other) }
+        然后可以对某个Int调用这个lambda表达式
+            1.sum(2)
+        
 八、异常
     所有的异常类都继承自Throwable
+        open class Throwable(open val message: String?, open val cause: Throwable?)
+        {
+            constructor(message: String?) : this(message, null)
+            constructor(cause: Throwable?) : this(cause?.toString(), cause)
+            constructor() : this(null, null)
+        }
     异常机制由try catch finally语句构成
         try {
             //some code
@@ -560,4 +805,36 @@
         {
             throw ...
         }
+作用域函数
+            this object             返回值
+    let         it                  lambda
+    with       this                 lambda
+    run        this（可省略）        lambda
+    apply      this（可省略）        当前对象
+    also       it                   当前对象
+
+    let常用于可空类型的null检查，在非空的情况下执行一些语句，是线程安全版本的if检查
+        let返回lambda的返回值，即最后lambda的最后一个语句的值
+        number?.let{
+            //do thing
+        }
+    also类似于let，但返回的是当前对象
     
+    apply用于对同一个对象多次调用其方法， 此时可以省略对象名或this关键字，只需写出其方法名
+    run类似于apply，但返回lambda的返回值，即最后lambda的最后一个语句的值
+    with类似于run，但是通过一个参数决定lambda所作用的对象，即
+        with(Object, lambda) <=> Object.run(lambda)
+        常用于对一个临时对象Object执行某些操作
+
+注解
+    注解是一种特殊的类
+    定义
+        使用annotation关键字定义一个注解类
+        注解类可以有构造函数，但参数只能是以下几种
+            基本类型
+            字符串
+            KClass （例如：Foo::class)
+            枚举
+            其他注解类型
+            以上几种类型的数组类型，用中括号["a", "b", "c"]括起来，或调用arrayOf("a", "b", "c")
+        注解类型的构造函数参数不能是null

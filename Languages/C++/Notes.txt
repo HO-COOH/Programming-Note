@@ -473,7 +473,10 @@ C++
                     -E 预处理源文件，生成预处理后的文件，输出到stdout，所以如果需要预处理后的文件，通常用>>重定向输出保存到一个文件，传统上以“.i”（C）和“.ii”（C++）结尾，此时再编译将不会进行预处理
                     -S 编译源文件，生成以“.s”结尾的汇编代码文件
                     -c 编译并汇编源文件，但不连接，生成以“.o”结尾的目标文件
-                    -o 编译汇编连接，生成一个可执行文件，
+                    -o 编译汇编连接，生成一个可执行文件
+                MSVC:
+                    /c 编译源文件，生成以".obj"结尾的目标文件
+
             优化等级：
                 gcc/Clang:
                     -O0 默认值
@@ -513,7 +516,40 @@ C++
                         分支判断情况（分支判断默认不启用，如需启用，要在--tool=cachegrind后加上--branch-sim=yes命令）
 
                 cg_annotate
-
+    目标文件里有什么
+        COFF：Common Object File Format
+        ELF：
+        PE：portable executable 
+            在64位Windows上使用了新PE32+格式，结构无变化，但将32位字段变成了64位
+            VC++产生的目标文件仍然使用COFF格式，而不是PE格式，所以一般统称PE/COFF格式
+            PE也允许将函数或变量放到自定义的段，使用 #pragma data_seg("<段>")，但注意这个指令是持续性的，要恢复就必须切换回来原来的段
+                #pragma data_seg("FOO")
+                int global = 1; // 在FOO段
+                #pragma data_seg(".data") //下面的其他全局和函数都切换回.data段
+            描述COFF的结构体在WinNT.h中
+                typedef struct _IMAGE_FILE_HEADER
+                {
+                    WORD Machine;
+                    WORD NumberOfSections;
+                    DWORD TimeDateStamp;
+                    DWORD PointerToSymbolTable;
+                    DWORD NumberOfSymbols;
+                    WORD SizeOfOptionalHeader;
+                    WORD Characteristics;
+                } IMAGE_FILE_HEADER, *PIMAGE_FILE_HEADER;
+                使用dumpbin输出一个COFF目标文件的段信息
+                
+    静态链接
+        链接控制脚本
+            ld的控制脚本在/usrlib/ldscripts下，在没有指定链接脚本时使用默认链接脚本
+            
+    可执行文件的装载
+    动态链接
+        Linux动态链接
+        Windows动态链接
+    库
+        运行库
+        系统调用
 
 1. 字符串输入
     cin.getline(char *s, int n);//读取一行，最多读取n-1个字符拷贝给s所指的字符串，并添加'\0'，丢弃用户输入的换行符
@@ -1733,13 +1769,13 @@ locale：
                 std::exception_ptr make_exception_ptr(E e) noexcept
                     返回一个指向e的exception_ptr，等同于
                     try
-                {
-                    throw e;
-                        } 
-                        catch(...)
-                        {
-                            return std::current_exception();
-                        }
+                    {
+                        throw e;
+                    } 
+                    catch(...)
+                    {
+                        return std::current_exception();
+                    }
         std::exception_ptr current_exception()
             通常在catch块中使用，返回一个指向当前抛出异常的对象的指针，这个指针可能直接引用异常对象，也可能引用复制后的异常对象
                 如果标准库的实现在函数中使用了new，而且new抛出了异常，则指向一个std::bad_alloc对象
@@ -3929,6 +3965,15 @@ C++11:
                     std::cout << "20! = " << constant<factorial(20)>::value << std::endl;
                     return 0;
                 }
+        constexpr和inline
+            对于constexpr局部变量，最好使用static修饰
+            如果没有static，则每次进入这个函数时，都会把一个固定的数据复制到栈上
+            如果这个局部变量很大，则造成栈空间浪费
+                void func()
+                {
+                    constexpr auto value = SomeFunction(); //每次进入函数都复制一个value到当前函数调用栈，应使用static修饰
+                }
+            对于constexpr全局变量，最好使用inline修饰
     std::reference_wrapper
         #include <functional>
         是一个用法类似于引用的可复制对象，定义了一个转换成指向所引用对象的引用的转换函数
@@ -4495,8 +4540,8 @@ C++11:
                         线程2读取数据acquire，要求线程1所准备的数据都可见
 
                     */
-                memory_order_acq_rel,   //确保原子操作前后的代码不能跨越这个原子操作，即之前的不能移到之后，之后的也不能移到之前
-                memory_order_seq_cst    //seqeunce consistent，默认值，最强的顺序约束
+                memory_order_acq_rel,   //确保原子操作前后的代码不能跨越这个原子操作，即之前的不能移到之后，之后的也不能移到之前，只对同一个原子量有效，只保证同一个原子量的读写可见性
+                memory_order_seq_cst    //seqeunce consistent，默认值，最强的顺序约束，对多个不同的原子量都有效，都保证读写可见性
             };
         }
         对于x86平台，所有原子量的load()操作都是acquire，所以使用这个内存序是没有代价的，同样的，所有原子量的store()都是release
@@ -5489,7 +5534,40 @@ C++17：
         
 C++20：
     1.模块 Modules
-        模块名：[模块名]
+        模块的定义
+            模块分两种文件：
+                .ixx结尾的模块接口文件，声明本模块导出的所有内容，可以包含模块内容的定义
+                .cpp结尾的模块接口实现文件，不能包含export关键字，包含模块内容的定义
+                    /*Module.ixx*/
+                    module;
+
+                    /*
+                        从这里到export module之前属于全局模块区，可以用来包含还未模块化的头文件，定义本模块可见的宏
+                        #include <SomeLib.h>
+                        #define SomeConstant 42
+                    */
+                    export module <ModuleName>;  //声明这个导出模块的名称
+            子模块
+                使用<Module>:<SubModule>定义一个子模块
+                    在字模块的接口文件（.ixx）中导出子模块
+                        export module Module:part1;
+                    在子模块的实现文件（.cpp）文件中声明子模块
+                        module Module:part1;
+                包含子模块的模块需要在主模块接口文件（.ixx）中重新导入并导出子模块
+                        export import :part1;
+                        export import :part2;
+        使用export关键字表示要导出的内容
+        可导出的内容：
+            各种C++实体，例如类、函数、名称空间、模板
+            导出一个export块
+                export{
+                    //anything
+                }
+        不可导出的内容：
+            内部链接性的实体，例如静态变量、静态全局函数、定义在匿名的名称空间的任何实体
+        导出一个作用域内的实体会将该作用域的名称隐式导出，例如导出一个名称空间内的类，会将这个名称空间的名字隐式的导出
+        模块名可以带句点.，对于编译器没有特殊意义，但是可以模拟出名称空间的效果
+            module math.algebra; 等同于有个模块叫做math.algebra，algebra不是math的一个子模块，跟math没有任何关系
         在MSVC中的std模块分为以下内容：
             std.regex:      the content of header <regex>
             std.filesystem: the content of header <filesystem>
@@ -5604,6 +5682,20 @@ C++20：
             {
                 floating_point auto val = f(1, 2.0f);
             }
+    自定义类型作为非模板参数
+        template<typename Char, size_t Length>
+        struct FixedString
+        {
+            Char data[Length + 1]{};
+            constexpr FixedString(const Char(&arr)[Length + 1])
+            {
+                std::copy(std::begin(arr), std::end(arr), data);
+            }
+            using CharType = Char;
+        };
+
+        template<typename Char, size_t N>
+        FixedString(const Char (&arr)[N])->FixedString<Char, N - 1>;
         
 
     4.协程 Coroutines
@@ -5615,7 +5707,7 @@ C++20：
             co_return
             co_yield
         coroutine_traits 
-            决定携程返回的promise的类型，要求R中必须定义了一个类型别名promise_type
+            根据协程对象R决定协程返回的promise的类型，要求R中必须定义了一个类型别名promise_type
                 template<typename, typename...>
                 struct coroutine_traits {};
 
@@ -5626,6 +5718,136 @@ C++20：
                     using primise_type = typename R::promise_type
                 }
             所以某种协程的返回值必须包含promise_type类型别名，可以直接定义，也可以通过对std::coroutine_traits具体化实现，例如对std::future具体化
+            promise_type必须至少包含下面5个成员函数：
+                1. 协程对象类型 get_return_object() 在刚进入协程时调用，从promise_type中构造一个协程对象
+                    所以这也就要求协程对象需要有一个构造函数接受std::coroutine_handle，通常这个构造函数将这个handle作为成员变量保存下来，这样就可以在协程对象中需要用到promise_type时，从handle调用.promise()取得promise_type
+                    通常实现是直接调用std::coroutine_handle<promise_type>::from_promise(*this)，例如协程对象Task
+                        struct Task
+                        {
+                            struct promise_type
+                            {
+                                Task get_return_object { return Task{ std::coroutine_handle<promise_type>::from_promise(*this) }; }
+                            };
+
+                            Task(std::coroutine_handle<promise_type> h) : m_handle{ h } {}
+
+                            std::coroutine_handle<promise_type> m_handle;
+                        };
+                2. initial_suspend() 刚进入协程时被调用，然后编译器co_await 这个函数的返回值
+                    也就是说这个函数的返回值必须也是一个可以被co_await的对象
+                    通常如果协程进入时没有什么特殊操作，就返回std::suspend_never
+                    如果需要执行特殊操作，需要自定义一个可以被co_await的类型
+                3. final_suspend()   协程执行完毕或到达co_return时被调用，然后编译器co_await 这个函数的返回值
+                    也就是说这个函数的返回值必须也是一个可以被co_await的对象
+                    通常如果协程退出时不执行特殊操作，就返回std::suspend_always
+                    如果需要执行特殊操作，需要自定义一个可以被co_await的类型
+                4. 然后下面两个函数3选1，函数内需要代码来记录协程的返回值
+                        对于无返回值的co_return ->          void return_void()
+                        对于有返回值的co_return value ->    void return_value(value)
+                        对于co_yield value  ->             void yield_value(value)
+
+                5. void unhandled_exception() 如果需要处理异常，则需要在promise_type中用std::current_exception()保存一个std::exception_ptr的实例，后面使用std::rethrow_exception()重新抛出
+            所以一个协程主要的执行工作和控制都是在promise_type中进行
+            所以一个最简单的不暂停promise_type
+                struct promise_type
+                {
+                    std::suspend_never initial_suspend() { return {}; }
+                    void return_void(){}
+                    std::suspend_never final_suspend() noexcept { return {}; }
+                    void unhandled_exception(){}
+                    Task get_return_object() { return{}; }
+                };
+            一个最简单的协程，什么也不做，直接返回
+                struct Task
+                {
+                    struct promise_type {/*...*/}; //上面定义的promise_type
+                };
+                Task DoNothing()
+                {
+                    co_return;
+                }
+            协程底层调用过程
+                struct Task
+                {
+                    Task()
+                    {
+                        std::cerr << "Task::Task()\n";
+                    }
+                    ~Task()
+                    {
+                        std::cerr << "Task::~Task()\n";
+                    }
+                    struct promise_type
+                    {
+                        promise_type()
+                        {
+                            std::cerr << "promise_type::promise_type()\n";
+                        }
+                        ~promise_type()
+                        {
+                            std::cerr << "promise_type::~promise_type()\n";
+                        }
+                        std::suspend_never initial_suspend() 
+                        { 
+                            std::cerr << "promise_type.initial_suspend()\n";
+                            return {}; 
+                        }
+                        void return_void() 
+                        {
+                            std::cerr << "promise_type.return_void()\n";
+                        }
+                        std::suspend_never final_suspend() noexcept 
+                        {
+                            std::cerr << "promise_type.final_suspend()\n";
+                            return {}; 
+                        }
+                        void unhandled_exception() 
+                        {
+                            std::cerr << "promise_type.unhandled_exception()\n";
+                        }
+                        Task get_return_object() 
+                        { 
+                            std::cerr << "promise_type.get_return_object()\n";
+                            return{}; 
+                        }
+                    };
+                };
+
+                Task DoNothing()
+                {
+                    std::cerr << "Enter DoNothing()\n";
+                    std::this_thread::sleep_for(std::chrono::seconds{ 10 });
+                    co_return;
+                    std::cerr << "Exit DoNothing()\n";
+                }
+        可异步等待的类型awaitable
+            一个awaitable类型必须包含3个成员函数
+                await_ready() 在表达式co_await expr后调用awaiter.await_ready()
+                    返回true，表示结果立即可用
+                    返回false，则挂起协程，执行awaiter.await_suspend()
+                await_suspend(std::coroutine_handle)
+                    这个函数需要将协程手动恢复
+                    如果返回void，协程返回到调用者
+                    如果返回true，协程返回到调用者
+                    如果返回false，恢复执行当前协程
+                await_resume()
+                    最后无论协程是否挂起还是恢复执行，都会调用await_resume()
+            标准中定义了两个awaitable
+                struct suspend_never
+                {
+                    constexpr bool await_ready() const noexcept { return true; }
+                    constexpr void await_suspend(std::coroutine_handle<>) const noexcept {}
+                    constexpr void await_resume() const noexcept {}
+                };
+                
+                struct suspend_always
+                {
+                    constexpr bool await_ready() const noexcept { return false; }
+                    constexpr void await_suspend(std::coroutine_handle<>) const noexcept {}
+                    constexpr void await_resume() const noexcept {}
+                };
+        co_await的执行流程
+            co_await的对象要么有operator co_await运算符重载，要么在当前协程对象的promise_type中定义了函数await_transform(expr) -> Awaitable，这个函数接收co_await的参数，返回一个可等待类型awaitable
         coroutine_handle
             用来引用一个被挂起或正在执行的协程
                 template<typename Promise = void>
@@ -5640,20 +5862,9 @@ C++20：
                 void operator()() const 恢复协程执行
                 constexpr void* address() const noexcept 返回这个协程句柄的地址
                 void destory() 析构协程的状态
-        
-        struct suspend_never
-        {
-            constexpr bool await_ready() const noexcept { return true; }
-            constexpr void await_suspend(std::coroutine_handle<>) const noexcept {}
-            constexpr void await_resume() const noexcept {}
-        };
-        
-        struct suspend_always
-        {
-            constexpr bool await_ready() const noexcept { return false; }
-            constexpr void await_suspend(std::coroutine_handle<>) const noexcept {}
-            constexpr void await_resume() const noexcept {}
-        };
+            所以可以通过coroutine_handle，在promise_type中调用from_promise()获得协程对象，也可以在协程对象中保存一个coroutine_handle，调用promise()获取promise_type
+
+            
 
     5.is_constant_evaluated
     6.<version>
@@ -5724,11 +5935,13 @@ C++20：
                         - 负数带符号，正数不带（默认）
                          (一个空格) 正数带一个空格，负数带负号（常用于对其正数和负数）
                     #：表示使用特殊格式化方法
+                        对于使用二进制、十六进制、八进制整数，插入前缀0b或0x或0
+                        对于浮点数，显示末尾的0
         库函数：
-            template<typename ...Args> std::string(/*char编码的格式化字符串*/, Args&&... args);
-            template<typename ...Args> std::string(std::locale const& loc, /*char编码的格式化字符串*/, Args&&... args); //带locale的版本
-            template<typename ...Args> std::wstring(/*wchar_t编码的格式化字符串*/, Args&&... args);
-            template<typename ...Args> std::wstring(std::locale const& loc, /*wchar_t编码的格式化字符串*/, Args&&... args); //带locale的版本
+            template<typename ...Args> std::string format(/*char编码的格式化字符串*/, Args&&... args);
+            template<typename ...Args> std::string format(std::locale const& loc, /*char编码的格式化字符串*/, Args&&... args);      //带locale的版本
+            template<typename ...Args> std::wstring format(/*wchar_t编码的格式化字符串*/, Args&&... args);                          //宽字符版本
+            template<typename ...Args> std::wstring format(std::locale const& loc, /*wchar_t编码的格式化字符串*/, Args&&... args);  //带locale的宽字符版本
 
             vformat()是去除模板化的版本，且可以使用运行时构造的格式化字符串
             std::string vformat(std::string_view fmt, std::format_args);
@@ -5736,9 +5949,55 @@ C++20：
             std::wstring vformat(std::wstring_view fmt, std::format_args);
             std::wstring vformat(std::locale const& loc, std::wstring_view fmt, std::format_args); //带locale的版本
 
+            format_to()家族指定一个输出迭代器，返回输出完之后迭代器的位置，例如可以输出到一个字符串中
+            template<typename OutputIt, typename... Args> OutputIt format_to(OutputIt out, /*char编码的格式化字符串*/ fmt, Args&&... args);
+
+            vformat_to()家族是format_to()去除模板化的版本，可以使用运行时构造的格式化字符串
+            format_to()相当于vformat_to(out, fmt, std::make_format_args(args...));
+            template<typename OutputIt, typename... Args> OutputIt vformat_to(OutputIt out, std::string_view fmt, std::format_args args);
+
             args比实际需要的参数多不会产生错误，例如
                 std::format("{} {}!", "Hello", "world", "something"); // OK, produces "Hello world!"
+        自定义类型
+            如果需要使用std::format()来格式化自定义类型，需要实例化模板std::formatter<>，并提供至少format()方法
+                template<>
+                struct std::formatter<MyType>
+                {
+                    template<typename CharT>
+                    std::format_parse_context::iterator parse(std::basic_format_parse_context<CharT>& ctx); //解析格式化字符串
+                    
+                    template<typename OutputIt, typename CharT>
+                    OutputIt format(MyType const& value, std::basic_format_context<CharT> context)//做实际的输出，通常是根据解析好的格式化字符串，对基本类型调用标准中的std::formatter来输出
+                    {
+                        return std::format_to(context.out(), ...);
+                    }
+                };
+            其中format_parse_context是一个表示当前解析格式化字符串状态的类型
+                template<typename CharT>
+                class basic_format_parse_context
+                {
+                public:
+                    const_iterator begin(); 返回格式化字符串的起始
+                    const_iterator end();   返回格式化字符串的超尾迭代器
+                    void advance_to(const_iterator) 设置起始位置
+                    size_t next_arg_id(); //进入自动解析模式，返回下一个格式化参数的位置（从0开始），如果已经调用过check_arg_id()进入手动解析模式则抛出异常std::format_error
+                    void check_arg_id(size_t) 进入手动解析模式，如果已经调用过next_arg_id()进入自动解析模式则抛出异常std::format_error 
+                };
+                using format_parse_context = basic_format_parse_context<char>;
+                using wformat_parse_context = basic_format_parse_context<wchar_t>;
+            其中format_context是一个表示当前格式化上下文状态的类型，提供了输出位置的迭代器，格式化参数，locale等信息
+                template<typename OutputIt, typename CharT>
+                class basic_format_context
+                {
 
+                };
+    9.std::span
+        传统上要传一个内存上连续的区域给函数，需要一个起始指针和大小，容易造成超出范围的错误难以捕获
+        std::span是一个非占有的表示连续内存的对象，分为动态大小和静态大小
+        动态大小的span在运行时确定范围，成员需要一个起始指针和结束指针
+        静态大小的span在编译时确定范围，成员只需要一个起始指针
+            template<typename T, size_t Extend = std::dynamic_extend>
+            class span;
 
 Effective C++
     1.C++的四个子语言

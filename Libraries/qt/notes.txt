@@ -1,0 +1,36 @@
+qt windows部署工具
+    windeployqt.exe是qt在windows上的部署工具，用来打包qt相关的资源、库、插件
+    位置在${QTDIR}/bin/windeployqt.exe
+    在调用前，应该先调用同目录下的qtenv2.bat来设置环境变量
+    部署exe
+        windeployqt.exe接受一个exe参数或一个包含qt exe的文件夹
+        然后扫描这个exe所需的依赖库并复制到这个文件夹
+        对于使用MSVC编译的exe，还包括了Visual C++ Redistributable中的运行时库
+        插件不同于普通dll，需要单独新建一个plugins文件夹，然后拷贝相应的qt插件库的dll
+            可以在exe的main函数创建QApplication对象后调用函数QCoreApplication::addLibraryPath("<path>")来使用自定义的路径
+        对于QT webEngine，还需要额外的工作
+        例如官方的plug & paint 示范工程
+            plug & paint依赖于basictools工程，生成一个plugin dll
+            那么最后应该打包的文件清单为
+                plugandpaint.exe
+                plugins\pnp_basictools.dll  basictools工程编译的dll
+                platforms\qwindows.dll      qt的windows plugin
+                styles\qwindowsvistastyle   qt的vista风格plugin
+                Qt5Core.dll
+                Qt5Gui.dll
+                Qt5Widgets.dll
+                vcruntime140.dll
+                vccorlib140.dll
+                msvcp140.dll
+        所有的QT GUI程序都需要一个实现了QT Platform Abstraction QT平台抽象层的插件，在windows上这个插件是qwindows.dll
+        这个插件通常需要位于与exe的同级目录的platforms目录下
+        
+        部署静态链接的qt
+            静态编译qt
+                cd <path_to_qt>
+                configure -static <other options>
+            如果自己使用qt源码编译了qt，则可以在编译exe时静态链接到qt库，此时那个exe可以单独部署，不需要拷贝依赖的库
+        
+    部署qml
+
+    部署uwp

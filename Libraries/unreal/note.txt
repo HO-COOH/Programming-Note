@@ -1,0 +1,408 @@
+编译相关
+    UE完整源码编译后大小约207GB
+类型
+    类型前缀
+        从Actor类继承的类名前缀A，例如AController
+        从Object类继承的类名前缀U，例如UComponent
+        枚举类前缀E，例如EFortificationType
+        接口类前缀I，例如IAbilitySystemInterface
+        模板类前缀T，例如TArray
+        从SWidget类继承的类名前缀S，例如SButton
+        其他类前缀F，例如FVector
+    数值类型
+        int8 uint8
+        int16 uint16
+        int32 uint32
+        int64 uint64
+        float double
+        数值类型的极值信息在模板类TNumericLimits<T>中
+    字符串
+        FName
+            静态字符串，不可修改，多个重复的字符串只创建了一个实例
+        FText
+            主要用于字符串本地化
+            使用NSLOCTEXT(<namespace>, <key>, <value>)宏创建一个本地化字符串
+                FText MyText = NSLOCTEXT("Game UI", "Health Warning Message", "Low Health!")
+        FString
+            可修改的动态字符串
+            可以使用TEXT(<text>)宏将字符串字面值构造一个FString
+        TCHAR
+            与字符集无关的字符类型
+            FChar类中包含了一些处理TChar字符的函数
+    容器
+        TArray<T>
+            类似于std::vector
+            当TArray的元素类型是从UObject继承来的类型的指针时，可以实现自动垃圾回收GC
+            .Empty(num) // 预分配num个空间
+            .Shrink()
+        TMap<KeyType, ValueType>
+            类似于std::map
+            元素类型需要定义函数GetTypeHash()
+        TSet<T>
+            类似于std::set
+            元素类型需要定义函数GetTypeHash()
+        哈希函数
+            对于需要存储在TMap和TSet中的自定义类型，需要定义函数friend GetTypeHash(const CustomClass&) -> uint32
+            例如：
+                class FMyClass
+                {
+                    uint32 ExampleProperty1;
+                    uint32 ExampleProperty2;
+
+                    // Hash Function
+                    friend uint32 GetTypeHash(const FMyClass& MyClass)
+                    {
+                        // HashCombine is a utility function for combining two hash values.
+                        uint32 HashCode = HashCombine(MyClass.ExampleProperty1, MyClass.ExampleProperty2);
+                        return HashCode;
+                    }
+
+                    // For demonstration purposes, two objects that are equal
+                    // should always return the same hash code.
+                    bool operator==(const FMyClass& LHS, const FMyClass& RHS)
+                    {
+                        return LHS.ExampleProperty1 == RHS.ExampleProperty1
+                            && LHS.ExampleProperty2 == RHS.ExampleProperty2;
+                    }
+                };
+            其中HashCombine()是一个工具函数
+                #include "Templates/TypeHash.h"
+                uint32 HashCombine(uint32 A, uint32 C)
+                注意这个函数不满足交换律
+    智能指针和智能引用
+        TUniquePtr
+        TSharedPtr / TSharedRef TSharedRef保证指向的对象非空，所以TSharedRef可以转化成一个TSharedPtr
+            MakeShared()    要求类必须有一个public的构造函数
+            MakeShareable()  类的构造函数可以是private，这使得可以拿到从别的地方创建的对象的所有权
+            StaticCastSharedRef() / StaticCastSharedPtr() 将基类的TSharedPtr或TSharedRef转化成派生类
+            ConstCastSharedRef / ConstCastSharedPtr()
+        TWeakPtr
+            .Pin() 返回一个TSharedPtr
+        智能指针类的第二个模板参数可以用于指定多线程时的同步模式，例如使用ESPMode::ThreadSafe可以保证：
+            读和复制是线程安全的
+            写入和重置也是线程安全的
+            当需要将对象作为参数传给函数使用时，不要使用智能指针，应当使用引用
+            智能指针类与UObject不兼容，UObject使用unreal内部的引用计数机制
+        FWeakObjectPtr
+            是一个指向UObject的弱引用指针，不参与GC
+        template<typename T, typename TWeakObjectPtrBase>
+        struct TWeakObjectPtr : private TWeakObjectPtrBase
+            是一个模板化的FWeakObjectPtr
+
+    委托
+        https://docs.unrealengine.com/4.27/en-US/ProgrammingAndScripting/ProgrammingWithCPP/UnrealArchitecture/Delegates/
+        
+    主要的游戏物件类型包含UObject, AActor, UActorComponent, UStruct
+        UObject
+            可以使用TSubclassOf<T>来限制可以实际赋值的UClass*指针
+            创建对象
+                template<class T>
+                T* NewObject(UObject* Outer = (UObject*)GetTransientPackage(), UClass* Class = T::StaticClass)
+
+                template< class TClass >
+                TClass* NewNamedObject
+                (
+                    UObject* Outer, 
+                    FName Name, 
+                    EObjectFlags Flags = RF_NoFlags, 
+                    UObject const* Template=NULL
+                )
+            类型转换
+                #include "Templates/Casts.h"
+                template<typename To, typename From> To* Cast(From* Src) //将一个类型的指针动态转换为另一个类型
+            定义
+                
+        AActor继承于UObject
+            可以在编辑器中创建，也可以在游戏运行时由逻辑创建
+            AStaticMeshActor, ACameraActor, APointLight
+            Actor实例创建后可以显式调用Destory()析构，或等到当前Level析构时析构
+            Actor类的生命周期：
+                BeginPlay() 当Actor实例生成时调用
+                Tick() 每帧调用一次
+                EndPlay() 当Actor实例离开游戏时调用
+                SetLifeSpan(float sec) 设置sec秒后销毁，如果为0，则取消计时，不会被销毁
+                SetActorHiddenInGame(hidden)
+            创建Actor类需要很多信息，例如初始位置和角都、物理系统等，所以使用专门的函数UWorld::SpawnActor()来创建
+    蓝图函数库
+        可以在C++中创建辅助函数库并在蓝图中调用
+        蓝图函数库类应该继承自UBlueprintFunctionLibrary，并添加普通UObject类所需的UCLASS()宏和GENERATED_UCLASS_BODY()宏
+        要暴露在蓝图中的函数需要是静态成员函数，并添加UFUNCTION()宏
+            UCLASS()
+            class MyBlueprintFunctionLibrary : public UBlueprintFunctionLibrary
+            {
+                GENERATED_UCLASS_BODY();
+
+                UFUNCTION(BlueprintCallable, Category = "MyCategory")
+                static Type MyFunction(); 
+                //...
+            }；
+断言
+    check族
+        check(expr) / checkSlow(expr) 等同于assert(expr)
+        checkf(expr, formattedText) / checkfSlow(formattedText) 将信息输出到log中
+        checkCode(codeBlock) 执行一次代码块codeBlock，常用于某些检查
+            #define checkCode( Code )		do { Code; } while ( false );
+        checkNoEntry()     断言不应该执行到这一行
+        checkNoReentry()    断言不应该重复执行到这一行
+        checkNoRecursion()  断言不该递归执行到这一行
+        unimplemented() 类似于check(false)，但用于必须要求虚函数被override时
+        带Slow()后缀的check宏仅在Debug中执行
+    verify族
+        由于check()族宏在release版本中不执行，所以不能在check断言中调用函数，否则在Release版本中就根本不会执行函数
+        verify()族宏在release版本中不检查值，但仍然执行函数
+        verify(expr) / verifySlow(expr)
+        verifyf(expr, formattedText) / verifyfSlow(expr, formattedText)
+    ensure族
+        ensure族用于在断言时不停止程序执行，只使用错误报告
+            ensure(expr) 同一次编辑器启动后只报告一次
+            ensureMsgf(expr, formattedText)
+            ensureAlways(expr)同一次编辑器启动后总是报告
+            ensureAlwaysMsgf(expr, formattedText)
+垃圾回收
+    UObject
+        UObject类继承而来的类带引用计数和自动垃圾回收
+        只要将UObject指针作为一个UPROPERTY属性存储在一个类中，或存储在容器类中，就参与引用计数
+        否则将会被自动回收
+        例如
+            UPROPERTY()
+            MyGCType* SafeObject;   //当Owner被回收时回收
+
+            MyGCType* DoomedObject; //自动被回收
+    普通C++类
+        普通C++类也可以参与自动垃圾回收，只需从FGCObject上继承出来
+            class MyNormalClass : public FGCObject
+            {
+                UObject* SafeObject; //当MyNormalClass对象释放时自动释放
+            };
+unreal编辑器
+    设置游戏输入
+        Edit -> Project Settings -> Engine -> Input -> Action Binding / Axis Binding
+反射
+    GetClass() 和 StaticClass()
+        GetClass()是UObject类的成员函数
+        StaticClass()是UObject类的静态成员函数，对同一个类调用时总是返回一样的结果
+Slate UI
+    Slate UI Gallery 位置
+        UE4: Window -> Developer Tools -> Debug Tools -> Test Suite
+        UE5: Tools -> Debug -> Debug Tools -> Test Suite
+    Slate UI官方自带一个演示程序SlateViewer，源码位置：Engine\Source\Programs\SlateViewer，生成的工程位置：Engine\Intermediate\ProjectFiles
+    Slate UI可视化工具
+        UE5: Tools -> Debug -> Widget Reflector
+    创建一个Editor
+    要是用Slate UI库，需要在Build.cs文件中添加下面模块
+        PublicDependencyModuleNames.AddRange(new string[] {..., "InputCore"});
+        PrivateDependencyModuleNames.AddRange(new string[] { ... , "Slate", "SlateCore"});
+    所有组件共有的属性
+        IsEnabled
+        ToolTip
+        ToolTipText 如果使用了ToolTip，则该属性不生效
+        Cursor
+        Visibility
+    可见性Visibility
+        Visible
+        Collapsed
+        Hidden
+        HitTestInvisible
+        SelfHitTestInvisible
+    对齐Alignment
+        HAlign_Fill / VAlign_Fill
+        HAlign_Left
+        VAlign_Top
+        HAlign_Center / VAlign_Center
+        HAlign_Right
+        VAlign_Bottom
+    对齐策略
+        Auto Size 占用所需的大小
+        Fill Size 占满父控件的大小
+        Max Size
+        Padding
+        Alignment
+    基础类
+        SWidget
+            所有Slate控件的公共基类
+        SWeakWidget : SWidget
+            包含一个指向子控件的weak pointer的控件
+            TWeakChild<SWidget> WeakChild;
+        SCompoundWidget
+            复合控件，非原始类型的UI控件都基于这个类
+            包含一个ChildSlot成员
+            FCompoundWidgetOneChildSlot ChildSlot;
+            其中FCompoundWidgetOneChildSlot继承关系：
+             -> TSingleWidgetChildrenWithBasicLayoutSlot
+              -> TSingleWidgetChildrenWithSlot<TSingleWidgetChildrenWithBasicLayoutSlot<InPaddingInvalidationReason>>
+                这个类定义了一个重载的operator[]，
+                    SlotType& operator[](const TSharedRef<SWidget>& InChildWidget)
+                    {
+                        this->AttachWidget(InChildWidget);
+		                return static_cast<SlotType&>(*this);
+                    }
+                其中的SlotType即是TSingleWidgetChildrenWithBasicLayoutSlot<InPaddingInvalidationReason>
+                所以SlotType其实是CTRTP，返回了自己的引用
+        
+    布局类
+        SHorizontalBox
+        SVerticalBox
+        SUniformGridPanel
+        SWrapBox 按行放置子控件，放满换行
+        SListView
+        STreeView
+        STileView
+        SOverlay
+            SOverlay使得各个子空间叠加显示，代码中后面的Slot中的子空间叠加在前面Slot的上面，例如
+                SOverlay::Slot(SNew(SMyWidget1))
+                SOverlay::Slot(SNew(SMyWidget2))
+                SMyWidget2会叠加在SMyWidget1上方
+        
+    SLATE宏
+        SLATE_BEGIN_ARGS(WidgetType)
+        SLATE_ARGUMENT(ArgType, ArgName)
+        SLATE_END_ARGS()
+        展开为
+            public:
+                struct FArguments : public TSlateBaseNamedArgs<WidgetType>
+                {
+                    typedef FArguments WidgetArgsType;
+                    
+                    FORCENOINLINE FArguments()
+
+                    ArgType _ArgName;
+                    WidgetArgsType& ArgName(ArgType InArg)
+                    {
+                        _ArgName = InArg;
+                        return static_cast<WidgetArgsType*>(this)->Me();
+                    }
+                };
+        SNew(WidgetType, ...)
+        SAssignNew(ExposeAs, WidgetType, ...)
+            Slate控件应当使用这两个宏来构造，例如
+                TSharedRef<SButton> MyButton = SNew(SButton);
+                //或
+                TSharedPtr<SButton> MyButton;
+                SAssignNew(MyButton, SButton);
+            
+
+            /** Normal widgets are allocated directly by the TSlateDecl. */
+            template<typename WidgetType, bool IsDerived>
+            struct TWidgetAllocator
+            {
+                static TSharedRef<WidgetType> PrivateAllocateWidget()
+                {
+                    return MakeShared<WidgetType>();
+                }
+            };
+
+            /**
+            * SUserWidgets are allocated in the corresponding CPP file, so that
+            * the implementer can return an implementation that differs from the
+            * public interface. @see SUserWidgetExample
+            */
+            template<typename WidgetType>
+            struct TWidgetAllocator< WidgetType, true >
+            {
+                static TSharedRef<WidgetType> PrivateAllocateWidget()
+                {
+                    return WidgetType::New();
+                }
+            };
+
+            template<typoename DerivedType, typename BaseType>
+            struct TIsDerivedFrom
+            {
+                static constexpr bool Value;    //通过测试Derived类指针是否能直接隐式赋值给BaseType*或const BaseType*
+                static constexpr bool IsDerived = Value;
+            };
+
+            /**
+            * Utility class used during widget instantiation.
+            * Performs widget allocation and construction.
+            * Ensures that debug info is set correctly.
+            * Returns TSharedRef to widget.
+            *
+            * @see SNew
+            * @see SAssignNew
+            */
+            template<class WidgetType, typename RequiredArgsPayloadType>
+            struct TSlateDecl
+            {
+                TSlateDecl( const ANSICHAR* InType, const ANSICHAR* InFile, int32 OnLine, RequiredArgsPayloadType&& InRequiredArgs )
+                    : _Widget( TWidgetAllocator<WidgetType, TIsDerivedFrom<WidgetType, SUserWidget>::IsDerived >::PrivateAllocateWidget() )
+                    , _RequiredArgs(InRequiredArgs)
+                {
+                    _Widget->SetDebugInfo( InType, InFile, OnLine, sizeof(WidgetType) );
+                }
+
+                /**
+                * Initialize OutVarToInit with the widget that is being constructed.
+                * @see SAssignNew
+                */
+                template<class ExposeAsWidgetType>
+                TSlateDecl& Expose( TSharedPtr<ExposeAsWidgetType>& OutVarToInit )
+                {
+                    OutVarToInit = _Widget;
+                    return *this;
+                }
+
+                /**
+                * Initialize OutVarToInit with the widget that is being constructed.
+                * @see SAssignNew
+                */
+                template<class ExposeAsWidgetType>
+                TSlateDecl& Expose( TSharedRef<ExposeAsWidgetType>& OutVarToInit )
+                {
+                    OutVarToInit = _Widget;
+                    return *this;
+                }
+
+                /**
+                * Initialize a WEAK OutVarToInit with the widget that is being constructed.
+                * @see SAssignNew
+                */
+                template<class ExposeAsWidgetType>
+                TSlateDecl& Expose( TWeakPtr<ExposeAsWidgetType>& OutVarToInit )
+                {
+                    OutVarToInit = _Widget;
+                    return *this;
+                }
+
+                /**
+                * Complete widget construction from InArgs.
+                *
+                * @param InArgs  NamedArguments from which to construct the widget.
+                *
+                * @return A reference to the widget that we constructed.
+                */
+                TSharedRef<WidgetType> operator<<=( const typename WidgetType::FArguments& InArgs ) const
+                {
+                    _Widget->SWidgetConstruct(InArgs);
+                    _RequiredArgs.CallConstruct(_Widget, InArgs);
+                    _Widget->CacheVolatility();
+                    _Widget->bIsDeclarativeSyntaxConstructionCompleted = true;
+
+                    return _Widget;
+                }
+
+                const TSharedRef<WidgetType> _Widget;
+                RequiredArgsPayloadType& _RequiredArgs;
+            };
+
+            //这个函数单纯是为了推导TSlateDecl的模板参数类型
+            template<typename WidgetType, typename RequiredArgsPayloadType>
+            TSlateDecl<WidgetType, RequiredArgsPayloadType> MakeTDecl<WidgetType>(
+                const ANSICHAR* InType, 
+                const ANSICHAR* InFile, 
+                int32 OnLine, 
+                RequiredArgsPayloadType&& InRequiredArgs)
+            {
+                return TSlateDecl<WidgetType, RequiredArgsPayloadType>(
+                    InType, 
+                    InFile, 
+                    OnLine, 
+                    Forward<RequiredArgsPayloadType>(InRequiredArgs));
+            }
+
+            SNew()宏展开为
+                                        //这是WidgetType的字符串表达
+                MakeTDecl<WidgetType>(#WidgetType, __FILE__, __LINE__, RequiredArgs::MakeRequiredArgs(__VA_ARGS__)) <<= WidgetType::FArguments()
+            SAssignNew(ExposeAs, WidgetType, ...)宏展开为
+                MakeTDecl<WidgetType>(#WidgetType, __FILE__, __LINE__, RequiredArgs::MakeRequiredArgs(__VA_ARGS__)).Expose(ExposeAs) <<= ...
+

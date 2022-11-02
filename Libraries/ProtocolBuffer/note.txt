@@ -27,7 +27,11 @@
         repeated 可以出现任何次（包括0次，此时成为可选字段）
 
 生成代码
-    protocol buffer编译器对每个消息类型生成一个对应的类的.h和.cc文件
+    protocol buffer编译器对每个消息类型生成一个对应的类的.pb.h和.pb.cc文件
+        protoc需要指定proto文件的文件夹地址proto_path、输出地址cpp_out、proto文件名
+    例如有me.proto
+        protoc.exe --proto_path=. --cpp_out=. any.proto
+    则会在当前目录生成any.pb.h和any.pb.cc
     包括getter和setter，序列化和反序列化方法
 字段类型
     protocol Buffer中的类型         C++类型
@@ -127,3 +131,58 @@ oneof
                 SubMessage sub_message = 9;
             }
         }
+package
+    可以使用package <PackageName>;的方式声明这个message的名称空间
+    对应生成C++的名称空间namespace PackageName
+序列化
+    每个message都会生成两个序列化方法
+        bool SerializeToString(string* output) const
+            注意这里的string只是为了作为容器存储二进制数据
+        bool SerializeToOstream(ostream* output) const
+反序列化
+    bool ParseFromString(const string& data)
+    bool ParseFromIstream(istream* input)
+
+代码生成
+    给message生成的C++代码会取决于优化等级
+    如果为性能优化，则生成的message类会提供所有虚函数的重载
+    如果为代码体积优化，即使用option optimize_for = CODE_SIZE;
+        则生成的message类只提供必要的虚函数重载
+    如果使用轻量运行时 option optimize_for = LITE_RUNTIME
+        则在优化性能的同时去掉实现反射的代码
+    每个message类都有下面的方法：
+        默认构造
+        析构
+        复制构造 复制赋值运算符
+        移动构造 移动赋值运算符
+        void Swap(Message* other) 交换
+        const UnknownFieldSet& unknown_fields() const 返回解析过程中遇到的未知字段
+        UnknownFieldSet* mutable_unknown_fields() 返回可修改的未知字段
+        static const Descriptor* descriptor()
+        static const Message& default_instance() 等同于返回一个默认构造的对象
+    对于嵌套定义的message例如
+        message Foo
+        {
+            message Bar
+        }
+        会生成一个Foo::Bar类，而由于C++不允许前向声明的嵌套定义，所以在需要使用嵌套的类时可以使用类型别名Foo_Bar类
+    
+
+    例如有optional int id
+    会生成以下成员函数
+        inline bool has_id() const          //判空
+        inline void clear_id()              //置空
+        inline int32_t id()                 //getter
+        inline void set_id(int32_t value)   //setter
+
+    对于string类型，会生成一个mutable_的成员函数，来获得指向数据的指针
+
+    每个message都还有以下几个方法：
+        bool IsInitialized() const 检查所有required字段是否已设置
+        string DebugString() const 返回一个易读的消息体的字符串表示
+        void CopyFrom(AnotherMessage) 复制构造
+        void Clear() 清空所有字段
+杂项
+    通常在main函数开头使用GOOGLE_PROTOBUF_VERIFY_VERSION来验证实际链接的protobuf库与头文件兼容
+    在main函数结束前使用google::protobuf::ShutdownProtobufLibrary()来释放在protobuf库中分配的全局内存
+    

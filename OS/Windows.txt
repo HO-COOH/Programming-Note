@@ -44,8 +44,11 @@
         定义在<winnt.h>中，用来消除函数未使用参数时编译器警告
     调用约定
         __cdecl 
+            参数是从右到左入栈，所以第一个参数在栈顶，主调函数负责将参数出栈，函数名修饰时在前面加一个下划线
         __clrcall
         __stdcall
+            是Win32 API主要使用的调用约定，除了可变参数函数（可变参数函数使用__cdecl调用约定）
+            参数是从左到右入栈，所以第一个参数在栈底，被调函数负责将参数出栈，函数名修饰时会在前面加一个下划线，在后面加一个'@'和参数的字节数
         __fastcall
         __thiscall
         __vectorcall
@@ -75,12 +78,14 @@
         /MTd -> LibCMtD.lib 静态链接调试版本
         /MD -> MSVCRt.lib 导入库，用于动态链接MSVCR80.dll库的发行版本（默认）
         /MDd -> MSVCRtD.lib 导入库，用于动态链接MSVCR80D.dll库的调试版本
-    调用约定：
-        __cdecl
-            参数是从右到左入栈，所以第一个参数在栈顶，主调函数负责将参数出栈，函数名修饰时在前面加一个下划线
-        __stdcall
-            是Win32 API主要使用的调用约定，除了可变参数函数（可变参数函数使用__cdecl调用约定）
-            参数是从左到右入栈，所以第一个参数在栈顶，被调函数负责将参数出栈，函数名修饰时会在前面加一个下划线，在后面加一个'@'和参数的字节数
+    参数检验
+        很多CRT的函数都会进行参数合法性检测，例如指针是否为空，整数和枚举类型是否有效
+        如果参数不合法，执行非法参数处理函数调度函数，这些函数可以是_invalid_parameter(), _invalid_parameter_noinfo(), _invalid_parameter_noinfo_noreturn()等
+        这些函数的原型：https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/invalid-parameter-functions?view=msvc-170
+        具体执行哪个取决于操作系统的版本和程序构建的版本，例如在调试版本中，非法参数执行函数通常会调用一个断言，然后调试器中断
+        断言会导致向用户显示一个对话框“Abort，Retry，Continue”，让用户分别终止程序、附加调试器、继续执行程序
+        默认的非法参数处理函数是_invoke_watson()，会终止程序、生成一个dump，发送错误报告
+        可以通过_set_invalid_parameter_handler()和_set_thread_local_invalid_parameter_handle()来更改非法参数处理函数
 
 Microsoft::VisualStudio::CppUnitTestFramework 单元测试框架
     https://docs.microsoft.com/en-us/visualstudio/test/microsoft-visualstudio-testtools-cppunittestframework-api-reference?view=vs-2022#In_this_topic
@@ -645,6 +650,82 @@ Microsoft::VisualStudio::CppUnitTestFramework 单元测试框架
         std::wclog.clear();
         std::wcerr.clear();
         std::wcin.clear();
+    内存管理
+        32位进程访问的虚拟地址空间的范围：
+            进程使用低2G：0x00000000-0x7fff ffff
+            系统使用高2G：0x80000000-0xffff ffff
+        进程所使用的虚拟地址中，实际存放在物理内存中且可以被分页存储到硬盘中的部分成为 工作集working set
+        当物理内存不足时，系统将部分物理内存中的内容按页（最不常用的页）存储到硬盘中
+        页的状态：
+            空闲：这个页没有被保留或提交，进程不可访问，否则会导致访问错误异常
+            保留：这个页被保留，进程不可访问，需要提交后才能访问。使用VirtualAlloc()和VirtualAllocEx()来保留一个页
+            提交：系统将页分配给进程。使用VirtualAlloc()和VirtualAllocEx()来提交一个页，使用VirtualFree()和VirtualFreeEx()来释放一个页
+        内存分配函数的层次：
+            malloc() / free() / new / delete
+                         ↓
+            HeapCreate() / HeapDestory() / HeapAlloc() / HeapFree()
+                         ↓
+                VirtualAlloc() / VirtualFree()
+            ------------------------------------------------------------kernel mode
+                   kernel
+        GlobalAlloc()和LocalAlloc()
+            HGLOBAL GlobalAlloc(UINT uFlags, SIZE_T dwBytes)
+                其中uFlags参数可以是
+                    GHND = GMEM_MOVEABLE | GMEM_ZEROINIT
+                    GMEM_FIXED 分配固定内存，返回的就是直接可以用的指针
+                    GMEM_MOVEABLE 分配可移动的内存，移动是指可以在默认堆中移动，返回的是一个句柄，需要用GlobalLock()函数从这个句柄获取指针
+                    GMEM_ZEROINIT 全零初始化内存
+                    GPTR = GMEM_FIXED | GMEM_ZEROINIT
+                GHND和GMEM_MOVEABLE参数会导致额外的开销，而且需要调用GlobalLock()来锁定并获取指针来访问，所以应该尽量避免
+            GlobalAlloc()如果成功，分配的内存不会比指定的少，程序可以使用所有分配的内存
+            要获取实际分配的大小，调用GlobalSize()函数
+            失败返回NULL
+            这个函数分配的内存会对齐到8字节边界
+            Windows不区分全局堆和本地堆，所以GlobalAlloc()和LocalAlloc()是一样的，但是GlobalAlloc()分配的内存应该相应的使用GlobalFree()来释放
+            这两个函数比Heap族函数功能少、性能低，新开发的程序应该使用Heap族函数管理内存
+        Heap族函数
+            HANDLE HeapCreate(DWORD flOptions, SIZE_T dwInitialSize, SIZE_T dwMaximumSize)
+                在进程的虚拟地址空间中保留一部分内存（initialSize大小的内存直接就是提交的状态），创建一个私有堆，对进程有效，返回堆句柄，如果失败返回NULL
+                flOptions参数可以是下面的组合
+                    HEAP_NO_SERIALIZE 创建一个不被顺序顺序化访问的堆
+                    HEAP_GENERATE_EXCEPTIONS 分配失败时不返回NULL，而是抛出异常
+                    HEAP_CREATE_ENABLE_EXECUTE 这个堆的代码可执行，如果没有这个标识，而进程尝试执行这个堆的代码段，抛出STATUS_ACCESS_VIOLATION异常
+                dwInitialSize参数指定初始分配的内存大小，这些内存页是提交状态，如果为0，则分配一个内存页，内存页的大小通过GetSystemInfo()函数获取
+                dwMaximumSize参数指定最大分配的内存大小，如果为0，则不限制最大分配的内存大小
+            LPVOID HeapAlloc(HANDLE hHeap, DWORD dwFlags, SIZE_T dwBytes)
+                从已经通过HeapCreate()创建的堆中分配一部分内存
+        Virtual族函数
+            Virtual族函数比Heap族函数更加底层，用于操作虚拟内存地址空间
+            VirtualAlloc()函数可以
+                保留一些内存页
+                提交一些被保留的内存页
+                同时保留和提交一些内存页
+            LPVOID VirtualAlloc(LPVOID lpAddress, SIZE_T dwSize, DWORD flAllocationType, DWORD flProtect)
+
+        获取进程的工作集信息：
+            获取当前的工作集大小GetProcessMemoryInfo()
+            获取或更改最小和最大的工作集大小GetProcessWorkingSetSizeEx() SetProcessWorkingSetSizeEx()
+        内存保护：
+            为了防止缓冲溢出攻击，默认情况下系统不允许在数据页内存执行代码，即使用malloc()和HeapAlloc()函数分配的内存是不可执行的
+            如果一定要执行，需要特定的标记PAGE_EXECUTE
+            使用VirtualAlloc()可以分配可执行的内存页
+            另外，应当将可执行的内存页分配在比不可执行的内存页更低的地址，这样即使缓冲溢出，也不会溢出到可执行内存的区域
+        VirtualAlloc()用法
+            https://docs.microsoft.com/en-us/windows/win32/memory/reserving-and-committing-memory
+        保护页
+            有时为了检测是否发生了内存越界等访问错误，常常分配一个保护页，然后系统检测是否读取和写入到了保护页的区域来保证算法的正确性
+            栈溢出检查通常就是系统使用这种方法实现的
+            https://docs.microsoft.com/en-us/windows/win32/memory/creating-guard-pages
+        使用共享内存映射文件在进程间共享内存的方法
+            第一个进程：
+                CreateFileMapping()
+                MapViewOfFile()
+                写入数据
+            其他进程：
+                OpenFileMapping()
+                MapViewOfFile()
+                读取或写入数据
+            注意进程间的同步
     Windows版本
         typedef struct
         {
@@ -789,7 +870,7 @@ Microsoft::VisualStudio::CppUnitTestFramework 单元测试框架
                 } SYSTEM_LOGICAL_PROCESSOR_INFORMATION, *PSYSTEM_LOGICAL_PROCESSOR_INFORMATION;
             
             BOOL GetLogicalProcessorInformation(PSYSTEM_LOGICAL_PROCESSOR_INFORMATION Buffer, PDWORD ReturnedLength)
-        关键段
+        关键段/临界区
             需要给每一个要被共享的数据定义一个CRITICAL_SECTION类型的变量，然后使用
                 VOID InitializeCriticalSection(PCRITICAL_SECTION pcs) 初始化CRITICAL_SECTION变量
             操作
@@ -1372,7 +1453,8 @@ UI相关
         BOOL WriteFileEx(HANDLE hFile, PVOID pvBuffer, DWORD nNumBytesToRead, OVERLAPPED* pOverlapped, LPOVERLAPPED_COMPLETION_ROUTINE pFnCompletionRoutine)
         BOOL FlushFileBuffers(HANDLE hFile)
 
-
+GDI
+    
 Direct2D
     D2D是用来替代已有的GDI GDI+的2D图形API，它可以在有硬件加速的条件下基于Direct3D渲染，也可以在没有时基于软件渲染
     Direct2D和其他API的关系
@@ -1550,6 +1632,36 @@ DirectWrite
         REFIID iid,         //__uuidof(IDWriteFactory)
         IUnknown** factory  //指向要存储所创建的DirectWrite工厂的指针
     )
+win32
+    RC资源文件
+        rc文件是一个文本文件，可以使用单字节、双字节或unicode字符
+        rc文件的语法类似于C++，支持一部分预处理器指令
+        对于使用其他文件的资源，例如图标、字体等，在rc中引用这些文件的位置
+        对于字符串、对话框、菜单资源，则直接在rc文件中定义
+        语法
+            注释
+                支持单行//注释和/**/多行注释
+            宏
+                RC编译器仅支持一部分宏定义功能，不支持ANSI C中的标准宏，例如__DATE__ __FILE__ __LINE__ __STDC__ __TIME__ __TIMESTAMP__等
+                可以使用下面的办法似的rc文件可以被普通c编译器编译
+                    #ifdef RC_INVOKED
+                        //使用RC编译器编译
+                    #else
+                        //使用C编译器编译
+                    #endif
+                code_page宏用来修改使用的编码页，但仅支持在顶层rc文件中使用，不支持在被包含的rc文件中使用
+                    #pragma code_page(1252)
+            定义资源
+                https://docs.microsoft.com/en-us/windows/win32/menurc/resource-definition-statements
+        RC编译器
+            RC编译器通常放在Windows SDK中，例如 C:\Program Files (x86)\Windows Kits\10\bin\10.0.22000.0\x86\rc.exe
+        使用
+            要在win32程序中使用rc文件
+                1.给指针、图标、位图、对话框、字体等资源创建独立的资源文件
+                2.创建一个资源描述脚本，即rc文件
+                3.使用rc编译器编译rc文件
+                4。将编译后的res文件链接到程序的可执行文件中
+
 MFC
     Microsoft Foundation Class主要是Win32和COM的面向对象化的接口
     MFC源码
@@ -2808,6 +2920,18 @@ UWP
                 bool viewShown = await ApplicationViewSwitcher.TryShowAsStandaloneAsync(newViewId);
     运行期查询接口
         class Windows.Foundation.Metadata.ApiInformation
+    应用设置
+        应用设置应该存到Windows.Storage.ApplicationData.Current.RoamingSettings中
+        设置项的Values属性返回一个以字符串为键的字典，直接对字典中的键值转换成基本类型即可
+            setting.Values[key] as Type
+        应用存储
+            大文件应该存储到本地数据文件夹中，使用Windows.Storage.ApplicationData.Current.LocalFolder
+    Webview2
+        事件
+            NavigationStarting -> SourceChanged -> ContentLoading -> HistoryChanged -> DOMContentLoaded -> NavigationCompleted
+            要监听子Frame的导航时间，需要监听FrameNavigationStarting FrameNavigationCompleted事件
+            加载失败时，取决于失败页是否存在，如果不存在则可能没有NavigationCompleted事件
+            
 XAML
     数据绑定
         通常数据存在一个专门的数据类里，然后这个类的UI呈现即ViewModel存放一个数据类的实体作为公有成员，然后在XAML需要引用数据的地方使用数据绑定
@@ -3040,4 +3164,42 @@ WMI
     Windows Management Instrumentation
     WMI用于管理Windows系统的数据和操作
     可以通过使用WMI脚本来远程自动化一些管理员权限的操作，在企业应用中比较常见
-    
+多媒体
+    音频
+        core audio api
+            core audio api是windows底层音频api，其他技术如direct sound, wasapi, waveXX都基于这一套底层api实现
+            组件和头文件
+                MMDevice        -> Mmdeviceapi.h
+                WASAPI          -> Audioclient.h Audiopolicy.h
+                DeviceTopology  -> Devicetopology.h
+                EndpointVolumne -> Endpointvolumne.h
+            动态库
+                Audioses.dll   Mmdevapi.dll
+            要获取设备，先使用CoCreateInstance()获取一个IMMDeviceEnumerator
+            每个终端音频设备由一个唯一的id字符串标识，使用IMMDevice::GetId()获取
+            控制音量
+                音频会话，共享模式
+                    IAudioStreamVolume 一个音频会话中某个音频流的音量
+                    IChannelAudioVolume 一个音频会话中某个声道的音量
+                    ISimpleAudioVolume 一个音频会话的主音量
+                独占模式
+                    独占模式需要直接控制音频终端设备的音量
+                    在音频设备没有硬件音量控制时，使用IAudioEndpointVolume会影响共享模式的音量
+                    在音频设备有硬件音量控制时，使用这个接口会影响共享和独占模式的音量
+            音频会话
+                播放
+                    从IMMDeviceEnumerator获取IMMDevice，然后调用.Activate()方法获取IAudioClient接口
+                    IAudioClient::Initialize()方法初始化音频流
+                录制
+                监听
+                    可以从一个播放设备捕获音频流
+                从IAudioClient调用.GetService()可以获取下面的接口
+                    IAudioRenderClient 写终端缓冲
+                    IAudioCaptureClient 读终端缓冲
+                    IAudioSessionControl 控制关联到这个音频流的音频会话
+                    ISimpleAudioVolume 控制关联到这个音频流的音频会话的音量
+                    IChannelAudioVolume 控制关联到这个音频流的音频会话的某个声道的音量
+                    IAudioClock 监控音频流的码率和位置
+        directsound
+        directshow
+        waveout
