@@ -726,6 +726,28 @@ Microsoft::VisualStudio::CppUnitTestFramework 单元测试框架
                 MapViewOfFile()
                 读取或写入数据
             注意进程间的同步
+            boost::interprocess库
+                使用boost::interprocess库可以方便的在共享内存上构造对象（对象中包括用于进程同步的对象，例如互斥量、条件变量、信号量等等）
+                1. 通常是先开辟一块内存区域为共享内存
+                2. 然后把其中的一部分（或者全部）内存映射到本进程的地址空间
+                3. 然后在这个地址空间上像往常一样构造对象（通常使用定位new运算符）
+                然后被
+                进程同步
+                    各个进程同步的对象的头文件在boost/interprocess/sync/目录下
+                    互斥量和锁
+                        interprocess_mutex / named_mutex
+                        interprocess_recursive_mutex / named_recursive_mutex
+                        scoped_lock
+                    条件变量
+                        interprocess_condition 与interprocess_mutex搭配 / named_condition 与named_mutex搭配
+                        interprocess_condition_any 与任何互斥量类型搭配 / named_condition_any 与任何具名的互斥量搭配
+                    信号量
+                        interprocess_semaphore / named_semaphore
+                            调用.post()使信号量的值+1，并唤醒一个正在被阻塞的进程
+                            调用.wait()使信号量的值-1，且当信号量的值小于0时，将阻塞直到信号量的值大于0
+                            除此之外还有.try_wait()尝试等待，和带超时时间的等待函数.timed_wait(TimePoint const& abs_time)
+                    
+
     Windows版本
         typedef struct
         {
@@ -1755,6 +1777,8 @@ MVVM
     ViewModel定义了界面与核心业务逻辑和核心业务数据交互的逻辑，包括界面元素响应的处理函数
     Model定义了核心业务逻辑，与界面完全剥离开
 C++/WinRT
+    将VS创建的普通桌面应用程序加上C++/WinRT支持
+        https://learn.microsoft.com/en-us/windows/uwp/cpp-and-winrt-apis/get-started#modify-a-windows-desktop-application-project-to-add-cwinrt-support
     每个winrt中的类都有一个接收nullptr的构造函数，用来延迟初始化，而默认构造函数会实际构造对象
     数据绑定
         数据绑定的3歌要素
@@ -1813,6 +1837,9 @@ C++/WinRT
 
         template<typename T>
         T unbox_value_or(winrt::Windows::Foundation::IInspectable const& value, T const& default_value)
+    IReference<T>类型
+        https://devblogs.microsoft.com/oldnewthing/20221215-00/?p=107595
+
     事件处理
         事件管理机制可以使用任何C++的函数类型
         在Xaml中与物件连接的事件处理函数在code behind中必须是public函数，C#中没有这个限制，可以是private
@@ -1874,6 +1901,27 @@ C++/WinRT
                     };
                 有时使用auto_revoke会抛出winrt::hresult_no_interface异常，表明该事件源不支持弱引用
                 此时需要手动注销
+        定义事件
+            有参事件
+                //idl
+                event Windows.Foundation.EventHandler<Type> Event;
+                
+                //.h中相应加上添加事件处理函数和移除事件处理函数的函数
+                winrt::event_token Event(winrt::Windows::Foundation::EventHandler<Type> const& handler) { return m_event.add(handler); }
+                void Event(winrt::event_token const& token) { m_event.remove(token); }
+                例如：
+                    event Windows.Foundation.EventHandler<Single> TemperatureIsBelowFreezing;
+            无参事件
+                由于Windows.Foundation.EventHandler<T>中的类型参数T不能是void，所以无参事件需要自己定义委托delegate的类型
+                //idl
+                delegate void SignalDelegate();
+
+                ...
+                event SignalDelegate Event;
+                
+                //.h
+                winrt::event_token Event(SignalDelegate const& handler) {...}
+                void Event(winrt::event_token const& token) { ... }
     异步
         执行时间可能超过50毫秒的Windows Runtime API都被写成异步函数，函数名以Async结尾
         在Windows::Foundation名称空间中定义了以下4中异步操作对象
@@ -2048,6 +2096,47 @@ C++/WinRT
                     property_value.GetInt32Array(array);
     注意事项：
         winrt::event<T>的类型必须是Windows Runtime类型
+    C++/WinRT + COM
+        使用COM
+            由于COM对象需要使用指向其接口的指针，C++/WinRT定义了智能指针类型winrt::com_ptr<>
+            使用void**作为接口的输出类型的函数
+                使用winrt::com_ptr<T>::put_void()方法
+                例如D2D1CreateFactory(..., void** ppIFactory)
+                    winrt::com_ptr<ID2DFactory> factory;
+                    D2D1_FACTORY_OPTIONS options{D2D1_DEBUG_LEVEL_NONE};
+                    D2D1CreateFactory(
+                        D2D1_FACTORY_TYPE_SINGLE_THREADED,
+                        __uuidof(factory),
+                        &options,
+                        factory.put_void()
+                    );
+            使用某个接口类型指针的指针作为输出的函数
+                使用winrt::com_ptr<T>::put()方法
+                例如D3D11CreateDevice(..., ID3D11** pDevice, ...)
+                    winrt::com_ptr<ID3D11Device> device;
+                    D3D11CreateDevice(
+                        ...
+                        device.put(),
+                        ...);
+            使用IUnknown**作为接口的输出类型的函数
+                使用winrt::com_ptr<T>::put()方法并reinterpret_cast<IUnknown**>
+                例如DWriteCreateFactory(..., IUnknown** factory)
+                    DWriteCreateFactory(
+                        DWRITE_FACTORY_TYPE_SHARED,
+                        __uuidof(dwriteFactory2),
+                        reinterpret_cast<IUnknown**>(dwriteFactory2.put()));
+            .get()方法返回一个原始指针
+            .as<Interface>()方法做类型转换，如果不能，抛出异常
+            .try_as<Interface>()尝试做类型转换，如果不能，返回nullptr
+            重置一个智能指针时，需要先赋值为nullptr，来清空引用计数，才能赋值一个新的对象接口的指针
+            使用winrt::check_hresult()在HRESULT返回错误时抛出异常
+        实现COM
+            winrt::imolements<>类默认不支持COM的IUnknown类，只支持winrt::Windows::Foundation::IUnknown类
+            要支持，必须在包含任何C++/WinRT头文件 之前 包含<unknwn.h>头文件
+            推荐的方法是包含<wil/cppwinrt.h>头文件
+    WinRT -> ABI
+        从WinRT类型获取ABI类型
+        从ABI类型转换到WinRT类型
         
 UWP
     UWP项目类型
@@ -2533,6 +2622,20 @@ UWP
             Window.Current.Activated -= Current_Activated;
             GC.Collect();
         }
+    UWP 3D相关
+        数学库
+            Windows.Foundation.Numerics
+            矩阵类
+                float3x2
+                float4x4
+            向量类
+                float2
+                float3
+                float4
+                Quaternion 四元数，顺序为xyzw
+            辅助类
+                Rational 有理数类
+                Plane 平面类
     UWP非活动窗口透明效果
         DependencyProperty
             DependencyProperty提供了一个全局的访问依赖属性和提供属性事件响应的方法
@@ -2858,6 +2961,7 @@ UWP
                 case ApplicationTheme.Dark:
                 case ApplicationTheme.Light:
             }
+        }
     多窗口
         使用AppWindow
             AppWindow创建的窗口与主窗口同属于一个UI线程中
@@ -2926,6 +3030,17 @@ UWP
             setting.Values[key] as Type
         应用存储
             大文件应该存储到本地数据文件夹中，使用Windows.Storage.ApplicationData.Current.LocalFolder
+    命令
+        命令通过UI触发，然后通常由代码中的事件响应函数处理
+        例如一个按钮在被点击时，就发出一个命令，可以通过直接处理点击事件，也可以通过绑定到一个UI命令
+        命令是从Windows.UI.Xaml.Input.ICommand类继承出来的，Xaml中提供了两个简化实现ICommand的类
+            XamlUICommand
+
+            StandardUICommand 
+                继承自XamlUICommand，提供了一些预定义的常见指令，例如删除、复制、剪切等操作和图标，但是命令的事件处理还是需要自己写代码逻辑的
+                预定义的所有命令见https://learn.microsoft.com/en-us/windows/windows-app-sdk/api/winrt/microsoft.ui.xaml.input.standarduicommand?view=windows-app-sdk-1.2
+            ICommand
+                
     Webview2
         事件
             NavigationStarting -> SourceChanged -> ContentLoading -> HistoryChanged -> DOMContentLoaded -> NavigationCompleted
@@ -3086,10 +3201,10 @@ XAML
                 <Page.Resources>
                     <!-- Storyboard resource: Animates a rectangle's opacity. -->
                     <Storyboard x:Name="myStoryboard">
-                    <DoubleAnimation
-                        Storyboard.TargetName="MyAnimatedRectangle"
-                        Storyboard.TargetProperty="Opacity"
-                        From="1.0" To="0.0" Duration="0:0:1"/>
+                        <DoubleAnimation
+                            Storyboard.TargetName="MyAnimatedRectangle"
+                            Storyboard.TargetProperty="Opacity"
+                            From="1.0" To="0.0" Duration="0:0:1"/>
                     </Storyboard>
                 </Page.Resources>
 
@@ -3119,6 +3234,14 @@ XAML
                 指定动画播放几次
                 可以是Forever，使得永远循环动画
             SpeedRatio
+    XAML lights
+        https://learn.microsoft.com/en-us/windows/uwp/composition/xaml-lighting
+        可以对UIElement添加Lights来增加光照效果，例如
+            <Button>
+                <Button.Lights>
+                    ... 这些Lights为自定义的类，继承自Windows.UI.Xaml.Media.XamlLight
+                </Button.Lights>
+            </Button>
     STA
         Single-threaded aparatments
         ATSA
@@ -3160,6 +3283,21 @@ WINUI3
                 <Resource Language="en-US"/>
                 <Resource Language="es-ES"/>
             </Resource>
+    窗口管理和UWP
+        UWP中的窗口管理类为Windows.UI.ViewManagement.ApplicationView和Windows.UI.Core.CoreWindow
+        Winui3中的窗口管理类为Microsoft.UI.Windowing.AppWindow
+        AppWindow与顶层窗口的HWND有一比一对应的关系，即HWND创建时AppWindow类就立即有效了
+        每个AppWindow都应用了一个AppWindowPresenter，AppWindowPresenter有点类似于win32中的窗口样式和窗口状态的组合，但提供更多功能
+        默认情况下，
+        AppWindow<->HWND<->Microsoft.UI.Xaml.Window的转换
+            HWND -> AppWindow: 先调GetWindowIdFromWindow(HWND) 得到WindowId，再调AppWindow::GetFromWindowId(WindowId)得到AppWindow
+            Microsoft.UI.Xaml.Window -> HWND:
+                #include <microsoft.ui.xaml.window.h> //包含这个头文件
+                auto windowNative{ this->try_as<::IWindowNative>() };
+                winrt::check_bool(windowNative);
+                HWND hWnd{ 0 };
+                windowNative->get_WindowHandle(&hWnd);
+            
 WMI
     Windows Management Instrumentation
     WMI用于管理Windows系统的数据和操作

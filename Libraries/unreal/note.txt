@@ -29,6 +29,18 @@
         TCHAR
             与字符集无关的字符类型
             FChar类中包含了一些处理TChar字符的函数
+        UI相关
+            在Runtime\Core\Public\Internationalization\LocalizedTextSourceTypes.h中定义了几个UI相关的字符串类型别名
+                typedef TSharedRef<FString, ESPMode::ThreadSafe> FTextDisplayStringRef;
+                typedef TSharedPtr<FString, ESPMode::ThreadSafe> FTextDisplayStringPtr;
+                typedef TSharedRef<const FString, ESPMode::ThreadSafe> FTextConstDisplayStringRef;
+                typedef TSharedPtr<const FString, ESPMode::ThreadSafe> FTextConstDisplayStringPtr;
+
+                inline FTextDisplayStringRef MakeTextDisplayString(FString&& InDisplayString)
+                {
+                    return MakeShared<FString, ESPMode::ThreadSafe>(MoveTemp(InDisplayString));
+                }
+                
     容器
         TArray<T>
             类似于std::vector
@@ -76,6 +88,16 @@
             MakeShareable()  类的构造函数可以是private，这使得可以拿到从别的地方创建的对象的所有权
             StaticCastSharedRef() / StaticCastSharedPtr() 将基类的TSharedPtr或TSharedRef转化成派生类
             ConstCastSharedRef / ConstCastSharedPtr()
+            辅助类
+                template<typename ObjectType, ESPMode Mode>
+                class TSharedFromThis
+                {
+                    AsShared() -> TSharedRef
+                    AsWeak() -> TWeakPtr
+                    DoesSharedInstanceExist() -> bool 返回是否可以调用AsShared()
+
+                    static SharedThis(OtherType* thisPtr) -> TSharedRef 
+                };
         TWeakPtr
             .Pin() 返回一个TSharedPtr
         智能指针类的第二个模板参数可以用于指定多线程时的同步模式，例如使用ESPMode::ThreadSafe可以保证：
@@ -135,7 +157,7 @@
                 UFUNCTION(BlueprintCallable, Category = "MyCategory")
                 static Type MyFunction(); 
                 //...
-            }；
+            };
 断言
     check族
         check(expr) / checkSlow(expr) 等同于assert(expr)
@@ -178,6 +200,7 @@ unreal编辑器
     设置游戏输入
         Edit -> Project Settings -> Engine -> Input -> Action Binding / Axis Binding
 反射
+    URROPERTY宏的值在ObjectMacros.h中
     GetClass() 和 StaticClass()
         GetClass()是UObject类的成员函数
         StaticClass()是UObject类的静态成员函数，对同一个类调用时总是返回一样的结果
@@ -188,6 +211,12 @@ Slate UI
     Slate UI官方自带一个演示程序SlateViewer，源码位置：Engine\Source\Programs\SlateViewer，生成的工程位置：Engine\Intermediate\ProjectFiles
     Slate UI可视化工具
         UE5: Tools -> Debug -> Widget Reflector
+    内置Style
+        默认Style从FStyleDefault类中获取
+
+        模块EditorStyle
+            FEditorStyle类中定义了一些静态函数，通过Style名来取得预定义的一些Style
+            例如要获取设置面板左侧目录标题的字体，可以调用FEditorStyle::GetFontStyle("SettingsEditor.CatgoryAndSectionFont") （定义在SlateEditorStyle.cpp）中
     创建一个Editor
     要是用Slate UI库，需要在Build.cs文件中添加下面模块
         PublicDependencyModuleNames.AddRange(new string[] {..., "InputCore"});
@@ -237,7 +266,7 @@ Slate UI
 		                return static_cast<SlotType&>(*this);
                     }
                 其中的SlotType即是TSingleWidgetChildrenWithBasicLayoutSlot<InPaddingInvalidationReason>
-                所以SlotType其实是CTRTP，返回了自己的引用
+                所以SlotType其实是CRTP模式，返回了自己的引用
         
     布局类
         SHorizontalBox
@@ -252,7 +281,31 @@ Slate UI
                 SOverlay::Slot(SNew(SMyWidget1))
                 SOverlay::Slot(SNew(SMyWidget2))
                 SMyWidget2会叠加在SMyWidget1上方
-        
+        SScrollBox
+    回调函数
+        在\Engine\Source\Runtime\Slate\Public\Framework\SlateDelegates.h中定义了所有Slate回调函数的类型
+            #define DECLARE_DELEGATE_RetVal( ReturnValueType, DelegateName ) 展开为 
+            typedef TDeletate<ReturnValueType()> DelegateName;
+        其中TDelegate是一个模板类型
+            template <typename DelegateSignature, typename UserPolicy = FDefaultDelegateUserPolicy>
+            class TDelegate //主模板，如果匹配不到特化就会报错
+            {
+                static_assert(sizeof(DelegateSignature) == 0, "Expected a function signature for the delegate template parameter");
+            };
+
+            template <typename InRetValType, typename... ParamTypes, typename UserPolicy> //具有函数形式的模板特化
+            class TDelegate<InRetValType(ParamTypes...), UserPolicy> : public TDelegateBase<UserPolicy>
+            {
+                CreateStatic()     ---> C++ 原始全局函数指针(包括静态成员函数) ---> TBaseStaticDelegateInstance<...>::Create(...)
+                CreateLambda()     ---> Lambada 可调用对象                   ---> TBaseFunctorDelegateInstance<...>::Create(...)
+                CreateWeakLambda() ---> weak object C++ lambda delegate     ---> TWeakBaseFunctorDelegateInstance<...>::Create(...)
+                CreateRaw()        ---> C++ 原始成员函数委托                 ---> TBaseRawMethodDelegateInstance<...>::Create(...)
+                CreateSP()         ---> 基于共享指针的成员函数委托            ---> TBaseSPMethodDelegateInstance<...>::Create(...)
+                CreateUFunction()  ---> 基于UFunction的成员函数委托          ---> TBaseUFunctionDelegateInstance<...>::Create(...)
+                CreateUObject()    ---> 基于UObject的成员函数委托            ---> TBaseUObjectMethodDelegateInstance<...>::Create(...)
+            }
+        例如
+            
     SLATE宏
         SLATE_BEGIN_ARGS(WidgetType)
         SLATE_ARGUMENT(ArgType, ArgName)
@@ -401,8 +454,143 @@ Slate UI
             }
 
             SNew()宏展开为
-                                        //这是WidgetType的字符串表达
+                                        //v这是WidgetType的字符串表达
                 MakeTDecl<WidgetType>(#WidgetType, __FILE__, __LINE__, RequiredArgs::MakeRequiredArgs(__VA_ARGS__)) <<= WidgetType::FArguments()
             SAssignNew(ExposeAs, WidgetType, ...)宏展开为
                 MakeTDecl<WidgetType>(#WidgetType, __FILE__, __LINE__, RequiredArgs::MakeRequiredArgs(__VA_ARGS__)).Expose(ExposeAs) <<= ...
 
+模块
+    创建一个模块，可以总结为BUILD五个单词
+    构建
+        在UE中，项目是根据.Target.cs文件和.Build.cs文件来构建的，跟Visual Studio里显示的工程无关，工程只是方便管理文件用的
+        创建Visual Studio工程可以通过
+            GenerateProject.bat
+            右键一个.uproject文件->Generate Visual Studio Project Files
+        例如要创建一个模块FooBar，在项目文件夹的Source文件夹下新建与模块同名的文件夹FooBar
+        并在目录下创建一个FooBar.Build.cs，最后的目录应该看起来如下
+            Project Folder
+                Source
+                    FooBar
+                        FooBar.Build.cs
+        .Build.cs文件至少需要包含下面代码
+            using UnrealBuildTool;
+            public class FooBar : ModuleRules
+            {
+                public FooBar(ReadOnlyTargetRules Target) : base(Target)
+                {
+                    PrivateDependencyModuleNames.AddRange(new string[] { "Core" });
+                    //私有依赖使用PrivateDependencyModuleNames.AddRange(new string[]{...});
+                }
+            }
+            每个uproject都必须至少在私有依赖中依赖Core模块
+            公有依赖public dependency和私有依赖private dependency
+                当别的项目要使用这个模块时，也需要的依赖，需要指定为公有依赖
+                    例如这个模块依赖与某个slate ui控件，需要引入控件的定义
+                    如果把slate定义为私有依赖，会导致无法找到某个slate控件的定义，产生编译错误
+                当别的项目使用这个模块时不需要的依赖，就定义为私有依赖
+    使用
+        为了让这个模块能被别的模块使用，通常需要把头文件放到Public文件夹中，这样其他模块才可以使用这个模块
+        实现代码放到Private文件夹中
+            Project Folder
+                Source
+                    FooBar
+                        FooBar.Build.cs
+                        Public
+                            MyModuleImpl.h
+                        Private
+                            MyModuleImpl.cpp
+    实现
+        任何的模块都需要一个主类，这个类 类似于单例模式，模块的生命周期即有这个类的生命周期决定
+        这个主类需要继承自IModuleInterface，并定义两个虚函数
+            #include "Modules/ModuleInterface.h"
+            class FooBarModule : public IModuleInterface
+            {
+            public:
+                virtual void StartupModule() override;
+                virtual void ShutdownModule() override;
+            };
+            由于IModuleInterface来自Core模块，所以所有的模块都要至少包含Core的依赖
+        如果其他模块要使用这个模块，可以添加依赖后直接通过FModuleManager调用
+            auto foobarModule = FModuleManager::Get().LoadModuleChecked<FooBarModule>();
+
+        实现一个模块，还需要添加一些注册模块和初始化的代码
+        习惯上，在Private文件夹下创建一个<模块名>Module.cpp文件，这里创建一个FooBarModule.cpp
+            Project Folder
+                Source
+                    FooBar
+                        FooBar.Build.cs
+                        Public
+                            MyModuleImpl.h
+                        Private
+                            MyModuleImpl.cpp
+                            FooBarModule.cpp
+        在这个文件中，需要把模块的主类暴露给UE，通常使用一个自带的宏
+            IMPLEMENT_GAME_MODULE(FooBarModule, FooBar)
+        uproject文件中还要添加对这个模块的描述
+            "Modules":
+            [
+                {
+                    "Name": "FooBar",
+                    "Type": "Runtime", //可选的"LoadingPhase": "Default"
+                }
+            ]
+            关乎Type，参考ModuleDescriptor.h（Engine\Source\Runtime\Projects\Public）中的注释
+    扩展Details Panel
+        按上面的步骤创建一个Editor模块
+            自定义Struct的呈现形式
+                class FMyStructCustomization : public IPropertyTypeCustomization
+                {
+                public:
+                    static TSharedRef<IPropertyTypeCustomization> MakeInstance()
+                    {
+                        return MakeShareable(new FMyStructCustomization);   //其他的初始化操作
+                    }
+
+                    virtual void CustomizeHeader(TSharedRef<IPropertyHandle> structPropertyHandle, class FDetailWidgetRow& headerRow, IPropertyTypeCustomizationUtils& structCustomizationUtils) override
+                    {
+
+                    }
+
+                    virtual void CustomizeChildren(TSharedRef<IPropertyHandle> structPropertyHandle, class IDetailChildrenBuilder& structBuilder, IPropertyTypeCustomizationUtils& structCustimizationUtils) override
+                    {
+
+                    }
+                };
+            自定义整个UObject的呈现形式
+                class FMyClassCustomization : public IDetailCustomization
+                {
+                public:
+                    static TSharedRef<IDetailCustomization> MakeInstance()
+                    {
+                        return MakeShareable(new FMyClassCustomization);
+                    }
+
+                    virtual void CustomizationDetails(IDetailLayoutBuilder& builder) override
+                    {
+
+                    }
+                };
+        注册自定义的类型
+            在StartupModule()中添加
+                auto& propertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
+                //注册一个自定义Struct的呈现形式
+                propertyModule.RegisterCustomPropertyTypeLayout(
+                    <MyStruct>::StaticStruct()->GetFName(),
+                    FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FMyStructCustomization::MakeInstance) //或任意的函数对象，来构造一个IPropertyTypeCustomization
+                );
+                //注册UObject的呈现形式
+                propertyModule.RegisterClassLayout(
+                    <MyUObject>::StaticClass()->GetFName(),
+                    FOnGetDetailCustomizationInstance::CreateStatic(&FMyClassCustomization::MakeInstance) //或任意函数对象，来构造一个IDetailCustomization
+                );
+                propertyModule.NotifyCustomizationModuleChanged();
+            在ShutdownModule()中添加
+                if(FModuleManager::Get().IsModuleLoaded("PropertyEditor"))
+                {
+                    auto& propertyModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
+                    //注销自定义Struct的呈现
+                    propertyModule.UnregisterCustomPropertyTypeLayout(<MyStruct>::StaticStruct()->GetFName());
+                    //注销自定义UObject的呈现
+                    propertyModule.UnregisterCustomClassLayout(<MyUObject>::StaticClass()->GetFName());
+                    propertyModule.NotifyCustomizationModuleChanged();
+                }

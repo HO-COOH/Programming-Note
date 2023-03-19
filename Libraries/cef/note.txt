@@ -1,0 +1,389 @@
+QCefView
+    CefViewCore -> CefViewCore.lib
+        class CefViewBrowserAppDelegateInterface;
+        
+        class CefViewBrowserApp
+            : CefApp
+            : CefBrowserProcessHandler;
+            包含 CefViewBrowserAppDelegateInterface::WeakPtr
+
+        class CefViewBrowserClientDelegateInterface;
+        class CefViewBrowserClient
+            : public CefClient
+            , public CefContextMenuHandler
+            , public CefDisplayHandler
+            , public CefDragHandler
+            , public CefFocusHandler
+            , public CefJSDialogHandler
+            , public CefKeyboardHandler
+            , public CefLifeSpanHandler
+            , public CefLoadHandler
+            , public CefRequestHandler
+            , public CefResourceRequestHandler
+            , public CefRenderHandler
+            , public CefDownloadHandler
+            包含CefViewBrowserClientDelegateInterface
+    CefViewWing -> CefViewWing.exe 依赖libcef_dll_wrapper.lib 
+        class CefViewAppBase: public CefApp
+        {
+            GetProcessType(command_line);
+            GetBridgeObjectName(command_line)
+        }
+
+        class CefViewRenderApp
+            : public CefViewAppBase
+            , public CefRenderProcessHandler
+        
+        class CefViewOtherApp
+            : public CefViewAppBase
+    QCefView -> QCefView.dll 依赖libcef_dll_wrapper.lib libcef.lib
+        
+        class QCefConfigPrivate;
+        class QCefConfig 包含QCefConfigPrivate
+
+        class QCefContextPrivate : public QObject;
+        class QCefContext : public QObject 包含QCefContextPrivate
+        
+        class CCefClientDelegate
+            : public CefViewBrowserClientDelegateInterface
+        
+        class QCefViewPrivate : QObject 
+            包含 CCefClientDelegate
+            CefViewBrowserClient
+            QCefContextPrivate
+        class QCefView : QObject
+            包含 QcefViewPrivate
+            QCefView构造函数：
+                1.通过单例QCefContext构造QCefViewPrivate
+                2.QCefViewPrivate.createCefBrowser()
+                    构造一个CCefClientDelegate
+                    通过QCefViewPrivate和CCefClientDelegate构造CefViewBrowserClient
+                        设置本地资源文件夹的位置
+                        调用CefBrowserHost（libcef）.CreateBrowser()完成CefViewBrowserClient的构造
+
+    QCefTest
+        CefViewWidget : QCefView
+        
+
+Cef
+    准备
+        调试
+            由于Cef运行在多进程下，而调试器只会调试主进程，所以需要调试器自动关联到主进程启动的子进程上方便调试
+            vs 安装这个插件 https://marketplace.visualstudio.com/items?itemName=vsdbgplat.MicrosoftChildProcessDebuggingPowerTool2022
+    Cef基础类
+        Cef内存管理基础类
+            在<cef_base.h>中
+            有基于引用计数的CefBaseRefCounted类和基于作用域的CefBaseScoped类
+            由于菱形继承问题，比如一个用户定义的类同时实现两个Cef类引用计数类的接口，通常Cef引用计数的类都从CefBaseRefCounted类virtual继承
+            CefRefCounted类
+                class CefBaseRefCounted
+                {
+                public:
+                    virtual void AddRef() const = 0;
+                    virtual void Release() const  = 0;
+                    virtual bool HasOneRef() const = 0;
+                    virtual bool HasAtLeastOneRef() const = 0;
+                protected:
+                    virtual ~CefBaseRefCounted() {}
+                };
+                当继承自这个类时，通常在类定义中添加一行IMPLEMENT_REFCOUNTING(<类名>);来获得默认的引用计数实现
+
+            CefBaseScoped类
+                class CefBaseScoped
+                {
+                public:
+                    virtual ~CefBaseScoped() {}
+                };
+        字符串类
+            C++中提供了CefString类，可以由各种std的字符串类和C字符串构造，并提供了与std::string和std::wstring的自动双向转换
+                CefString.ToString() -> std::string
+                CefString.ToWSting() -> std::wstring
+                CefString.ToString16()->std::u16string
+        命令行解析类
+            命令行参数的标准形式为 --<some_argument>[=<optional-param>]
+            所有cef支持的命令行参数在shared/common/client_switches.cc中
+            包含了用于解析命令行参数的方便函数
+            该类可以在初始化Cef环境即CefInitialize()前使用
+            class CefCommandLine : public virtual CefBaseRefCounted
+            
+    CefApp类
+        CefApp类要实现指定进程的回调函数，所以这个类本身就代表一个抽象的进程回调函数的工厂
+        由于CefApp的多进程渲染是通过主进程启动后再次通过命令行参数的不同来启动同一个exe用作不同的进程（例如渲染进程）
+        所以通过这个统一的入口类来获取两个重要的handler，即CefBrowserProcessHandler浏览器进程处理类和CefRenderProcessHandler渲染进程处理类
+        class CefApp : public virtual CefBaseRefCounted
+        {
+        public:
+            //在调用cef内部逻辑前会被调用，此时有机会修改命令行参数（通过使用MessageBox，似乎会被调用两次，一次command_line空白），在浏览器进程中process_type为空
+            virtual void OnBeforeCommandLineProcessing(const CefString& process_type, CefRefPtr<CefCommandLine> command_line);
+
+            //注册自定义schema，会在每个进程的主线程被调用一次（所以需要确保对每个进程都执行一样的逻辑，注册一样的schema）
+            virtual void OnRegisterCustomSchemas(CefRawPtr<CefSchemeRegistrar> registrar);
+
+            virtual CefRefPtr<CefResourceBundleHandler> GetResourceBundleHandler(); //获取资源处理类
+            virtual CefRefPtr<CefBrowserProcessHandler> GetBrowserProcessHandler(); //获取浏览器进程处理类
+            virtual CefRefPtr<CefRenderProcessHandler> GetRenderProcessHandler();   //获取渲染进程处理类
+        };
+    三大处理类
+        CefBrowserProcessHandler类 cef_browser_process_handler.h
+            class CefBrowserProcessHandler : public virtual CefBaseRefCounted
+            {
+            public:
+                virtual void OnRegisterCustomPreferences(cef_preferences_type_t type, CefRawPtr<CefPreferenceRegistrar> registrar);
+                virtual void OnContextInitialized();
+                virtual void OnBeforeChildProcessLaunch(CefRefPtr<CefCommandLine> command_line);
+                virtual void OnScheduleMessagePumpWork(int64 delay_ms);
+                virtual CefRefPtr<CefClient> GetDefaultClient();
+            };
+        CefRenderProcessHandler类 <cef_render_process_handler.h>
+            class CefRenderProcessHandler : public virtual CefBaseRefCounted
+            {
+            public:
+                virtual void OnWebKitInitialized();
+                virtual void OnBrowserCreated(CefRefPtr<CefBrowser> browser, CefRefPtr<CefDictionaryValue> extra_info);
+                
+                //在browser对象被销毁前调用
+                virtual void OnBrowserDestoryed(CefRefPtr<CefBrowser> browser);
+
+                virtual CefRefPtr<CefLoadHandler> GetLoadHandler();
+                virtual void OnContextCreated(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefV8Context> context);
+                virtual void OnContextReleased(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefV8Context> context);
+
+                //默认被禁用，要启用，需要在cef_settings_t.uncaught_exception_stack_size设置为>0
+                virtual void OnUncaughtException(CefRefPtr<CefBrowser> browser,
+                    CefRefPtr<CefFrame> frame,
+                    CefRefPtr<CefV8Context> context,
+                    CefRefPtr<CefV8Exception> exception,
+                    CefRefPtr<CefV8StackTrace> stackTrace);
+                
+                virtual void OnFocusedNodeChanged(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefDOMNode> node);
+                virtual void OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefProcessId source_process, CefRefPtr<CefProcessMessage> message);
+            };
+        CefResourceBudlerHandler类
+    CefClient类
+        返回各种与浏览器功能相关的Handler
+        class CefClient : public virtual CefBaseRefCounted
+        {
+        public:
+            //以下函数都是形如virtual CefRefPtr<...> Get...Handler() override; 所以这里直接列出具体的handler类型名，不再写完整函数
+            CefAudioHandler
+            CefCommandHandler
+            CefContextMenuHandler
+            CefDialogHandler
+            CefDisplayHandler
+            CefDownloadHandler
+            CefDragHandler
+            CefFocusHandler
+            CefFrameHandler
+            CefPermissionHandler
+            CefJSDialogHandler
+            CefKeyboardHandler
+            CefLifeSpanHandler
+            CefLoadHandler
+            CefPrintHandler
+            CefRenderHandler
+            CefRequestHandler
+            //注意这个函数在CefRenderProcessHandler类中也有定义
+            virtual void OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefProcessId source_process, CefRefPtr<CefProcessMessage> message);
+        };
+    CefBrowser类
+        代表一个实际展示在UI上的浏览器
+        这个对象的实例通常是在调用CefBrowserHost::CreateBrowser()后，在CefClient::OnAfterCreated()获取
+        由于一个html页面可能通过<iframe> tag来创建多个子frame，所以一个CefBrowser实例可能包含了多个CefFrame
+            class CefBrowser : public virtual CefBaseRefCounted
+            {
+            public:
+                /*获取子Frame相关*/
+                virtual CefRefPtr<CefFrame> GetMainFrame() = 0;
+                virtual CefRefPtr<CefFrame> GetFrame(int64 identifier) = 0;
+                virtual CefRefPtr<CefFrame> GetFrame(CefString const& name) = 0;
+                virtual void GetFrameIdentifiers(std::vector<int64>& identifiers) = 0;
+                virtual void GetFrameNames(std::vector<CefString>& names) = 0;
+                virtual size_t GetFrameCount() = 0;
+
+                /*浏览器控制相关*/
+                
+            };
+    两个UI框架
+        Views
+        Aura
+        窗口管理类
+            CefWindow类表示一个完整的顶层窗口，默认情况下会有一个非客户区（标题栏，图标、按钮和拖拽区）
+            所有的大小都是设备无关像素DIP作为单位，所有的方法都必须在浏览器进程的UI线程中被调用
+            class CefWindow : public CefPanel //cef_window.h
+            {
+            public:
+                static CefRefPtr<CefWindow> CreateTopLevelWindow(CefRefPtr<CefWindowDelegate> delegate);
+                /*
+                    然后包括各种跟窗口管理相关的函数，例如移动窗口、设置窗口大小、最大最小化、
+                    置顶、设置窗口图标和标题栏、发送窗口键盘鼠标信息等等
+                */
+            }
+            class CefWindowDelegate : public CefPanelDelegate //cef_window_delegate.h
+            {
+            public:
+                virtual void OnWindowCreated(CefRefPtr<CefWindow> window);
+                virtual void OnWindowClosing(CefRefPtr<CefWindow> window);
+                virtual void OnWindowDestroyed(CefRefPtr<CefWindow> window);
+                virtual void OnWindowActivationChanged(CefRefPtr<CefWindow> window, bool active);
+                virtual void OnWindowBoundsCHanged(CefRefPtr<CefWindow> window, const CefRect& newBounds);
+                virtual CefRefPtr<CefWindow> GetParentWindow(CefRefPtr<CefWindow> window, bool* is_menu, bool* can_activate_menu);
+                virtual CefRect GetInitialBounds(CefRefPtr<CefWindow> window);
+                virtual cef_show_state_t GetInitialShowState(CefRefPtr<CefWindow> window);
+
+            }
+    最简单的cef实例
+        在cefsimple项目中
+            类SimpleHandler实现了CefDisplayHandler, CefLifeSpanHandler, CefLoadHandler
+            所以这几个Handler有必要详细熟悉一下
+                class CefDisplayHandler : public virtual CefBaseRefCounted //cef_display_handler.h
+                {
+                public:
+                    virtual void OnAddressChange(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, const CefString& url);
+                    virtual void OnTitleChange(CefRefPtr<CefBrowser> browser, const CefString& title);
+                    //在网页图标改变时被调用，而不是收藏的网页图标的改变（函数名有点误导）
+                    virtual void OnFaviconURLChange(CefRefPtr<CefBrowser> browser, const std::vector<CefString>& icon_urls);
+                    //当web内容需要全屏时，fullScreen参数为true，此时需要客户端自己配合调整窗口大小
+                    virtual void OnFullScreenModeChange(CefRefPtr<CefBrowser> browser, bool fullScreen);
+                    virtual bool OnTooltip(CefRefPtr<CefBrowser> browser, CefString& text);
+                    virtual void OnStatusMessage(CefRefPtr<CefBrowser> browser, const CefString& value);
+                    virtual bool OnConsoleMessage(CefRefPtr<CefBrowser> browser,
+                        cef_log_severity_t level,
+                        const CefString& message,
+                        const CefString& source,
+                        int line)
+                    {
+                        其中枚举值level的值有
+                        enum 
+                        {
+                            LOGSEVERITY_DEFAULT,
+                            LOGSEVERITY_VERBOSE,
+                            LOGSEVERITY_DEBUG = LOGSEVERITY_VERBOSE,
+                            LOGSEVERITY_INFO,
+                            LOGSEVERITY_WARNING,
+                            LOGSEVERITY_ERROR,
+                            LOGSEVERITY_FATAL,
+                            LOGSEVERITY_DISABLE
+                        }                        
+                    }
+                    virtual bool OnAutoResize(CefRefPtr<CefBrowser> browser, const CefSize& newSize);
+                    virtual void OnLoadingProgressChange(CefRefPtr<CefBrowser> browser, double progress); //progress范围从0~1
+                    //其中CefCursorHandle是一个HCURSOR的宏定义
+                    virtual bool OnCursorChange(CefRefPtr<CefBrowser> browser, CefCursorHandle cursor, cef_cursor_type_t type, const CefCursorInfo& custom_cursor_info);
+                    virtual void OnMediaAccessChange(CefRefPtr<CefBrowser> browser, bool has_video_access, bool has_audio_access)
+                }
+                class CefLifeSpanHandler : public virtual CefBaseRefCounted
+                {
+                public:
+                    virtual bool OnBeforePopup(...)
+                    virtual void OnAfterCreated(CefRefPtr<CefBrowser> browser);
+                    virtual bool DoClose(CefRefPtr<CefBrowser> browser);
+                    virtual void OnBeforeClose(CefRefPtr<CefBrowser> browser);
+                }
+                class CefLoadHandler : public virtual CefBaseRefCounted
+                {
+                public:
+                    virtual void OnLoadingStateChange(CefRefPtr<CefBrowser> browser, bool isLoading, bool canGoBack, bool canGoForward);
+                    virtual void OnLoadStart(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, TransitionType transitionType);
+                    virtual void OnLoadEnd(CefRefPtr<CefBrwoser> browser, CefRefPtr<CefFrame> frame, int httpStatusCode);
+                    virtual void OnLoadError(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, ErrorCode errorCode, const CefString& errorText, const CefString& failedUrl);
+                }
+        main函数的例行步骤
+        {
+            //启用高分屏支持
+            CefEnableHighDPISupport();
+            
+            //获取命令行参数，构造一个CefMainArgs对象，这个对象可以用argc, argv构造，在windows上也可以用进程句柄hInstance构造
+            CefMainArgs mainArgs{hInstance};
+
+            //创建sandbox
+            void* sandboxInfo = cef_sandbox_info_create();
+            if(int exitCode = CefExecuteProcess(mainArgs, nullptr, sandboxInfo); exitCode >= 0)
+                return exitCode;
+
+            //创建CefSettings
+            CefSettings settings; //下面根据实际需要，修改settings的内容，比如从命令行读取一些参数来修改settings
+
+            //构造CefApp
+            CefRefPtr<MyApp> app(new MyApp);
+
+            //初始化CEF
+            CefInitialize(mainArgs, settings, app.get(), sandboxInfo);
+            CefRunMessageLoop();
+            CefShutdown();
+            return 0;
+        }
+    native JS互操作
+        native调JS
+            数据类型
+                在CefV8Value类中提供了所有创建JS类型的值的静态函数
+                所有的JS的类型的值都以CefRefPtr<CefV8Value>返回
+                    class CefV8Value : public virtual CefBaseRefCounted
+                    {
+                    public:
+                        /*创建*/
+                        static CefRefPtr<CefV8Value> CreateUndefined();
+                        static CefRefPtr<CefV8Value> CreateNull();
+                        static CefRefPtr<CefV8Value> CreateBool(bool value);
+                        static CefRefPtr<CefV8Value> CreateInt(int32 value);
+                        static CefRefPtr<CefV8Value> CreateUInt(uint32 value);
+                        static CefRefPtr<CefV8Value> CreateDouble(double value);
+                        static CefRefPtr<CefV8Value> CreateDate(CefBaseTime date);
+                        static CefRefPtr<CefV8Value> CreateString(const CefString& value);
+                        static CefRefPtr<CefV8Value> CreateObject(
+                            CefRefPtr<CefV8Accessor> accessor,
+                            CefRefPtr<CefV8Interceptor> interceptor);
+                        static CefRefPtr<CefV8Value> CreateArray(int length);
+                        static CefRefPtr<CefV8Value> CreateArrayBuffer(
+                            void* buffer,
+                            size_t length,
+                            CefRefPtr<CefV8ArrayBufferReleaseCallback> release_callback);
+                        static CefRefPtr<CefV8Value> CreateFunction(const CefString& name,
+                                                                    CefRefPtr<CefV8Handler> handler);
+                        static CefRefPtr<CefV8Value> CreatePromise();
+                        /*相应的，对应的每个JS类型的判断函数*/
+                        virtual bool IsUndefined() = 0;
+                        ...
+                        /*相应的，对应的每个JS类型的取值函数*/
+                        virtual bool GetBoolValue() = 0;
+                        ...
+
+                    };
+                Object对象
+                    主要到CreateObject()函数接受一个accessor参数，使得可以自定义实现一个CefV8Accessor类来实现这个JS Object的功能
+                        class MyV8Accessor : public CefV8Accessor 
+                        {
+                        public:
+                            virtual bool Get(const CefString& name,
+                                            const CefRefPtr<CefV8Value> object,
+                                            CefRefPtr<CefV8Value>& retval,
+                                            CefString& exception) override;
+
+                            virtual bool Set(const CefString& name,
+                                            const CefRefPtr<CefV8Value> object,
+                                            const CefRefPtr<CefV8Value> value,
+                                            CefString& exception) override;
+                        };
+                函数对象
+                    创建一个函数对象需要定义一个CefV8Handler类来处理
+                        class MyV8Handler : public CefV8Handler
+                        {
+                        public:
+                            virtual bool Execute(
+                              const CefString& name,
+                              CefRefPtr<CefV8Value> object,
+                              const CefV8ValueList& arguments,
+                              CefRefPtr<CefV8Value>& retval,
+                              CefString& exception) override;
+                        }
+                window对象
+                    要获取全局的window对象，需要在派生的CefRenderProcessHandler::OnContextCreated()中获取
+                        void MyRenderProcessHandler::OnContextCreated(
+                            CefRefPtr<ClientAppRenderer> app,
+                            CefRefPtr<CefBrowser> browser,
+                            CefRefPtr<CefFrame> frame,
+                            CefRefPtr<CefV8Context> context
+                        )
+                        {
+                            CefRefPtr<CefV8Value> window = context->GetGlobal();
+                        }
+                

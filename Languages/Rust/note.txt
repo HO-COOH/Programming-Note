@@ -1,0 +1,351 @@
+变量
+    变量定义
+        变量
+            let mut x = 1;
+        常变量
+            let x = 1;
+        常量
+            常量使用const声名，而且可以在任何作用域，包括全局作用域中定义
+            习惯上，rust的常量使用下划线+全大写命名
+            const THREE_HOURS_IN_SECONDS: u32 = 60 * 60 * 3;
+    基本类型
+        整数类型
+            i8 / u8
+            i16 / u16
+            i32 / u32
+            i64 / u64
+            i128 / u128
+            isize / usize 取决于运行环境，编译成32位时即为32位整数类型
+            整数字面值
+                十进制整数可以使用下划线_作为分隔符来增强可读性，如1_1000
+                十六进制使用0x开头  0xff
+                八进制使用0o开头    0o77
+                二进制使用0b开头    0b12
+                u8类型可以使用特殊的b+单引号开头 b'A'
+            在Debug模式下，如果发生整数溢出，会引发panic
+            在Release模式下，就按正常的二进制运算法
+        浮点类型
+            f32
+            f64
+            rust默认的浮点类型是f64，除非显式指定类型
+        字符类型
+            char
+            字符字面值用单引号括起来
+            rust的char是4字节，可以表示任意unicode字符
+        复合类型
+            元组类型
+                元组类型用圆括号()括起来，成员用逗号,分隔
+                    let tup: (i32, f64, u8) = (500, 6.4, 1);
+                元组成员的类型也可以靠编译器自动推断来省略不写
+                    let tup = (500, 6.4, 1); //(i32, f64, i32)
+                要结构化绑定元组的成员，可以用同样的语法复制给变量，也可以使用句点.加序号的方式
+                    let (x, y, z) = tup;
+                    let a = tup.0; //取元组的第一个元素
+            数组类型
+                用方括号[]括起来，成员用逗号,分割
+                    let a : [i32; 5] = [1, 2, 3, 4, 5];
+                数组的类型是方括号[<type>, <size>]，也可以由编译器推断省略不写
+                数组类型是固定长度的
+                统一初始化数组元素
+                    可以使用[<value>, <count>]的语法初始化一个把一个count大小的数组的元素值全部初始化为value
+                    let a = [3; 5]; //[3,3,3,3,3]
+    结构体
+        定义
+            struct User {
+                active: bool,
+                username: String,
+                email: String,
+                sign_in_count: u64,
+            }
+        初始化和赋值
+            let user1 = User {
+                active: true,
+                username: String::from("someusername123"),
+                email: String::from("someone@example.com"),
+                sign_in_count: 1,
+            };
+            当使用另一个struct变量赋值，但大部分成员的值相同，只需更改少数几个成员时，使用..<变量>的语法可以简化成员的复制
+                let user2 = User {
+                    email: String::from("another@example.com"),
+                    ..user1
+                };
+            但是注意这种方法适用与所有权的复制机智，即使被复制的结构体变量中实现了Copy trait的成员依然有效，但实现了Move trait的成员不再有效
+        空结构体
+            空结构体即没有任何成员的结构体，多用于元编程，只表示一个类型
+            定义一个空结构体不需要一对花括号，直接声名为struct即可
+                struct EmptyStruct;
+            赋值时，也不需要花括号和初始化，直接let var = EmptyStruct;即可
+        格式化输出
+            可以在结构体定义前加上#[derive(Debug)]的属性，使得结构体变量可以使用println!来方便的打印出值
+            println!中可以用{:?}作为格式化字符串，也可以使用{:#?}来打印出更可读的版本
+                #[derive(Debug)]
+                struct Rectangle {
+                    width: u32,
+                    height: u32,
+                }
+
+                let rect1 = Rectangle 
+                {
+                    width: 30,
+                    height: 50,
+                };
+
+                println!("{:?}", rect1);  //打印出：Rectangle { width: 30, height: 50 }
+                println!("{:#?}", rect1);
+                打印出：
+                Rectangle {
+                    width: 30,
+                    height: 50,
+                }
+        成员函数
+            结构体成员函数的定义不直接放在结构体定义中，而是放在一个impl <StructName>的代码块中
+            成员函数的第一参数通常为指向自身的常量引用&self（当要修改成员的值时使用非常量引用mut& self）
+            例如
+                struct Rect
+                {
+                    ...
+                }
+                impl Rect
+                {
+                    fn area(&self) -> u32
+                    {
+                        self.width * self.height
+                    }
+                }
+            另外成员函数可以与成员变量重名，因为编译器可以根据调用方法确定访问的是方法还是成员变量
+                struct Rect
+                {
+                    width: u32,
+                    height: u32
+                }
+                impl Rect
+                {
+                    fn width(&self) -> bool
+                    {
+                        self.width > 0
+                    }
+                }
+        静态成员函数
+            在impl块中的函数也不一定需要self作为第一参数，此时这个函数成为静态成员函数
+            静态成员函数的调用方法为<StructName>::<MethodName>()
+            例如标准库中的String::new()
+            静态成员函数可以使用Self关键字代表当前的结构体的类型，例如
+            struct Rect{...}
+            impl Rect
+            {
+                fn square(size: u32)->Self
+                {
+                    Self{width:size, height: size} //Self即为Rect类型
+                }
+            }
+        多impl块
+            可以将不同的成员函数和静态成员函数放在不同的impl块中
+            即一个struct可以分开多个impl块
+    枚举
+        定义
+            enum <EnumName>
+            {
+                Value1,
+                Value2
+            }
+        枚举变量
+            let var = <EnumName>::Value
+        与其他语言不太相同的是，rust的枚举类型可以包含数据，例如用数据构造一个枚举值
+        枚举类型也支持与结构体类型类似的成员函数和静态成员函数
+
+函数
+    在Rust中，可以调用在当前作用域内任意位置定义的函数
+        fn main()
+        {
+            some_func();
+        }
+
+        fn some_func() {...}
+语句
+    与C风格的语言不同，rust的大多数语句都不需要圆括号()
+    if语句
+        if condition 
+        {
+            //true block
+        }
+        else
+        {
+            //false block
+        }
+        if语句也可以作为一个表达式使用，此时if语句的表达式的类型由真代码块的返回值确定，所以后面的每个else分支的返回值类型都需要匹配
+            let number = if condition { 5 } else { 6 }; //OK
+            let number = if condition { 5 } else { "six" }; //ERROR: 表达式类型是i32，但else是&str
+    loop语句
+        loop代码块会创建一个死循环，所以肯定需要一个退出循环的条件
+        loop
+        {
+            //forever loop
+            if condition
+                break;
+        }
+        loop语句可以作为一个表达式，可以在break语句上添加返回值
+            let mut counter = 0;
+
+            let result = loop {
+                counter += 1;
+
+                if counter == 10 {
+                    break counter * 2; //返回值
+                }
+            };
+    while语句
+        while number != 0 {
+            println!("{number}!");
+
+            number -= 1;
+        }
+    范围for循环
+        let a = [10, 20, 30, 40, 50];
+        for element in a {
+            println!("the value is: {element}");
+        }
+引用和所有权
+    在同一时刻（即上一个引用最后被使用之前）只能创建一个非常量的引用
+    但是常量引用不受此限制
+模块
+    pub 结构体
+        将一个struct结构体标识为pub，其成员和方法并不能在其他模块中直接访问
+        要访问其结构体方法，也需要在impl块中将需要在别的模块中访问的方法标识为pub
+    pub 枚举
+        将一个枚举标识为pub，其所有枚举值包括数据成员都为pub
+异常
+    panic!宏
+        panic!(<message>)会在
+    Result<T, E>
+        .unwrap() 成功时返回T的值，否则调用panic!()
+        .expect(<message>)成功时返回T，否则调用panic!(message)
+泛型/模板
+    泛型函数
+        在函数名后的一对尖括号中加上泛型参数<T>
+            fn largest<T>(list: &[T]) -> &T
+            {
+                //...
+            }
+    泛型结构体
+        在结构体名后的一对尖括号中加上泛型参数<T>
+            struct Point<T>
+            {
+                x: T,
+                y: T
+            }
+        多个泛型参数用,隔开
+            struct Point<T, U>
+            {
+                x: T,
+                y: U
+            }
+    特性
+        有时需要给泛型参数加上类型特性，给编译器提供更多信息
+        与其他编程语言中的接口类似，也是在表达某个类型支持的操作
+        定义一个特性，使用trait关键字，加一对花括号，里面加上这个泛型支持的成员函数
+            trait Summary
+            {
+                fn summarize(&self) -> String;
+            }
+            这个Summary特性支持包含了成员函数summarize()的任何泛型
+        要定义一个类型支持某个特性，在impl块使用impl <Trait> for <MyStruct>的语法，成员函数的实现与普通impl块相同，例如
+            struct NewsArticle
+            {
+                //...
+            }
+            impl Summary for NewsArticle
+            {
+                fn summarize(&self) -> String
+                {
+                    //...
+                }
+            }
+        默认实现
+            可以在定义特性时写出成员函数的实现，此时如果实现这个特性的类没有重新定义该函数，则使用默认实现
+                trait Summary
+                {
+                    fn summarize(&self) -> String
+                    {
+                        String::from("Read more");
+                    }
+                }
+            如果该特性的默认实现被具体的结构体类覆写，那就不会再被调用
+        特性参数
+            可以将函数的参数改为某个特性的引用，而不是具体的类型，这就类似于其他编程语言中的基类的引用，但调用的是派生类中覆写的方法
+            对某个特性类型的引用，将引用声明为&impl <Trait>类型
+                fn notify(item: &impl Summary) //表明item引用是一个是实现了Summary特性的类型
+                {
+                    //对item调用Summary特性中支持的方法
+                }
+            实现多个特性的类型参数
+                可以用&impl <Trait1> + <Trait2>的语法指定某个类型实现了多个特性
+                    fn notify(item: &(impl Summary + Display))
+                    {
+                        //。。。
+                    }
+        特性与泛型
+            要指定泛型参数实现了某个特性，在泛型参数后加: <Trait>
+                fn notify<T: Summary>(item: &T)
+                {
+                    //...
+                }
+            泛型特性约束比特性参数能实现更多的约束，例如可以约束多个参数是一样的类型
+            而特性参数就只能要求每一个参数的类型都实现了某个特性，而不能要求他们是一个类型
+                fn notify<T: Summary>(item1: &T, item2: &T)
+                {
+                    //...
+                }
+            多特性约束
+                与特性参数类似，泛型也可以使用多特性约束，也是用+连接多个特性名
+                    fn notify<T: Summary + Display>(item: &T)
+                    {
+                        //...
+                    }
+            where语句
+                当泛型参数的个数和特性个数多了之后整个函数签名会变得凌乱
+                此时可以使用where语句将特性约束和函数签名分开
+                在函数签名之后，函数体花括号之前，使用where语句，对每一个类型参数写上支持的特性，多个类型参数用逗号,分隔
+                    fn notify<T, U>(t: &T, u: &u) -> i32
+                    where 
+                        T: Display + Clone,
+                        U: Clone + Debug
+                    {
+                        //...
+                    }
+        特性的条件实现
+            可以
+生命周期标识
+    在Rust编译器无法通过变量作用域推断引用的生命周期时，需要显式的写出生命周期标识
+    生命周期标识仅仅用于给编译器信息，而不改变实际的生命周期
+    函数声名周期标识
+
+        例如
+            返回两个字符串更长的字符串的引用的函数
+            fn longest(x: &str, y: &str) -> &str
+            {
+                if x.len() > y.len() {
+                    x
+                }
+                else {
+                    y
+                }
+            }
+            此时编译器无法知道返回的字符串引用的生命周期与参数（也是个引用）的关系，所以需要给函数返回的引用提供生命周期表示
+            fn longest<'a>(x: &'a str, y: &'a str) -> &'a str 
+            {
+                if x.len() > y.len() {
+                    x
+                } else {
+                    y
+                }
+            }
+    结构体生命周期标识
+        当结构体中包含引用成员时，也需要加上生命周期标识，使用泛型的方法给结构体名和引用成员加上生命周期标识
+            struct SomeStruct<'a>
+            {
+                part: &'a str
+            }
+    'static 静态生命周期
+        所有的字符串字面值都具有静态生命周期，即
+            let s: &'static str = "some string"
+        如果编译器提示关于'static生命周期的编译错误，可能是错误/8ug/ug/ug/ug/ug/ug/ug/ug/ug/ug/ug/ug/ug/ug/ug/ug/ug/ug/u/8ug/ug/ug/ug/ug/ug/ug/ug/ug/ug/u/8ug/ug/ug/u/8ug/ug/ug/ug/ug/u/8ug/ug/u/8ug/ug/ug/ug/ug/u/8 g/ug/ug/ug/ug/ug/ug/ug/ug/ug/ug/ug/ug/ug/ug/ug/ug/u/8ug/ug/

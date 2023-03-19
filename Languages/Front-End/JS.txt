@@ -785,8 +785,24 @@ REST（Representational state transfer）
 
 文件IO
     FileReader
-    
-
+存储相关
+    localStorage
+        是挂在window对象下的一个对象
+        存储在浏览器中的数据是会一直存在的，及时浏览器被关闭了也不会消失
+        大小大约为5M
+        存储方式为key-value键值对，且key和value的类型均为字符串
+        所以如果要在value中存储非字符串类型，比如数组类型，需要调用JSON.stringify()来序列化
+        支持的操作即增删改查
+            setItem(): "增（改）"，将数据以键值对的形式存到 LocalStorage 中
+            getItem(): "查"，从 LocalStorage 获得对应键值的数据
+            removeItem(): "删"，删除 LocalStorage 中给定键的数据条目
+            clear(): 清空 LocalStorage
+            key(): 传递一个数字 n，获取第 n 个键的数据
+        不要在localStorage中存储敏感信息
+    sessionStorage
+        与localStorage有类似的调用方法，但页面关闭就清除数据
+    IndexedDb
+        
 TS
 1.变量
     变量的类型用:写在变量名的右边

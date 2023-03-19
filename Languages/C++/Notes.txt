@@ -2498,6 +2498,34 @@ locale：
         然而将保存一个指向this的shared_ptr成员将使得这个对象永远不能被析构，所以weak_ptr才是解决方案
         std::enable_shared_from_this的源码就是在类中添加了一个private的weak_ptr成员，默认构造时为nullptr
         当调用shared_from_this()时，shared_ptr的构造函数会通过trait来判断是否需要初始化这个weak_ptr成员
+    boost::intrusive_ptr
+        boost::intrusive_ptr是一种引用计数型指针，功能上类似于shared_ptr
+        但用于适配已经实现了某种引用计数方法的类，并使用两个个非成员函数intrusive_ptr_add_ref()和intrusive_ptr_release()来调用这个已经实现引用计数的机制
+        例如
+            struct CountedData
+            {
+                int m_count{};
+            };
+
+            void intrusive_ptr_add_ref(CountedData* p)
+            {
+                ++p->m_count;
+            }
+
+            void intrusive_ptr_release(CountedData* p)
+            {
+                --p->m_count;
+            }
+
+            boost::intrusive_ptr<CountedData> ptr{new CountedData{}};
+        构造函数接受一个原始指针类型，和一个表示是否增加引用计数的布尔值，如果不增加引用计数，则可以做到形如weak_ptr的功能，即
+            boost::intrusive_ptr<CountedData> ptr{new CountedData{}, false};
+        为了简化intrusive_ptr的使用（即免去手动定义两个引用计数管理函数），boost提供了boost::intrusive_ref_counter<T>类，把自定义的类从这个类继承并使用CRTP即可
+            struct CountedData : public boost::intrusive_ref_counter<CountedData>
+            {
+                //...
+            };
+            //无需定义intrusive_ptr_add_ref()和intrusive_ptr_release()
 STL
     容器：
         顺序容器：
@@ -5537,7 +5565,6 @@ C++20：
         模块的定义
             模块分两种文件：
                 .ixx结尾的模块接口文件，声明本模块导出的所有内容，可以包含模块内容的定义
-                .cpp结尾的模块接口实现文件，不能包含export关键字，包含模块内容的定义
                     /*Module.ixx*/
                     module;
 
@@ -5547,6 +5574,15 @@ C++20：
                         #define SomeConstant 42
                     */
                     export module <ModuleName>;  //声明这个导出模块的名称
+                .cpp结尾的模块接口实现文件，不能包含export关键字，包含模块内容的定义
+                    /*Module.cpp*/
+                    
+                    module; 
+                    /*
+                        从这里到到module <模块名>之前属于全局模块区，可以用来包含还未模块化的头文件，定义本模块可见的宏
+                    */
+                    module <ModuleName>;
+                    //实现部分
             子模块
                 使用<Module>:<SubModule>定义一个子模块
                     在字模块的接口文件（.ixx）中导出子模块
@@ -5574,6 +5610,7 @@ C++20：
             std.memory:     the content of header <memory>
             std.threading:  the contents of headers <atomic>, <condition_variable>, <future>, <mutex>, <shared_mutex>, <thread>
             std.core:       the rest of the C++ Standard Library
+            
     2.范围 Ranges
         #include <ranges>
         Ranges库主要分为两个部分
@@ -5646,7 +5683,7 @@ C++20：
             }
         concept习惯上不写is，这样配合require表达式时更可读
             template<typename T>
-            concep        oint=std::is_floating_point_v<T>;
+            concept floating_point=std::is_floating_point_v<T>;
 
             template<typename T>
             auto f(T l, T r) requires floating_point<T>
@@ -6671,7 +6708,7 @@ More Effective C++
         Y - (C & (Y - X))
     因为当C==true==-1时，-1 & 任何整数都等于这个整数本身，所以Y-(Y-X)=X，而当C==false==0时，Y-0=Y
 
-命名参数
+4.命名参数模拟
     template<typename T, int Order = 0> //第2参数是为了当T相同时区分顺序用
     class NamedType
     {

@@ -770,6 +770,15 @@ struct
                     带返回值的任务，虽然创建Task不会阻塞，但是对其调用Result属性会阻塞
 
         Task<T>
+    Timer
+        System.Threading.Timer
+        用于在线程池中，每隔特定的时间执行一次方法
+        构造：
+            Timer(TimerCallback callback)
+                其中TimerCallback是一个委托
+                    public delegate void TimerCallback(object? state)
+                使用这个构造函数构造后，callback不会执行，直到调用一次.Change(dueTime, interval)
+
 Attribute
     Attribute提供了程序获取元信息的一种途径
     每个用户自定义的Attribute都应该继承自System.Attribute类，并同时提供System.AttributeUsage，使得其只对某些实体（例如一个类、一个结构体）有效
