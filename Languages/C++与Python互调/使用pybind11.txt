@@ -1,0 +1,9 @@
+pybind11是一个纯头文件库，包含了两个功能：
+    更便捷的让Python调C++类和函数
+        将C++类导出到一个python模块，编译生成一个.pyd文件
+    更快捷的让C++调Python函数
+        经过实验，如果想要在没有安装python的机器上也能随便调非Python标准库的模块中的功能，要将本机上用于编译调用python的C++ exe所实际使用的python和安装的lib（除了python.exe）整个拷贝到exe的同级目录下 
+要安装pybind11，可以用vcpkg安装
+    vcpkg install pybind11:x64-windows
+通常使用CMake来创建一个工程，具体参考SampleProject
+最原始的Python API都为C api，文档在：https://docs.python.org/3/c-api/index.html
